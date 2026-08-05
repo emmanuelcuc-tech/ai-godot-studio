@@ -72,7 +72,7 @@ static func pipeline_prompt_block() -> String:
 
 
 static func write_guides_into_files(files: Array) -> Array:
-	var by := {}
+	var by: Dictionary = {}
 	for f in files:
 		if typeof(f) == TYPE_DICTIONARY:
 			by[str(f.get("path", ""))] = f
@@ -85,7 +85,7 @@ static func _put(files: Array, by: Dictionary, path: String, content: String) ->
 	if by.has(path):
 		by[path]["content"] = content
 	else:
-		var f := {"path": path, "content": content}
+		var f: Dictionary = {"path": path, "content": content}
 		files.append(f)
 		by[path] = f
 

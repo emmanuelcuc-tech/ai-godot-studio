@@ -1,6 +1,6 @@
 extends Node
 ## Game Factory — ChatGPT/AI plans + codes Godot games from your directions.
-## Flow: starter template → web research → AI PLAN (instructions/assets) → AI CODE → download textures
+## Flow: starter → search → AI PLAN → multi-asset / addon / open-ref fetch → AI CODE
 
 signal status(message: String)
 signal pipeline_finished(success: bool, result: Dictionary)
@@ -11,6 +11,9 @@ const ClaudeClientScript = preload("res://scripts/ai/claude_client.gd")
 const GeminiClientScript = preload("res://scripts/ai/gemini_client.gd")
 const WebSearchClientScript = preload("res://scripts/ai/web_search_client.gd")
 const ImageAssetClientScript = preload("res://scripts/ai/image_asset_client.gd")
+const AssetLibClientScript = preload("res://scripts/ai/assetlib_client.gd")
+const OpenRefClientScript = preload("res://scripts/ai/open_ref_client.gd")
+const ResourceCatalogScript = preload("res://scripts/ai/resource_catalog.gd")
 const GenreCatalogScript = preload("res://scripts/genre_catalog.gd")
 const GenreTemplatesScript = preload("res://scripts/templates/genre_templates.gd")
 const GameGeneratorScript = preload("res://scripts/game_generator.gd")
@@ -21,13 +24,19 @@ const OfflineEnhancerScript = preload("res://scripts/offline_enhancer.gd")
 const ArtPipelineScript = preload("res://scripts/art_pipeline.gd")
 const CppGdextensionScript = preload("res://scripts/templates/cpp_gdextension.gd")
 const CppBuilderScript = preload("res://scripts/cpp_builder.gd")
+const GameAssetLayoutScript = preload("res://scripts/editors/game_asset_layout.gd")
+const StudioGameConfigScript = preload("res://scripts/editors/studio_game_config.gd")
+
+const MAX_TEXTURE_JOBS := 8
+const RESOURCE_WAIT_SEC := 28.0
+const IMAGE_EXTS: PackedStringArray = ["png", "jpg", "jpeg", "webp"]
 
 const SYSTEM_PLAN := """You are a lead Godot 4 game designer working with ChatGPT-style instructions.
 From the player's directions, write a concrete BUILD PLAN the coder will follow.
 Engine is ALWAYS Godot 4 with **C++ GDExtension (godot-cpp)** as the intended implementation.
 Also plan a **playable GDScript 2.0 fallback** so the game runs before the native library is compiled.
 Never use Unity/Unreal/GameMaker as the runtime.
-List C++ classes/files (src/*.h, src/*.cpp), GDScript bootstrap, textures, sprites, materials, plugins, and Asset Library ideas that MATCH the described game (CC0 / open only — never commercial ROMs or ripped assets).
+List C++ classes/files (src/*.h, src/*.cpp), GDScript bootstrap, several matching textures/sprites, materials, plugins, and Asset Library ideas (CC0 / open only — never commercial ROMs or ripped assets).
 Return ONLY JSON (no markdown fences):
 {
   "title":"short name",
@@ -36,9 +45,12 @@ Return ONLY JSON (no markdown fences):
   "godot_features":["GDExtension classes, nodes, systems, scenes needed"],
   "cpp_classes":["GameApp","GamePlayer","GameWorld","GameEnemy"],
   "assets_required":[
-    {"name":"wall.png","type":"texture","query":"cc0 brick wall seamless","usage":"corridor walls"}
+    {"name":"wall.png","type":"texture","query":"cc0 brick wall seamless","usage":"corridor walls"},
+    {"name":"floor.png","type":"texture","query":"cc0 concrete floor seamless","usage":"floors"},
+    {"name":"sprite_enemy.png","type":"sprite","query":"cc0 pixel monster sprite","usage":"enemy"}
   ],
-  "plugins_or_addons":["optional Godot AssetLib ideas"],
+  "download_queries":[{"filename":"sky.png","query":"cc0 stormy sky"}],
+  "plugins_or_addons":["Godot AssetLib search terms that match the genre"],
   "modify_notes":"if updating an existing game, what to change vs keep (update C++ sources + GDScript fallback together)"
 }"""
 
@@ -49,8 +61,12 @@ Write or UPDATE a playable Godot 4 project whose **intended gameplay is C++**:
 - bin/game.gdextension, SConstruct and/or CMakeLists.txt, docs/CPP_BUILD.md
 Also keep a **playable GDScript 2.0 fallback** (scripts/*.gd + scenes/main.tscn) so Run Game works without a compiler.
 Optional scenes/main_cpp.tscn may use native class names GamePlayer / GameWorld after the extension is built.
-Use assets already on disk (assets/wall.png, assets/floor.png, etc.) via StandardMaterial3D.albedo_texture or Sprite2D.texture.
+Use assets already on disk via category folders:
+assets/character/, assets/enemy/, assets/weapon/, assets/world/, assets/ui/, assets/effects/, assets/background/, assets/materials/, assets/models/, assets/sprites/, assets/textures/
+Also keep root aliases like assets/wall.png when present. Wire StandardMaterial3D.albedo_texture or Sprite2D.texture. Honor res://studio_display.json, studio_effects.json, studio_controls.json, studio_anim.json and scripts/studio_runtime.gd autoload.
 Match feel of the described game with original/CC0 art — never commercial ROMs or ripped assets.
+Study refs/<name>/ open Godot samples (README + scripts) for genre patterns. Do not copy proprietary assets.
+If addons/ contains a plugin.cfg, you may enable it in project.godot [editor_plugins] only when safe; gameplay must still run without it.
 Include collisions, materials, particles, simple FX when the plan asks (especially shooters).
 Return ONLY JSON (no markdown fences):
 {
@@ -67,7 +83,7 @@ Always include project.godot and a main scene that runs. Do not dump godot-cpp s
 const SYSTEM_PLAN_GDSCRIPT := """You are a lead Godot 4 game designer working with ChatGPT-style instructions.
 From the player's directions, write a concrete BUILD PLAN the coder will follow.
 Engine is ALWAYS Godot 4 (GDScript 2.0) — never Unity/Unreal/GameMaker as the runtime.
-List textures, sprites, materials, plugins, and Asset Library ideas that MATCH the described game (CC0 / open only — never commercial ROMs or ripped assets).
+List several matching textures/sprites, materials, plugins, and Asset Library ideas (CC0 / open only — never commercial ROMs or ripped assets).
 Return ONLY JSON (no markdown fences):
 {
   "title":"short name",
@@ -75,16 +91,22 @@ Return ONLY JSON (no markdown fences):
   "gameplay":["core loops / controls / win-lose"],
   "godot_features":["nodes, systems, scenes needed"],
   "assets_required":[
-    {"name":"wall.png","type":"texture","query":"cc0 brick wall seamless","usage":"corridor walls"}
+    {"name":"wall.png","type":"texture","query":"cc0 brick wall seamless","usage":"corridor walls"},
+    {"name":"floor.png","type":"texture","query":"cc0 concrete floor seamless","usage":"floors"},
+    {"name":"sprite_player.png","type":"sprite","query":"cc0 pixel hero sprite","usage":"player"}
   ],
-  "plugins_or_addons":["optional Godot AssetLib ideas"],
+  "download_queries":[{"filename":"sky.png","query":"cc0 sky background"}],
+  "plugins_or_addons":["Godot AssetLib search terms that match the genre"],
   "modify_notes":"if updating an existing game, what to change vs keep"
 }"""
 
 const SYSTEM_CODE_GDSCRIPT := """You are a Godot 4 programmer. Follow the BUILD PLAN and USER DIRECTIONS exactly.
 Write or UPDATE a playable Godot 4 project in GDScript 2.0 only.
-Use assets already on disk (assets/wall.png, assets/floor.png, etc.) via StandardMaterial3D.albedo_texture or Sprite2D.texture.
+Use assets already on disk via category folders:
+assets/character/, assets/enemy/, assets/weapon/, assets/world/, assets/ui/, assets/effects/, assets/background/, assets/materials/, assets/models/, assets/sprites/, assets/textures/
+Also keep root aliases like assets/wall.png when present. Wire StandardMaterial3D.albedo_texture or Sprite2D.texture. Honor res://studio_display.json, studio_effects.json, studio_controls.json, studio_anim.json and scripts/studio_runtime.gd autoload.
 Match feel of the described game with original/CC0 art — never commercial ROMs or ripped assets.
+Study refs/<name>/ open Godot samples for genre patterns. Gameplay must run even if addons/ is empty.
 Include collisions, materials, particles, simple FX when the plan asks (especially shooters).
 Return ONLY JSON (no markdown fences):
 {
@@ -102,25 +124,42 @@ var claude
 var gemini
 var search
 var images
+var assetlib
+var openrefs
 var session = GameSessionScript.new()
 
-var _busy := false
-var _awaiting := ""
-var _description := ""
-var _genre_id := "fps"
+var _busy: bool = false
+var _awaiting: String = ""
+var _description: String = ""
+var _genre_id: String = "fps"
 var _genre: Dictionary = {}
 var _inspiration: Dictionary = {}
 var _base: Dictionary = {}
-var _research := ""
-var _asset_research := ""
+var _research: String = ""
+var _asset_research: String = ""
 var _plan: Dictionary = {}
-var _plan_raw := ""
+var _plan_raw: String = ""
 var _notes: PackedStringArray = []
-var _modify := false
-var _awaiting_tex := false
-var _tex_index := 0
+var _modify: bool = false
+var _awaiting_tex: bool = false
+var _tex_index: int = 0
 var _pending_downloads: Array = []
-var _download_active := false
+var _download_active: bool = false
+var _tex_filename: String = "wall.png"
+var _tex_query: String = ""
+var _tex_category: String = "textures"
+var _queued_names: Dictionary = {}
+var _downloaded_assets: Array = []
+var _addon_busy: bool = false
+var _ref_busy: bool = false
+var _addon_listed: Array = []
+var _addon_installed: Dictionary = {}
+var _ref_result: Dictionary = {}
+var _ref_summary: String = ""
+var _waiting_resources: bool = false
+var _want_ai_after_resources: bool = false
+var _res_gen: int = 0
+var _resource_timer: Timer
 
 
 func _ready() -> void:
@@ -129,18 +168,30 @@ func _ready() -> void:
 	gemini = GeminiClientScript.new()
 	search = WebSearchClientScript.new()
 	images = ImageAssetClientScript.new()
+	assetlib = AssetLibClientScript.new()
+	openrefs = OpenRefClientScript.new()
 	openai.attach(self)
 	claude.attach(self)
 	gemini.attach(self)
 	search.attach(self)
 	images.attach(self)
+	assetlib.attach(self)
+	openrefs.attach(self)
 	openai.reply.connect(_on_ai)
 	claude.reply.connect(_on_ai)
 	gemini.reply.connect(_on_ai)
 	search.reply.connect(_on_search)
 	images.search_done.connect(_on_images_found)
 	images.preview_ready.connect(_on_image_ready)
+	assetlib.status.connect(func(m: String): status.emit(m))
+	assetlib.finished.connect(_on_addon_finished)
+	openrefs.status.connect(func(m: String): status.emit(m))
+	openrefs.finished.connect(_on_ref_finished)
 	session.changed.connect(func(): session_changed.emit())
+	_resource_timer = Timer.new()
+	_resource_timer.one_shot = true
+	_resource_timer.timeout.connect(_on_resource_timeout)
+	add_child(_resource_timer)
 
 
 func is_busy() -> bool:
@@ -160,13 +211,28 @@ func get_project_path() -> String:
 
 
 func new_game() -> void:
+	_res_gen += 1
 	_busy = false
 	_awaiting = ""
 	_awaiting_tex = false
 	_download_active = false
 	_pending_downloads.clear()
+	_queued_names.clear()
+	_downloaded_assets.clear()
+	_addon_busy = false
+	_ref_busy = false
+	_waiting_resources = false
+	_want_ai_after_resources = false
+	_addon_listed.clear()
+	_addon_installed = {}
+	_ref_result = {}
+	_ref_summary = ""
 	_plan = {}
 	_plan_raw = ""
+	if openrefs:
+		openrefs.cancel()
+	if _resource_timer:
+		_resource_timer.stop()
 	session.clear()
 	status.emit("New Game — describe what to make, then Create Game.")
 	session_changed.emit()
@@ -182,6 +248,7 @@ func create_game(description: String, genre_index: int = 0) -> void:
 		pipeline_finished.emit(false, {"ok": false, "error": "Empty description"})
 		return
 
+	_res_gen += 1
 	_busy = true
 	_notes.clear()
 	_research = ""
@@ -189,7 +256,21 @@ func create_game(description: String, genre_index: int = 0) -> void:
 	_plan = {}
 	_plan_raw = ""
 	_pending_downloads.clear()
+	_queued_names.clear()
+	_downloaded_assets.clear()
 	_download_active = false
+	_addon_busy = false
+	_ref_busy = false
+	_waiting_resources = false
+	_want_ai_after_resources = false
+	_addon_listed.clear()
+	_addon_installed = {}
+	_ref_result = {}
+	_ref_summary = ""
+	if openrefs:
+		openrefs.cancel()
+	if _resource_timer:
+		_resource_timer.stop()
 	_modify = session.active
 	_description = text
 	_genre_id = GenreCatalogScript.id_at(genre_index)
@@ -233,9 +314,10 @@ func create_game(description: String, genre_index: int = 0) -> void:
 	_start_texture_download()
 
 	if not AppSettings.has_any_ai_key():
-		status.emit("Game created (offline). Add ChatGPT key in Settings for AI coding.")
+		status.emit("Game created (offline). Fetching open assets in the background…")
 		_busy = false
 		pipeline_finished.emit(true, starter)
+		_begin_resource_enrichment(false)
 		return
 
 	# Playable now; ChatGPT plan → code continues
@@ -259,6 +341,7 @@ func _build_and_write_starter() -> Dictionary:
 	files = ArtPipelineScript.write_guides_into_files(files)
 	if AppSettings.create_with_cpp:
 		files = _ensure_cpp_scaffold(files)
+	files = StudioGameConfigScript.inject_into_files(files)
 	var engine_line: String = "Godot 4 + C++ GDExtension (GDScript fallback until native lib is built)" if AppSettings.create_with_cpp else "Godot 4"
 	files.append({
 		"path": "PLAYER_BRIEF.md",
@@ -266,17 +349,11 @@ func _build_and_write_starter() -> Dictionary:
 	})
 	files.append({
 		"path": "docs/RESOURCES.md",
-		"content": """# Resources / engine
-- **Game engine:** Godot 4 (your installed executable)
-- **Gameplay code:** %s
-- Studio genre template: %s
-- ChatGPT / Claude / Gemini write C++ + GDScript when API keys are set
-- CC0 textures via Openverse; kits: Kenney, OpenGameArt, Godot Asset Library
-- Directions are applied as AI instructions on Create / Modify
-""" % [
-			"C++ GDExtension in src/ (intended) + GDScript fallback in scripts/" if AppSettings.create_with_cpp else "GDScript in scripts/",
-			_genre_id,
-		],
+		"content": _resources_stub_markdown(),
+	})
+	files.append({
+		"path": "docs/PLUGINS.md",
+		"content": _plugins_stub_markdown(),
 	})
 	built["files"] = files
 	built["ok"] = true
@@ -290,6 +367,9 @@ func _build_and_write_starter() -> Dictionary:
 		session.start(str(written.get("path", "")), str(written.get("project_name", "")), _genre_id)
 	else:
 		session.bump(_description)
+	if not session.project_path.is_empty():
+		GameAssetLayoutScript.ensure_layout(session.project_path)
+		StudioGameConfigScript.ensure_on_disk(session.project_path)
 	if AppSettings.create_with_cpp:
 		_note_cpp_build(not _modify)
 	written["session"] = session.label()
@@ -335,24 +415,44 @@ func _note_cpp_build(start_build: bool) -> void:
 
 
 func _start_texture_download() -> void:
-	var q := ImageAssetClientScript.detect_texture_query(_description)
+	var jobs: Array = ResourceCatalogScript.texture_jobs(_genre_id, _description)
+	var hint: String = ImageAssetClientScript.detect_texture_query(_description)
+	if not hint.is_empty() and not jobs.is_empty():
+		var first: Dictionary = jobs[0]
+		first["query"] = hint
+		jobs[0] = first
+	for job in jobs:
+		if typeof(job) != TYPE_DICTIONARY:
+			continue
+		_queue_texture_download(str(job.get("filename", "")), str(job.get("query", "")), false, str(job.get("category", "")))
+
+
+func _queue_texture_download(filename: String, query: String, force: bool = false, category: String = "") -> void:
+	var fname: String = ResourceCatalogScript.sanitize_filename(filename if not filename.is_empty() else "wall.png")
+	var q: String = query.strip_edges()
 	if q.is_empty():
-		match _genre_id:
-			"fps", "tps":
-				q = "brick wall seamless texture"
-			"voxel":
-				q = "grass dirt block texture"
-			"platformer":
-				q = "pixel tileset platformer"
-			"space_shooter":
-				q = "space starfield texture"
-			_:
-				q = "game texture seamless CC0"
-	_queue_texture_download("wall.png", q + " CC0")
-
-
-func _queue_texture_download(filename: String, query: String) -> void:
-	_pending_downloads.append({"filename": filename, "query": query})
+		return
+	var cat: String = category if not category.is_empty() else GameAssetLayoutScript.categorize(fname, q)
+	var key: String = fname.to_lower()
+	if _queued_names.has(key):
+		return
+	if _queued_names.size() >= MAX_TEXTURE_JOBS:
+		return
+	if not session.project_path.is_empty():
+		var existing: String = GameAssetLayoutScript.find_existing(session.project_path, fname)
+		if not force and not existing.is_empty():
+			_queued_names[key] = true
+			_downloaded_assets.append({
+				"filename": fname,
+				"query": q,
+				"license": "on disk",
+				"source": "existing",
+				"category": cat,
+				"path": existing,
+			})
+			return
+	_queued_names[key] = true
+	_pending_downloads.append({"filename": fname, "query": q, "category": cat})
 	if not _download_active:
 		_pump_downloads()
 
@@ -361,6 +461,7 @@ func _pump_downloads() -> void:
 	if _pending_downloads.is_empty():
 		_download_active = false
 		_awaiting_tex = false
+		_maybe_finish_resources()
 		return
 	_download_active = true
 	var job: Dictionary = _pending_downloads.pop_front()
@@ -368,12 +469,10 @@ func _pump_downloads() -> void:
 	_tex_filename = str(job.get("filename", "wall.png"))
 	if _tex_filename.is_empty():
 		_tex_filename = "wall.png"
-	var q: String = str(job.get("query", "CC0 texture"))
+	_tex_query = str(job.get("query", "CC0 texture"))
+	_tex_category = str(job.get("category", GameAssetLayoutScript.categorize(_tex_filename, _tex_query)))
 	status.emit("Downloading asset: %s …" % _tex_filename)
-	images.search(q)
-
-
-var _tex_filename := "wall.png"
+	images.search(_tex_query)
 
 
 func _on_images_found(ok: bool, _results: Array, _error: String) -> void:
@@ -392,27 +491,39 @@ func _on_image_ready(ok: bool, index: int, texture: Texture2D, meta: Dictionary,
 		return
 	_awaiting_tex = false
 	if ok and texture != null and not session.project_path.is_empty():
-		var dest_dir: String = session.project_path.path_join("assets")
-		DirAccess.make_dir_recursive_absolute(dest_dir)
-		var dest: String = dest_dir.path_join(_tex_filename)
+		GameAssetLayoutScript.ensure_layout(session.project_path)
+		var cat: String = _tex_category if not _tex_category.is_empty() else GameAssetLayoutScript.categorize(_tex_filename, _tex_query)
+		var dest: String = GameAssetLayoutScript.dest_abs(session.project_path, _tex_filename, cat)
 		var cache: String = str(meta.get("cache_path", ""))
-		var saved := false
+		var saved: bool = false
 		if str(meta.get("source", "")) == "procedural" or cache.is_empty():
 			if texture is ImageTexture:
 				var img: Image = (texture as ImageTexture).get_image()
 				if img:
 					img.save_png(dest)
+					img.save_png(GameAssetLayoutScript.root_alias_abs(session.project_path, dest.get_file()))
 					saved = true
 		else:
-			var bytes := FileAccess.get_file_as_bytes(cache)
+			var bytes: PackedByteArray = FileAccess.get_file_as_bytes(cache)
 			if not bytes.is_empty():
-				var f := FileAccess.open(dest, FileAccess.WRITE)
-				if f:
-					f.store_buffer(bytes)
-					saved = true
+				saved = GameAssetLayoutScript.copy_bytes(dest, bytes)
+				GameAssetLayoutScript.copy_bytes(GameAssetLayoutScript.root_alias_abs(session.project_path, _tex_filename), bytes)
 		if saved:
-			_notes.append("Asset → assets/%s" % _tex_filename)
-			status.emit("Asset saved: assets/%s" % _tex_filename)
+			_downloaded_assets.append({
+				"filename": _tex_filename,
+				"query": _tex_query,
+				"license": str(meta.get("license", "cc0")),
+				"source": str(meta.get("source", "openverse")),
+				"title": str(meta.get("title", "")),
+				"page": str(meta.get("page", "")),
+				"category": cat,
+				"path": dest,
+			})
+			_notes.append("Asset → assets/%s/%s" % [cat, _tex_filename])
+			status.emit("Asset saved: assets/%s/%s" % [cat, _tex_filename])
+			var slot: String = _slot_for_filename(_tex_filename)
+			if not slot.is_empty():
+				StudioGameConfigScript.assign_slot(session.project_path, slot, GameAssetLayoutScript.dest_res(_tex_filename, cat))
 	_pump_downloads()
 
 
@@ -464,25 +575,28 @@ If C++ mode: list src/*.cpp classes to implement or update, plus GDScript fallba
 	]
 	_awaiting = "plan"
 	if not _dispatch_ai(SYSTEM_PLAN if AppSettings.create_with_cpp else SYSTEM_PLAN_GDSCRIPT, user):
-		_begin_ai_code()
+		_begin_resource_enrichment(true)
 
 
 func _begin_ai_code() -> void:
 	status.emit("ChatGPT writing Godot C++ / GDScript from plan + directions…" if AppSettings.create_with_cpp else "ChatGPT writing Godot scripts from plan + directions…")
-	var files_blob := ""
+	var files_blob: String = ""
 	if session.active:
 		var live: Array = ProjectWriterScript.read_project_files(session.project_path)
 		for f2 in live:
-			files_blob += "\n----- %s -----\n%s\n" % [str(f2.get("path", "")), str(f2.get("content", ""))]
+			var rel: String = str(f2.get("path", ""))
+			if rel.begins_with("refs/") or rel.begins_with("addons/") or rel.begins_with(".studio_cache/"):
+				continue
+			files_blob += "\n----- %s -----\n%s\n" % [rel, str(f2.get("content", ""))]
 	else:
 		for f in _base.get("files", []):
 			if typeof(f) != TYPE_DICTIONARY:
 				continue
 			files_blob += "\n----- %s -----\n%s\n" % [str(f.get("path", "")), str(f.get("content", ""))]
 
-	var plan_text := _plan_raw if not _plan_raw.is_empty() else JSON.stringify(_plan)
+	var plan_text: String = _plan_raw if not _plan_raw.is_empty() else JSON.stringify(_plan)
 	var engine_line: String = "Godot 4 + C++ GDExtension (update src/ C++ AND scripts/ GDScript fallback)" if AppSettings.create_with_cpp else "Godot 4 GDScript"
-	var user := """PLAYER DIRECTIONS (highest priority — implement these):
+	var user: String = """PLAYER DIRECTIONS (highest priority — implement these):
 %s
 
 BUILD PLAN FROM CHATGPT (follow these instructions):
@@ -499,13 +613,22 @@ GODOT RESEARCH:
 ASSET RESEARCH:
 %s
 
+ASSETS ON DISK (use these paths):
+%s
+
+OPEN GODOT SAMPLE REFS (patterns only, MIT/CC0):
+%s
+
+PLUGIN / ADDON NOTES:
+%s
+
 CURRENT FILES:
 %s
 
 Write/update the Godot 4 project JSON now.
 If ENGINE includes C++, update src/*.h / src/*.cpp gameplay to match new directions (merge, do not drop GDExtension glue).
 Keep scripts/*.gd + scenes/main.tscn playable without a compiled .dll/.so.
-Use assets/wall.png (and other assets/*.png listed) for materials/sprites when present.
+Wire StandardMaterial3D / Sprite2D to assets/*.png listed above when present.
 Include download_queries for any extra CC0 textures still needed.
 """ % [
 		_description,
@@ -514,9 +637,12 @@ Include download_queries for any extra CC0 textures still needed.
 		"MODIFY — merge into current files" if _modify or session.active else "CREATE from template + plan",
 		session.project_name if session.active else str(_base.get("project_name", "ai_game")),
 		engine_line,
-		_research.left(3000),
-		_asset_research.left(2000),
-		files_blob.left(26000),
+		_research.left(2500),
+		_asset_research.left(1800),
+		_asset_inventory_text(),
+		_ref_summary.left(4500) if not _ref_summary.is_empty() else "(none fetched)",
+		_plugin_prompt_text(),
+		files_blob.left(22000),
 	]
 	_awaiting = "code"
 	if not _dispatch_ai(SYSTEM_CODE if AppSettings.create_with_cpp else SYSTEM_CODE_GDSCRIPT, user):
@@ -556,17 +682,17 @@ func _on_ai(ok: bool, text: String, error: String) -> void:
 
 func _handle_plan_reply(ok: bool, text: String, error: String) -> void:
 	if not ok:
-		status.emit("Plan AI failed (%s) — coding from directions anyway…" % error)
+		status.emit("Plan AI failed (%s) — fetching assets then coding from directions…" % error)
 		_plan_raw = ""
 		_plan = {}
-		_begin_ai_code()
+		_begin_resource_enrichment(true)
 		return
 	_plan_raw = text
 	_plan = GameGeneratorScript.parse_plan_json(text)
 	_write_plan_docs()
 	_queue_plan_assets()
-	status.emit("Build plan ready — ChatGPT coding the Godot game…")
-	_begin_ai_code()
+	status.emit("Build plan ready — downloading matching assets, plugins, and open samples…")
+	_begin_resource_enrichment(true)
 
 
 func _write_plan_docs() -> void:
@@ -619,13 +745,24 @@ func _queue_plan_assets() -> void:
 	for a in assets:
 		if typeof(a) != TYPE_DICTIONARY:
 			continue
-		var fname := str(a.get("name", "")).get_file()
-		var query := str(a.get("query", ""))
+		var fname: String = str(a.get("name", "")).get_file()
+		var query: String = str(a.get("query", ""))
 		if fname.is_empty() or query.is_empty():
 			continue
-		if not fname.get_extension().to_lower() in ["png", "jpg", "jpeg", "webp"]:
+		var ext: String = fname.get_extension().to_lower()
+		if not IMAGE_EXTS.has(ext):
 			fname = fname.get_basename() + ".png"
-		_queue_texture_download(fname, query + " CC0")
+		_queue_texture_download(fname, query + " CC0", true, GameAssetLayoutScript.categorize(fname, query, str(a.get("usage", ""))))
+	var extra = _plan.get("download_queries", [])
+	if typeof(extra) == TYPE_ARRAY:
+		for q in extra:
+			if typeof(q) != TYPE_DICTIONARY:
+				continue
+			var fname2: String = str(q.get("filename", q.get("name", ""))).get_file()
+			var query2: String = str(q.get("query", ""))
+			if query2.is_empty():
+				continue
+			_queue_texture_download(fname2, query2 + " CC0", true, GameAssetLayoutScript.categorize(fname2, query2))
 
 
 func _handle_code_reply(ok: bool, text: String, error: String) -> void:
@@ -658,6 +795,9 @@ func _handle_code_reply(ok: bool, text: String, error: String) -> void:
 	var written: Dictionary = ProjectWriterScript.write_project(parsed, session.project_path)
 	if written.get("ok", false) and AppSettings.create_with_cpp:
 		_repair_cpp_glue()
+	if written.get("ok", false) and not session.project_path.is_empty():
+		GameAssetLayoutScript.ensure_layout(session.project_path)
+		StudioGameConfigScript.ensure_on_disk(session.project_path)
 	_busy = false
 	_awaiting = ""
 	if written.get("ok", false):
@@ -669,6 +809,7 @@ func _handle_code_reply(ok: bool, text: String, error: String) -> void:
 			written["notes"] = "ChatGPT updated Godot scripts from your directions.\n" + "\n".join(_notes)
 		written["summary"] = str(parsed.get("summary", written.get("summary", "")))
 		_queue_ai_download_queries(parsed)
+		_write_resource_docs()
 		status.emit("Game built by ChatGPT — Run Game (or type changes + Create to modify)")
 		session_changed.emit()
 		pipeline_finished.emit(true, written)
@@ -715,14 +856,291 @@ func _queue_ai_download_queries(parsed: Dictionary) -> void:
 		return
 	for q in queries:
 		if typeof(q) == TYPE_DICTIONARY:
-			var fname := str(q.get("filename", q.get("name", "wall.png"))).get_file()
-			var query := str(q.get("query", ""))
+			var fname: String = str(q.get("filename", q.get("name", "wall.png"))).get_file()
+			var query: String = str(q.get("query", ""))
 			if query.is_empty():
 				continue
 			if fname.is_empty():
 				fname = "wall.png"
-			if not fname.get_extension().to_lower() in ["png", "jpg", "jpeg", "webp"]:
+			var ext: String = fname.get_extension().to_lower()
+			if not IMAGE_EXTS.has(ext):
 				fname = fname.get_basename() + ".png"
-			_queue_texture_download(fname, query + " CC0")
+			_queue_texture_download(fname, query + " CC0", false, GameAssetLayoutScript.categorize(fname, query))
 		elif typeof(q) == TYPE_STRING and not str(q).is_empty():
-			_queue_texture_download("extra_tex.png", str(q) + " CC0")
+			_queue_texture_download("extra_tex.png", str(q) + " CC0", false)
+
+
+func _begin_resource_enrichment(then_ai: bool) -> void:
+	_want_ai_after_resources = then_ai
+	_waiting_resources = true
+	if session.project_path.is_empty():
+		_finish_resources_and_continue()
+		return
+	_write_resource_docs()
+	var extra_terms: PackedStringArray = PackedStringArray()
+	var plugins = _plan.get("plugins_or_addons", [])
+	if typeof(plugins) == TYPE_ARRAY:
+		for p in plugins:
+			var term: String = str(p).strip_edges()
+			if not term.is_empty():
+				extra_terms.append(term)
+				if extra_terms.size() >= 3:
+					break
+	_addon_busy = true
+	_ref_busy = true
+	if assetlib.search_and_maybe_install(session.project_path, _genre_id, extra_terms) != OK:
+		_addon_busy = false
+	if openrefs.fetch_for_genre(session.project_path, _genre_id) != OK:
+		_ref_busy = false
+	if _resource_timer:
+		_resource_timer.start(RESOURCE_WAIT_SEC)
+	_maybe_finish_resources()
+
+
+func _on_addon_finished(_ok: bool, result: Dictionary) -> void:
+	_addon_busy = false
+	if session.project_path.is_empty():
+		return
+	_addon_listed = result.get("listed", []) if typeof(result.get("listed", [])) == TYPE_ARRAY else []
+	var installed = result.get("installed", {})
+	_addon_installed = installed if typeof(installed) == TYPE_DICTIONARY else {}
+	if not _addon_installed.is_empty():
+		_notes.append("Addon → addons/ (%s)" % str(_addon_installed.get("title", "plugin")))
+	_write_resource_docs()
+	_maybe_finish_resources()
+
+
+func _on_ref_finished(_ok: bool, result: Dictionary) -> void:
+	_ref_busy = false
+	if session.project_path.is_empty():
+		return
+	_ref_result = result if typeof(result) == TYPE_DICTIONARY else {}
+	_ref_summary = str(_ref_result.get("summary", ""))
+	if not str(_ref_result.get("title", "")).is_empty():
+		_notes.append("Ref → refs/%s/" % str(_ref_result.get("id", "sample")))
+	_write_resource_docs()
+	_maybe_finish_resources()
+
+
+func _on_resource_timeout() -> void:
+	if not _waiting_resources:
+		return
+	status.emit("Resource wait timed out — continuing with what landed (downloads may finish in background).")
+	_finish_resources_and_continue()
+
+
+func _resources_idle() -> bool:
+	var tex_idle: bool = (not _download_active) and (not _awaiting_tex) and _pending_downloads.is_empty()
+	return tex_idle and (not _addon_busy) and (not _ref_busy)
+
+
+func _maybe_finish_resources() -> void:
+	if not _waiting_resources:
+		return
+	if _resources_idle():
+		_finish_resources_and_continue()
+
+
+func _finish_resources_and_continue() -> void:
+	if not _waiting_resources:
+		return
+	_waiting_resources = false
+	if _resource_timer:
+		_resource_timer.stop()
+	_write_resource_docs()
+	if _want_ai_after_resources and AppSettings.has_any_ai_key():
+		_want_ai_after_resources = false
+		status.emit("Assets ready — ChatGPT coding the Godot game…")
+		_begin_ai_code()
+	else:
+		_want_ai_after_resources = false
+		status.emit("Open assets / plugin notes updated. Run Game anytime.")
+
+
+func _slot_for_filename(filename: String) -> String:
+	var n: String = filename.get_file().to_lower()
+	if n.begins_with("wall"):
+		return "wall"
+	if n.begins_with("floor") or n.begins_with("ground"):
+		return "floor"
+	if n.begins_with("sky") or n.contains("background"):
+		return "sky"
+	if n.contains("player") or n.contains("character") or n.contains("hero"):
+		return "character"
+	if n.contains("enemy") or n.contains("monster"):
+		return "enemy"
+	if n.contains("weapon") or n.contains("gun"):
+		return "weapon"
+	if n.contains("menu"):
+		return "menu_background"
+	return ""
+
+
+func _asset_inventory_text() -> String:
+	var lines: PackedStringArray = PackedStringArray()
+	if not session.project_path.is_empty():
+		var listed: Array = GameAssetLayoutScript.list_all(session.project_path)
+		for item in listed:
+			if typeof(item) != TYPE_DICTIONARY:
+				continue
+			lines.append("- %s [%s]" % [str(item.get("res", "")), str(item.get("category", ""))])
+	if lines.is_empty():
+		for a in _downloaded_assets:
+			if typeof(a) == TYPE_DICTIONARY:
+				lines.append("- res://assets/%s/%s (%s)" % [
+					str(a.get("category", "textures")),
+					str(a.get("filename", "")),
+					str(a.get("query", "")),
+				])
+	if lines.is_empty():
+		lines.append("(none on disk yet — still use assets/world/wall.png, assets/character/, etc. when they appear)")
+	return "\n".join(lines)
+
+
+func _plugin_prompt_text() -> String:
+	var lines: PackedStringArray = PackedStringArray()
+	if not _addon_installed.is_empty():
+		lines.append("Installed addon: %s (%s) — files under addons/" % [
+			str(_addon_installed.get("title", "")),
+			str(_addon_installed.get("license", "")),
+		])
+	if _addon_listed.is_empty():
+		lines.append("See docs/PLUGINS.md for AssetLib / Kenney links. Do not fetch commercial packs.")
+	else:
+		lines.append("AssetLib candidates (recorded, not all installed):")
+		var count: int = mini(5, _addon_listed.size())
+		for i in range(count):
+			var row: Dictionary = _addon_listed[i]
+			lines.append("- %s [%s] %s" % [str(row.get("title", "")), str(row.get("cost", "")), str(row.get("page", ""))])
+	return "\n".join(lines)
+
+
+func _resources_stub_markdown() -> String:
+	return """# Resources / engine
+- **Game engine:** Godot 4 (your installed executable)
+- **Gameplay code:** %s
+- Studio genre template: %s
+- ChatGPT / Claude / Gemini write C++ + GDScript when API keys are set
+- Create downloads several CC0 textures/sprites into `assets/` (Openverse / Wikimedia / procedural fallback)
+- Open Godot samples may land in `refs/` for the coder to study
+- Kenney / AssetLib links are listed in `docs/PLUGINS.md` (CC0 / MIT only — never commercial ROMs or ripped assets)
+- Directions are applied as AI instructions on Create / Modify
+""" % [
+		"C++ GDExtension in src/ (intended) + GDScript fallback in scripts/" if AppSettings.create_with_cpp else "GDScript in scripts/",
+		_genre_id,
+	]
+
+
+func _plugins_stub_markdown() -> String:
+	return """# Plugins / kits
+
+Studio will search the Godot Asset Library and record MIT/CC0 options here.
+Small addon zips may be unpacked into `addons/` only when the archive contains `plugin.cfg` or an `addons/` folder.
+Kenney CC0 kits are linked (download from kenney.nl — not auto-mirrored unless a stable open URL is used).
+
+Never install commercial ROMs, WADs, or ripped game assets.
+"""
+
+
+func _write_resource_docs() -> void:
+	if session.project_path.is_empty():
+		return
+	var res_lines: PackedStringArray = PackedStringArray([
+		"# Resources",
+		"",
+		"- **Engine:** Godot 4",
+		"- **Genre template:** %s" % _genre_id,
+		"- **Gameplay code:** %s" % ("C++ GDExtension + GDScript fallback" if AppSettings.create_with_cpp else "GDScript"),
+		"- **Legal:** CC0 / MIT / Apache / BSD / original only — never commercial ROMs, WADs, or ripped assets.",
+		"",
+		"## Textures & sprites (`assets/<category>/`)",
+	])
+	if _downloaded_assets.is_empty():
+		res_lines.append("- (still downloading, or procedural fallback will be used)")
+	for a in _downloaded_assets:
+		if typeof(a) != TYPE_DICTIONARY:
+			continue
+		res_lines.append("- **assets/%s/%s** — query `%s` — license `%s` — source `%s`%s" % [
+			str(a.get("category", "textures")),
+			str(a.get("filename", "")),
+			str(a.get("query", "")),
+			str(a.get("license", "")),
+			str(a.get("source", "")),
+			(" — %s" % str(a.get("title", ""))) if not str(a.get("title", "")).is_empty() else "",
+		])
+	if not session.project_path.is_empty():
+		res_lines.append("")
+		res_lines.append("### Files currently on disk")
+		var listed: Array = GameAssetLayoutScript.list_all(session.project_path)
+		if listed.is_empty():
+			res_lines.append("- (none yet)")
+		else:
+			for item in listed:
+				if typeof(item) != TYPE_DICTIONARY:
+					continue
+				res_lines.append("- `%s`" % str(item.get("rel", "")))
+	res_lines.append("")
+	res_lines.append("## Open Godot sample (`refs/`)")
+	if _ref_result.is_empty() or str(_ref_result.get("title", "")).is_empty():
+		res_lines.append("- None fetched yet (or fetch still running / timed out).")
+	else:
+		res_lines.append("- **%s** (%s)" % [str(_ref_result.get("title", "")), str(_ref_result.get("license", ""))])
+		res_lines.append("- Source: %s" % str(_ref_result.get("page", "")))
+		for fpath in _ref_result.get("files", []):
+			res_lines.append("- `%s`" % str(fpath))
+	res_lines.append("")
+	res_lines.append("## Kenney / CC0 kits (manual download)")
+	for k in ResourceCatalogScript.kenney_links(_genre_id):
+		if typeof(k) != TYPE_DICTIONARY:
+			continue
+		res_lines.append("- [%s](%s) — %s — %s" % [
+			str(k.get("title", "")), str(k.get("url", "")), str(k.get("license", "CC0")), str(k.get("note", "")),
+		])
+
+	var plug_lines: PackedStringArray = PackedStringArray([
+		"# Plugins / Asset Library",
+		"",
+		"Auto-install only happens for small MIT/CC0/Apache/BSD addon zips that look like Godot addons (`plugin.cfg` or `addons/`).",
+		"Installers (`.exe` / `.msi`) are never run. GPL hits are listed but not auto-installed.",
+		"",
+	])
+	if not _addon_installed.is_empty():
+		plug_lines.append("## Installed")
+		plug_lines.append("- **%s** (%s) — %s" % [
+			str(_addon_installed.get("title", "")),
+			str(_addon_installed.get("license", "")),
+			str(_addon_installed.get("url", "")),
+		])
+		plug_lines.append("- Unpacked into `addons/` (%s files)." % str(_addon_installed.get("count", 0)))
+		plug_lines.append("")
+	plug_lines.append("## Asset Library search results")
+	if _addon_listed.is_empty():
+		plug_lines.append("- None yet (search skipped, timed out, or no hits).")
+	else:
+		for row in _addon_listed:
+			if typeof(row) != TYPE_DICTIONARY:
+				continue
+			plug_lines.append("- [%s](%s) — license `%s` — %s — Godot %s" % [
+				str(row.get("title", "")),
+				str(row.get("page", "")),
+				str(row.get("cost", "")),
+				str(row.get("author", "")),
+				str(row.get("godot_version", "")),
+			])
+	plug_lines.append("")
+	plug_lines.append("## Kenney CC0 (not auto-vendored unless a stable open zip URL is used)")
+	for k2 in ResourceCatalogScript.kenney_links(_genre_id):
+		if typeof(k2) != TYPE_DICTIONARY:
+			continue
+		plug_lines.append("- [%s](%s) (%s)" % [str(k2.get("title", "")), str(k2.get("url", "")), str(k2.get("license", "CC0"))])
+	plug_lines.append("")
+	plug_lines.append("Browse more: https://godotengine.org/asset-library/asset")
+
+	ProjectWriterScript.write_project({
+		"ok": true,
+		"project_name": session.project_name,
+		"files": [
+			{"path": "docs/RESOURCES.md", "content": "\n".join(res_lines) + "\n"},
+			{"path": "docs/PLUGINS.md", "content": "\n".join(plug_lines) + "\n"},
+		],
+	}, session.project_path)

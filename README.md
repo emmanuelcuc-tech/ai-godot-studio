@@ -1,6 +1,6 @@
 # AI Godot Studio
 
-Describe a game → **Create Game** builds a playable **Godot 4** project using templates, internet search, AI coding, and CC0 texture downloads.
+Describe a game → **Create Game** builds a playable **Godot 4** project using templates, internet search, AI coding, and matching **CC0 textures, sprites, open addons, and sample projects**.
 
 **Create defaults to C++ (GDExtension).** Games include `src/` godot-cpp gameplay plus a **GDScript fallback** so **Run Game** works before you compile.
 
@@ -20,15 +20,29 @@ Type new directions and press **Create Game** again to **modify** the same game 
 ## Pipeline (ChatGPT-driven)
 
 1. Detect genre from your directions  
-2. Load a **Godot 4** starter template and write a playable project immediately  
+2. Load a **Godot 4** starter template and write a playable project immediately (**Run Game** works now)  
 3. Overlay **C++ GDExtension** scaffolding (`src/`, `SConstruct`, `bin/game.gdextension`, `build_cpp.ps1`) unless C++ is turned off  
 4. Search the web for Godot / GDExtension tutorials / AssetLib / CC0 kits  
-5. **ChatGPT plan** — instructions, gameplay, C++ classes, textures → `docs/AI_PLAN.md`  
-6. Download matching CC0 textures into `assets/`  
-7. **ChatGPT code** — writes/merges C++ + GDScript to match your directions + plan  
-8. Extra `download_queries` from the AI pull more textures  
+5. **ChatGPT plan** — instructions, gameplay, C++ classes, several textures/sprites → `docs/AI_PLAN.md`  
+6. Download matching **CC0 textures & sprites** into `assets/` (wall, floor, sky, enemy/player sprites, …)  
+7. Search **Godot Asset Library**; record hits in `docs/PLUGINS.md`; unpack a small MIT/CC0 addon zip into `addons/` when it looks like a real plugin  
+8. Fetch a small **open Godot 4 sample** (README + key scripts) into `refs/<name>/`  
+9. **ChatGPT code** — writes/merges C++ + GDScript using those asset/ref paths  
+10. Extra `download_queries` from the AI pull more textures in the background  
 
-Modify mode: type new directions → Create again → plan + code merge into the same project (including `src/*.cpp`).
+Downloads are parallel / time-capped so play is not blocked. Modify mode: type new directions → Create again → plan + assets + code merge into the same project (including `src/*.cpp`).
+
+### Where files land (generated game)
+
+| Path | What |
+|------|------|
+| `assets/*.png` | CC0 / Wikimedia / procedural textures & sprites |
+| `addons/` | Optional open Godot addon (only if zip contains `plugin.cfg` or `addons/`) |
+| `refs/<name>/` | Open MIT/CC0 sample README + scripts for the AI to study |
+| `docs/RESOURCES.md` | Inventory + licenses of downloaded art / refs / Kenney links |
+| `docs/PLUGINS.md` | AssetLib search results + any installed addon |
+
+**Not auto-installed:** Kenney all-in-one packs (linked only — grab from [kenney.nl](https://kenney.nl/assets)), GPL AssetLib plugins, full demo zips over ~8 MB, commercial ROMs/WADs/ripped art.
 
 ## C++ / GDExtension
 

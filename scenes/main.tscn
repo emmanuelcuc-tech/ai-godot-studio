@@ -1,6 +1,11 @@
-[gd_scene load_steps=3 format=3 uid="uid://ai_godot_studio_main"]
+[gd_scene load_steps=8 format=3 uid="uid://ai_godot_studio_main"]
 
 [ext_resource type="Script" path="res://scripts/main_ui.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/editors/asset_library_ui.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/editors/script_browser_ui.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/editors/animation_editor_ui.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/editors/display_controls_ui.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/editors/effects_editor_ui.gd" id="6"]
 
 [sub_resource type="StyleBoxFlat" id="panel"]
 bg_color = Color(0.07, 0.1, 0.14, 0.94)
@@ -81,7 +86,7 @@ text = "AI GODOT STUDIO"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
 theme_override_font_sizes/font_size = 14
-text = "Describe a game. Create builds Godot 4 + C++ (GDExtension) with a playable GDScript fallback. Run to play."
+text = "Describe a game. Create builds Godot 4 + C++ (GDExtension) with a playable GDScript fallback. Library, Scripts, Animation, Controls, and Effects edit the active game."
 
 [node name="StatusBox" type="VBoxContainer" parent="Margin/RootVBox/Header"]
 layout_mode = 2
@@ -146,7 +151,7 @@ autowrap_mode = 3
 layout_mode = 2
 theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
 theme_override_font_sizes/font_size = 13
-text = "Create Game writes a Godot 4 + C++ GDExtension project (plus GDScript fallback), searches tutorials, plans with AI, and downloads CC0 textures. Type again + Create to modify C++ and scripts. New Game starts fresh."
+text = "Create Game writes a Godot 4 + C++ GDExtension project (plus GDScript fallback), searches tutorials, plans with AI, and downloads matching CC0 textures, sprites, open addons, and sample projects. Type again + Create to modify. New Game starts fresh."
 autowrap_mode = 3
 
 [node name="GenreRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
@@ -239,6 +244,56 @@ layout_mode = 2
 size_flags_vertical = 3
 bbcode_enabled = true
 scroll_active = true
+
+[node name="Library" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+script = ExtResource("2")
+
+[node name="Scripts" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+script = ExtResource("3")
+
+[node name="Animation" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+script = ExtResource("4")
+
+[node name="Controls" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+script = ExtResource("5")
+
+[node name="Effects" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+script = ExtResource("6")
 
 [node name="Settings" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
 visible = false

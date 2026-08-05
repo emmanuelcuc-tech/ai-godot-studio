@@ -54,14 +54,25 @@ static func _fps(title: String) -> Dictionary:
 @onready var hud: Label = $UI/HUD
 var kills := 0
 var _wall_tex: Texture2D
+var _floor_tex: Texture2D
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	_wall_tex = _try_load_wall()
+	_wall_tex = _try_load_tex([\"wall.png\", \"wall.jpg\", \"material.png\", \"brick.png\"])
+	_floor_tex = _try_load_tex([\"floor.png\", \"floor.jpg\", \"dirt.png\", \"concrete.png\"])
 	_level(); _enemies()
-func _try_load_wall() -> Texture2D:
-	for p in [\"res://assets/wall.png\", \"res://assets/wall.jpg\", \"res://assets/material.png\"]:
-		if ResourceLoader.exists(p):
-			return load(p) as Texture2D
+func _try_load_tex(names: Array) -> Texture2D:
+	if Engine.get_main_loop() is SceneTree:
+		var rt: Node = (Engine.get_main_loop() as SceneTree).root.get_node_or_null(\"StudioRuntime\")
+		if rt and rt.has_method(\"load_texture\"):
+			var mapped: Texture2D = rt.load_texture(names)
+			if mapped:
+				return mapped
+	var folders: Array = [\"\", \"world/\", \"textures/\", \"materials/\", \"background/\", \"character/\", \"enemy/\", \"weapon/\", \"sprites/\", \"ui/\", \"effects/\"]
+	for n in names:
+		for folder in folders:
+			var p := \"res://assets/%s%s\" % [folder, n]
+			if ResourceLoader.exists(p) or FileAccess.file_exists(p):
+				return load(p) as Texture2D
 	return null
 func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed(\"ui_cancel\"):
@@ -69,29 +80,29 @@ func _unhandled_input(e: InputEvent) -> void:
 func add_kill() -> void:
 	kills += 1
 	hud.text = \"FPS | Kills %s | WASD · Mouse · LMB · Esc\" % kills
-func _mat(color: Color, use_wall := false) -> StandardMaterial3D:
+func _mat(color: Color, tex: Texture2D = null) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
 	mat.roughness = 0.9
 	mat.metallic = 0.05
-	if use_wall and _wall_tex:
-		mat.albedo_texture = _wall_tex
+	if tex:
+		mat.albedo_texture = tex
 		mat.uv1_scale = Vector3(2, 2, 2)
 	return mat
-func _box(parent: Node, pos: Vector3, size: Vector3, color: Color, solid := true, textured := false) -> void:
+func _box(parent: Node, pos: Vector3, size: Vector3, color: Color, solid := true, tex: Texture2D = null) -> void:
 	var body: Node3D = StaticBody3D.new() if solid else Node3D.new()
 	body.position = pos
 	var mi := MeshInstance3D.new()
 	var bm := BoxMesh.new(); bm.size = size; mi.mesh = bm
-	mi.material_override = _mat(color, textured)
+	mi.material_override = _mat(color, tex)
 	body.add_child(mi)
 	if solid:
 		var c := CollisionShape3D.new(); var s := BoxShape3D.new(); s.size = size; c.shape = s; body.add_child(c)
 	parent.add_child(body)
 func _level() -> void:
-	_box(self, Vector3(0,-0.5,0), Vector3(40,1,40), Color(0.12, 0.1, 0.09), true, true)
+	_box(self, Vector3(0,-0.5,0), Vector3(40,1,40), Color(0.12, 0.1, 0.09), true, _floor_tex if _floor_tex else _wall_tex)
 	for w in [[Vector3(0,1.5,-14),Vector3(28,3,1)],[Vector3(0,1.5,14),Vector3(28,3,1)],[Vector3(-14,1.5,0),Vector3(1,3,28)],[Vector3(14,1.5,0),Vector3(1,3,28)],[Vector3(-5,1.5,-5),Vector3(10,3,1)],[Vector3(5,1.5,5),Vector3(1,3,10)]]:
-		_box(self, w[0], w[1], Color(0.55, 0.28, 0.2), true, true)
+		_box(self, w[0], w[1], Color(0.55, 0.28, 0.2), true, _wall_tex)
 	_box(self, Vector3(0, 1.2, -2), Vector3(2, 2.2, 0.4), Color(0.28, 0.32, 0.18))
 func _enemies() -> void:
 	for p in [Vector3(6,1,-6), Vector3(-6,1,6), Vector3(8,1,2), Vector3(-3,1,-8)]:
@@ -101,6 +112,8 @@ func _enemies() -> void:
 const SPEED := 7.0
 var pitch := 0.0
 var _bob_t := 0.0
+var max_hp := 100
+var hp := 100
 @onready var cam: Camera3D = $Camera3D
 @onready var ray: RayCast3D = $Camera3D/RayCast3D
 @onready var muzzle: GPUParticles3D = $Camera3D/MuzzleFX
@@ -109,6 +122,15 @@ func _ready() -> void:
 	add_to_group(\"player\")
 	_setup_fx(muzzle, Color(1.0, 0.75, 0.2), 18, 0.08)
 	_setup_fx(impact_fx, Color(1.0, 0.55, 0.15), 28, 0.35)
+func _studio_fx(key: String, fallback: bool = true) -> bool:
+	var rt := get_node_or_null(\"/root/StudioRuntime\")
+	if rt and rt.has_method(\"fx_on\"):
+		return rt.fx_on(key, fallback)
+	if FileAccess.file_exists(\"res://studio_effects.json\"):
+		var d = JSON.parse_string(FileAccess.get_file_as_string(\"res://studio_effects.json\"))
+		if typeof(d) == TYPE_DICTIONARY:
+			return bool(d.get(key, fallback))
+	return fallback
 func _setup_fx(p: GPUParticles3D, col: Color, amount: int, life: float) -> void:
 	p.emitting = false
 	p.one_shot = true
@@ -150,15 +172,18 @@ func _physics_process(d: float) -> void:
 		cam.position = cam.position.lerp(Vector3(0, 0.55, 0), d * 8.0)
 	move_and_slide()
 func _fire() -> void:
-	muzzle.restart()
-	muzzle.emitting = true
+	if _studio_fx(\"muzzle_flash\", true):
+		muzzle.restart()
+		muzzle.emitting = true
 	ray.force_raycast_update()
 	if ray.is_colliding():
 		var pt: Vector3 = ray.get_collision_point()
-		impact_fx.global_position = pt
-		impact_fx.restart()
-		impact_fx.emitting = true
-		_spawn_debris(pt, ray.get_collision_normal())
+		if _studio_fx(\"bullet_trail\", true):
+			impact_fx.global_position = pt
+			impact_fx.restart()
+			impact_fx.emitting = true
+		if _studio_fx(\"destroy_fx\", true):
+			_spawn_debris(pt, ray.get_collision_normal())
 		var h = ray.get_collider()
 		if h and h.has_method(\"take_damage\"): h.take_damage(34)
 func _spawn_debris(pos: Vector3, normal: Vector3) -> void:
@@ -197,6 +222,29 @@ func take_damage(a: int) -> void:
 	_hurt_flash = 0.35
 	if hp <= 0:
 		var w = get_parent(); if w and w.has_method(\"add_kill\"): w.add_kill()
+		var death_on := true
+		var rt := get_node_or_null(\"/root/StudioRuntime\")
+		if rt and rt.has_method(\"fx_on\"):
+			death_on = rt.fx_on(\"enemy_death\", true)
+		if death_on:
+			var p := GPUParticles3D.new()
+			p.one_shot = true
+			p.emitting = true
+			p.amount = 20
+			p.lifetime = 0.35
+			p.explosiveness = 1.0
+			var mat := ParticleProcessMaterial.new()
+			mat.direction = Vector3(0, 1, 0)
+			mat.spread = 80.0
+			mat.initial_velocity_min = 2.0
+			mat.initial_velocity_max = 6.0
+			mat.color = Color(1.0, 0.3, 0.15)
+			p.process_material = mat
+			var dm := SphereMesh.new(); dm.radius = 0.06; dm.height = 0.12
+			p.draw_pass_1 = dm
+			p.global_position = global_position
+			if get_parent(): get_parent().add_child(p)
+			get_tree().create_timer(0.5).timeout.connect(p.queue_free)
 		queue_free()
 """
 	var scene := """[gd_scene load_steps=4 format=3]
@@ -365,7 +413,15 @@ const GRAV := 1100.0
 var coyote := 0.0
 func _ready() -> void:
 	var c := CollisionShape2D.new(); var r := RectangleShape2D.new(); r.size=Vector2(22,30); c.shape=r; add_child(c)
-	var p := Polygon2D.new(); p.color=Color(0.95,0.45,0.3); p.polygon=PackedVector2Array([Vector2(-11,-15),Vector2(11,-15),Vector2(11,15),Vector2(-11,15)]); add_child(p)
+	var spr_path := \"\"
+	for pth in [\"res://assets/character/sprite_player.png\", \"res://assets/sprites/sprite_player.png\", \"res://assets/sprite_player.png\"]:
+		if ResourceLoader.exists(pth) or FileAccess.file_exists(pth):
+			spr_path = pth
+			break
+	if not spr_path.is_empty():
+		var spr := Sprite2D.new(); spr.texture = load(spr_path); add_child(spr)
+	else:
+		var p := Polygon2D.new(); p.color=Color(0.95,0.45,0.3); p.polygon=PackedVector2Array([Vector2(-11,-15),Vector2(11,-15),Vector2(11,15),Vector2(-11,15)]); add_child(p)
 func _physics_process(d: float) -> void:
 	if not is_on_floor(): velocity.y += GRAV * d; coyote = max(0.0, coyote - d)
 	else: coyote = 0.12

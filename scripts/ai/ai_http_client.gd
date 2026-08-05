@@ -8,6 +8,7 @@ signal completed_bytes(ok: bool, bytes: PackedByteArray, error: String, meta: Di
 var _http: HTTPRequest
 var _busy: bool = false
 var _want_bytes: bool = false
+var _download_path: String = ""
 
 
 func attach(host: Node) -> void:
@@ -27,6 +28,8 @@ func post_json(url: String, headers: PackedStringArray, body: Dictionary) -> Err
 		return ERR_BUSY
 	_busy = true
 	_want_bytes = false
+	_download_path = ""
+	_http.download_file = ""
 	var payload := JSON.stringify(body)
 	var err := _http.request(url, headers, HTTPClient.METHOD_POST, payload)
 	if err != OK:
@@ -40,6 +43,8 @@ func get_url(url: String, headers: PackedStringArray = PackedStringArray()) -> E
 		return ERR_BUSY
 	_busy = true
 	_want_bytes = false
+	_download_path = ""
+	_http.download_file = ""
 	var err := _http.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
 		_busy = false
@@ -52,6 +57,8 @@ func get_bytes(url: String, headers: PackedStringArray = PackedStringArray()) ->
 		return ERR_BUSY
 	_busy = true
 	_want_bytes = true
+	_download_path = ""
+	_http.download_file = ""
 	var err := _http.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
 		_busy = false
@@ -60,24 +67,48 @@ func get_bytes(url: String, headers: PackedStringArray = PackedStringArray()) ->
 	return err
 
 
+func download_file(url: String, dest_abs: String, headers: PackedStringArray = PackedStringArray()) -> Error:
+	if _busy:
+		return ERR_BUSY
+	if dest_abs.is_empty():
+		return ERR_INVALID_PARAMETER
+	DirAccess.make_dir_recursive_absolute(dest_abs.get_base_dir())
+	_busy = true
+	_want_bytes = false
+	_download_path = dest_abs
+	_http.download_file = dest_abs
+	var err: Error = _http.request(url, headers, HTTPClient.METHOD_GET)
+	if err != OK:
+		_busy = false
+		_download_path = ""
+		_http.download_file = ""
+		completed.emit(false, "HTTP download failed to start (%s)" % err, {"code": 0, "file": dest_abs})
+	return err
+
+
 func _on_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	_busy = false
-	var as_bytes := _want_bytes
+	var as_bytes: bool = _want_bytes
 	_want_bytes = false
+	var file_dest: String = _download_path
+	_download_path = ""
+	_http.download_file = ""
 	if result != HTTPRequest.RESULT_SUCCESS:
 		if as_bytes:
 			completed_bytes.emit(false, PackedByteArray(), "Network error (%s)" % result, {"code": response_code})
 		else:
-			completed.emit(false, "Network error (%s)" % result, {"code": response_code})
+			completed.emit(false, "Network error (%s)" % result, {"code": response_code, "file": file_dest})
 		return
 	if response_code < 200 or response_code >= 300:
-		var err_txt := body.get_string_from_utf8().left(800)
+		var err_txt: String = body.get_string_from_utf8().left(800)
 		if as_bytes:
 			completed_bytes.emit(false, PackedByteArray(), "HTTP %s: %s" % [response_code, err_txt], {"code": response_code})
 		else:
-			completed.emit(false, "HTTP %s: %s" % [response_code, err_txt], {"code": response_code})
+			completed.emit(false, "HTTP %s: %s" % [response_code, err_txt], {"code": response_code, "file": file_dest})
 		return
 	if as_bytes:
 		completed_bytes.emit(true, body, "", {"code": response_code})
+	elif not file_dest.is_empty():
+		completed.emit(true, file_dest, {"code": response_code, "file": file_dest})
 	else:
 		completed.emit(true, body.get_string_from_utf8(), {"code": response_code})
