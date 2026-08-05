@@ -50,6 +50,13 @@ func ui_style() -> String:
 	return str(controls.get("ui_style", display.get("ui_style", "neon")))
 
 
+func want_art(kind: String) -> bool:
+	var kinds_v: Variant = assets.get("kinds", {})
+	if typeof(kinds_v) != TYPE_DICTIONARY:
+		return true
+	return bool((kinds_v as Dictionary).get(kind, true))
+
+
 func assigned(slot: String) -> String:
 	var map_v: Variant = assets.get("assignments", {})
 	if typeof(map_v) != TYPE_DICTIONARY:
@@ -59,7 +66,7 @@ func assigned(slot: String) -> String:
 
 func load_texture(names: Array) -> Texture2D:
 	var candidates: PackedStringArray = PackedStringArray()
-	for slot_name in ["wall", "floor", "sky", "character", "enemy", "weapon", "menu_background", "game_background", "ui", "material"]:
+	for slot_name in ["wall", "floor", "sky", "skybox", "room", "character", "character_sprite", "character_texture", "character_model", "enemy", "enemy_texture", "enemy_model", "weapon", "weapon_texture", "weapon_model", "weapon_sprite", "room_model", "menu_background", "game_background", "ui", "material"]:
 		for n in names:
 			if str(n).get_file().get_basename().to_lower().contains(slot_name) or str(n).to_lower().contains(slot_name):
 				var mapped: String = assigned(slot_name)
@@ -80,15 +87,28 @@ func load_texture(names: Array) -> Texture2D:
 	return null
 
 
+func physics_on(key: String, fallback: bool = true) -> bool:
+	var phys_v: Variant = assets.get("physics", {})
+	if typeof(phys_v) != TYPE_DICTIONARY:
+		return fallback
+	return bool((phys_v as Dictionary).get(key, fallback))
+
+
 func _apply_all() -> void:
 	_reload()
 	await get_tree().process_frame
 	_apply_backgrounds()
+	_apply_skybox()
+	_apply_world_textures()
+	_apply_room_model()
 	_apply_camera()
+	_apply_character_visuals()
 	_apply_health_ui()
 	_apply_weapon_view()
 	_apply_effects()
 	_apply_anims()
+	_apply_enemy_anims()
+	_apply_physics()
 	_apply_ui_style()
 
 
@@ -136,20 +156,249 @@ func _apply_backgrounds() -> void:
 		if tex.get_size().x > 0.0:
 			spr.scale = Vector2(1280.0 / tex.get_size().x, 720.0 / tex.get_size().y)
 	elif scene is Node3D:
-		var sky_mi: MeshInstance3D = scene.find_child("StudioSky", true, false) as MeshInstance3D
-		if sky_mi == null:
-			sky_mi = MeshInstance3D.new()
-			sky_mi.name = "StudioSky"
-			var sphere: SphereMesh = SphereMesh.new()
-			sphere.radius = 80.0
-			sphere.height = 160.0
-			sky_mi.mesh = sphere
-			scene.add_child(sky_mi)
+		_apply_sky_mesh(scene as Node3D, tex)
+
+
+func _apply_skybox() -> void:
+	var scene: Node = get_tree().current_scene
+	if scene == null or not (scene is Node3D):
+		return
+	var tex: Texture2D = _tex_for_slot("skybox", ["skybox.png", "sky.png", "background.png"])
+	if tex == null:
+		tex = _tex_for_slot("sky", ["sky.png", "skybox.png", "background.png"])
+	if tex == null:
+		return
+	var env_node: WorldEnvironment = scene.find_child("StudioWorldEnv", true, false) as WorldEnvironment
+	if env_node == null:
+		env_node = WorldEnvironment.new()
+		env_node.name = "StudioWorldEnv"
+		scene.add_child(env_node)
+	var env: Environment = Environment.new()
+	var sky: Sky = Sky.new()
+	var pano: PanoramaSkyMaterial = PanoramaSkyMaterial.new()
+	pano.panorama = tex
+	sky.sky_material = pano
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
+	var sky_mat: Material = _load_material_slot("skybox_material")
+	if sky_mat is StandardMaterial3D and (sky_mat as StandardMaterial3D).albedo_texture:
+		pano.panorama = (sky_mat as StandardMaterial3D).albedo_texture
+	env_node.environment = env
+	_apply_sky_mesh(scene as Node3D, tex)
+
+
+func _apply_sky_mesh(scene: Node3D, tex: Texture2D) -> void:
+	if tex == null:
+		return
+	var sky_mi: MeshInstance3D = scene.find_child("StudioSky", true, false) as MeshInstance3D
+	if sky_mi == null:
+		sky_mi = MeshInstance3D.new()
+		sky_mi.name = "StudioSky"
+		var sphere: SphereMesh = SphereMesh.new()
+		sphere.radius = 80.0
+		sphere.height = 160.0
+		sky_mi.mesh = sphere
+		scene.add_child(sky_mi)
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	sky_mi.material_override = mat
+
+
+func _apply_world_textures() -> void:
+	if not want_art("textures"):
+		return
+	var scene: Node = get_tree().current_scene
+	if scene == null or not (scene is Node3D):
+		return
+	var wall: Texture2D = _tex_for_slot("wall", ["wall.png", "brick.png"])
+	var floor: Texture2D = _tex_for_slot("floor", ["floor.png", "ground.png", "dirt.png"])
+	var wall_mat: Material = _load_material_slot("wall_material")
+	var floor_mat: Material = _load_material_slot("floor_material")
+	if wall == null and floor == null and wall_mat == null and floor_mat == null:
+		return
+	_paint_meshes(scene, wall, floor, wall_mat, floor_mat)
+
+
+func _paint_meshes(node: Node, wall: Texture2D, floor: Texture2D, wall_mat: Material = null, floor_mat: Material = null) -> void:
+	if node is MeshInstance3D:
+		var mi: MeshInstance3D = node as MeshInstance3D
+		var n: String = mi.name.to_lower()
+		if n == "studiosky":
+			return
+		var use_floor: bool = n.contains("floor") or n.contains("ground")
+		var use_wall: bool = n.contains("wall") or n.contains("ceil")
+		if not use_floor and not use_wall and mi.mesh is BoxMesh:
+			var box: BoxMesh = mi.mesh as BoxMesh
+			if box.size.y <= 1.2 and box.size.x >= 8.0:
+				use_floor = true
+			else:
+				use_wall = true
+		if use_floor:
+			if floor_mat:
+				mi.material_override = floor_mat
+			elif floor or wall:
+				mi.material_override = _make_tex_mat(floor if floor else wall)
+		elif use_wall:
+			if wall_mat:
+				mi.material_override = wall_mat
+			elif wall or floor:
+				mi.material_override = _make_tex_mat(wall if wall else floor)
+	for child in node.get_children():
+		_paint_meshes(child, wall, floor, wall_mat, floor_mat)
+
+
+func _make_tex_mat(tex: Texture2D) -> StandardMaterial3D:
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.albedo_color = Color.WHITE
+	mat.uv1_scale = Vector3(2, 2, 2)
+	mat.roughness = 0.85
+	mat.metallic = 0.05
+	return mat
+
+
+func _load_material_slot(slot: String) -> Material:
+	var path: String = assigned(slot)
+	if path.is_empty():
+		return null
+	if not (ResourceLoader.exists(path) or FileAccess.file_exists(path)):
+		return null
+	var res: Resource = load(path)
+	return res as Material if res is Material else null
+
+
+func _apply_character_visuals() -> void:
+	var scene: Node = get_tree().current_scene
+	if scene == null:
+		return
+	var char_tex: Texture2D = null
+	if want_art("sprites") or want_art("textures"):
+		char_tex = _tex_for_slot("character_sprite", ["sprite_player.png", "character.png", "player.png"])
+		if char_tex == null:
+			char_tex = _tex_for_slot("character", ["sprite_player.png", "character.png", "player.png"])
+		if char_tex == null:
+			char_tex = _tex_for_slot("character_texture", ["character.png", "sprite_player.png"])
+	var enemy_tex: Texture2D = null
+	if want_art("sprites") or want_art("textures"):
+		enemy_tex = _tex_for_slot("enemy_texture", ["enemy.png", "sprite_enemy.png"])
+		if enemy_tex == null:
+			enemy_tex = _tex_for_slot("enemy", ["sprite_enemy.png", "enemy.png"])
+	var model_path: String = assigned("character_model") if want_art("models") else ""
+	var enemy_model: String = assigned("enemy_model") if want_art("models") else ""
+	var char_mat: Material = _load_material_slot("character_material")
+	var enemy_mat: Material = _load_material_slot("enemy_material")
+	var player: Node = get_tree().get_first_node_in_group("player")
+	if player:
+		if player is Node3D:
+			_attach_3d_character(player as Node3D, char_tex, model_path, false, char_mat)
+		elif player is CanvasItem or player is Node2D:
+			_attach_2d_sprite(player, char_tex)
+	for child in scene.get_children():
+		if child == player:
+			continue
+		var is_enemy: bool = child.is_in_group("enemy") or str(child.name).to_lower().contains("enemy")
+		if child is CharacterBody3D:
+			_attach_3d_character(child, enemy_tex if enemy_tex else char_tex, enemy_model if is_enemy else "", is_enemy, enemy_mat if is_enemy else null)
+		elif child is CharacterBody2D or (child is Node2D and is_enemy):
+			_attach_2d_sprite(child, enemy_tex if enemy_tex else char_tex)
+
+
+func _tex_for_slot(slot: String, names: Array) -> Texture2D:
+	var mapped: String = assigned(slot)
+	if not mapped.is_empty():
+		var hit: Texture2D = load_texture([mapped.get_file(), mapped])
+		if hit:
+			return hit
+	return load_texture(names)
+
+
+func _attach_2d_sprite(host: Node, tex: Texture2D) -> void:
+	if tex == null:
+		return
+	var spr: Sprite2D = host.find_child("StudioCharSprite", true, false) as Sprite2D
+	if spr == null:
+		spr = host.find_child("Sprite2D", true, false) as Sprite2D
+	if spr == null:
+		spr = Sprite2D.new()
+		spr.name = "StudioCharSprite"
+		host.add_child(spr)
+	spr.texture = tex
+
+
+func _attach_3d_character(body: Node3D, tex: Texture2D, model_path: String, is_enemy: bool, slot_mat: Material = null) -> void:
+	var model_node_name: String = "StudioEnemyModel" if is_enemy else "StudioCharModel"
+	if not model_path.is_empty() and body.get_node_or_null(model_node_name) == null:
+		var inst: Node = _try_instance_model(model_path)
+		if inst:
+			inst.name = model_node_name
+			if inst is Node3D:
+				(inst as Node3D).position = Vector3(0.0, 0.0, 0.0)
+			body.add_child(inst)
+			_apply_mat_to_node(inst, slot_mat, tex)
+			if not is_enemy and camera_mode() != "third_person":
+				inst.visible = false
+	var mi: MeshInstance3D = body.find_child("StudioBody", true, false) as MeshInstance3D
+	if mi == null:
+		for child in body.get_children():
+			if child is MeshInstance3D and not str(child.name).begins_with("Studio"):
+				mi = child
+				break
+	if mi == null:
+		mi = body.find_child("MeshInstance3D", true, false) as MeshInstance3D
+	if mi == null:
+		mi = MeshInstance3D.new()
+		mi.name = "StudioBody"
+		var cap: CapsuleMesh = CapsuleMesh.new()
+		cap.radius = 0.35 if is_enemy else 0.32
+		cap.height = 1.5
+		mi.mesh = cap
+		body.add_child(mi)
+	if slot_mat:
+		mi.material_override = slot_mat
+	elif tex:
 		var mat: StandardMaterial3D = StandardMaterial3D.new()
 		mat.albedo_texture = tex
-		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		sky_mi.material_override = mat
+		mat.albedo_color = Color.WHITE
+		mi.material_override = mat
+	if not is_enemy and camera_mode() != "third_person":
+		mi.visible = false
+
+
+func _apply_mat_to_node(node: Node, slot_mat: Material, tex: Texture2D) -> void:
+	if node is MeshInstance3D:
+		if slot_mat:
+			(node as MeshInstance3D).material_override = slot_mat
+		elif tex:
+			var mm: StandardMaterial3D = StandardMaterial3D.new()
+			mm.albedo_texture = tex
+			(node as MeshInstance3D).material_override = mm
+	for child in node.get_children():
+		_apply_mat_to_node(child, slot_mat, tex)
+
+
+func _try_instance_model(path: String) -> Node:
+	var p: String = path.strip_edges()
+	if p.is_empty():
+		return null
+	if not (ResourceLoader.exists(p) or FileAccess.file_exists(p)):
+		var fname: String = p.get_file()
+		for folder in ["character", "enemy", "weapon", "models", ""]:
+			var alt: String = "res://assets/%s%s" % [("" if folder.is_empty() else folder + "/"), fname]
+			if ResourceLoader.exists(alt) or FileAccess.file_exists(alt):
+				p = alt
+				break
+	if not (ResourceLoader.exists(p) or FileAccess.file_exists(p)):
+		return null
+	var res: Resource = load(p)
+	if res is PackedScene:
+		return (res as PackedScene).instantiate()
+	if res is Mesh:
+		var mi: MeshInstance3D = MeshInstance3D.new()
+		mi.mesh = res as Mesh
+		return mi
+	return null
 
 
 func _apply_camera() -> void:
@@ -236,6 +485,20 @@ func _apply_weapon_view() -> void:
 	var player: Node = get_tree().get_first_node_in_group("player")
 	if player == null:
 		return
+	if player is Node2D or player is CharacterBody2D:
+		var spr_tex: Texture2D = _tex_for_slot("weapon_sprite", ["sprite_weapon.png", "weapon.png"])
+		if spr_tex == null:
+			spr_tex = _tex_for_slot("weapon", ["weapon.png", "gun.png"])
+		if spr_tex:
+			var wspr: Sprite2D = player.find_child("StudioWeaponSprite", true, false) as Sprite2D
+			if wspr == null:
+				wspr = Sprite2D.new()
+				wspr.name = "StudioWeaponSprite"
+				wspr.position = Vector2(18, 8)
+				player.add_child(wspr)
+			wspr.texture = spr_tex
+			wspr.visible = show_weapon()
+		return
 	var cam: Camera3D = player.find_child("Camera3D", true, false) as Camera3D
 	if cam == null:
 		return
@@ -254,11 +517,29 @@ func _apply_weapon_view() -> void:
 		weapon.rotation_degrees = Vector3(8.0, 8.0, 0.0)
 		cam.add_child(weapon)
 	weapon.visible = true
-	var tex: Texture2D = load_texture(["weapon.png", "gun.png", assigned("weapon").get_file()])
-	if tex:
+	var tex: Texture2D = _tex_for_slot("weapon_texture", ["weapon.png", "gun.png"])
+	if tex == null:
+		tex = _tex_for_slot("weapon", ["weapon.png", "gun.png"])
+	var wmat: Material = _load_material_slot("weapon_material")
+	if wmat:
+		weapon.material_override = wmat
+	elif tex:
 		var mat: StandardMaterial3D = StandardMaterial3D.new()
 		mat.albedo_texture = tex
 		weapon.material_override = mat
+	var wmodel: String = assigned("weapon_model") if want_art("models") else ""
+	if not wmodel.is_empty() and cam.get_node_or_null("StudioWeaponModel") == null:
+		var inst: Node = _try_instance_model(wmodel)
+		if inst and inst is Node3D:
+			inst.name = "StudioWeaponModel"
+			(inst as Node3D).position = Vector3(0.22, -0.18, -0.42)
+			cam.add_child(inst)
+			_apply_mat_to_node(inst, wmat, tex)
+	var player2: Node = get_tree().get_first_node_in_group("player")
+	if player2 and (player2 is Node2D or player2 is CharacterBody2D):
+		var spr_tex: Texture2D = _tex_for_slot("weapon_sprite", ["sprite_weapon.png", "weapon.png"])
+		if spr_tex:
+			_attach_2d_sprite(player2, spr_tex)
 
 
 func _apply_effects() -> void:
@@ -354,6 +635,114 @@ func _apply_anims() -> void:
 	if ap.has_animation_library("studio"):
 		ap.remove_animation_library("studio")
 	ap.add_animation_library("studio", lib)
+
+
+func _apply_room_model() -> void:
+	if not want_art("models") or not physics_on("room_static", true):
+		return
+	var scene: Node = get_tree().current_scene
+	if scene == null or not (scene is Node3D):
+		return
+	var path: String = assigned("room_model")
+	if path.is_empty() or scene.find_child("StudioRoomModel", true, false):
+		return
+	var inst: Node = _try_instance_model(path)
+	if inst == null:
+		return
+	var host: StaticBody3D = StaticBody3D.new()
+	host.name = "StudioRoomModel"
+	host.position = Vector3(0.0, 1.2, -2.0)
+	scene.add_child(host)
+	host.add_child(inst)
+	_ensure_static_collision(host)
+
+
+func _apply_enemy_anims() -> void:
+	if not bool(anim.get("mode_enabled", false)) and assigned("enemy_anim").is_empty():
+		return
+	var scene: Node = get_tree().current_scene
+	if scene == null:
+		return
+	var clip: String = assigned("enemy_anim")
+	if clip.is_empty():
+		clip = "idle"
+	for child in scene.get_children():
+		if not (child is CharacterBody3D or child is CharacterBody2D):
+			continue
+		if child.is_in_group("player"):
+			continue
+		if child is Node2D or child is CharacterBody2D:
+			var sprite: AnimatedSprite2D = child.find_child("StudioAnimSprite", true, false) as AnimatedSprite2D
+			if sprite and sprite.sprite_frames and sprite.sprite_frames.has_animation(clip):
+				sprite.play(clip)
+		else:
+			var ap: AnimationPlayer = child.find_child("StudioAnimPlayer", true, false) as AnimationPlayer
+			if ap and ap.has_animation("studio/%s" % clip):
+				ap.play("studio/%s" % clip)
+
+
+func _apply_physics() -> void:
+	var scene: Node = get_tree().current_scene
+	if scene == null:
+		return
+	var player: Node = get_tree().get_first_node_in_group("player")
+	if player and physics_on("character_collision", true):
+		_ensure_actor_collision(player, false)
+	if scene is Node3D and physics_on("world_static", true):
+		_ensure_world_static(scene)
+	for child in scene.get_children():
+		if child == player:
+			continue
+		if (child is CharacterBody3D or child is CharacterBody2D) and physics_on("enemy_collision", true):
+			_ensure_actor_collision(child, true)
+	if player:
+		player.set_meta("studio_weapon_rigid", physics_on("weapon_rigid", true))
+
+
+func _ensure_actor_collision(body: Node, is_enemy: bool) -> void:
+	if body is CharacterBody3D:
+		if body.find_child("CollisionShape3D", true, false):
+			return
+		var cs: CollisionShape3D = CollisionShape3D.new()
+		cs.name = "StudioCollision"
+		var cap: CapsuleShape3D = CapsuleShape3D.new()
+		cap.radius = 0.38 if is_enemy else 0.35
+		cap.height = 1.6
+		cs.shape = cap
+		body.add_child(cs)
+	elif body is CharacterBody2D:
+		if body.find_child("CollisionShape2D", true, false):
+			return
+		var cs2: CollisionShape2D = CollisionShape2D.new()
+		cs2.name = "StudioCollision"
+		var cap2: CapsuleShape2D = CapsuleShape2D.new()
+		cap2.radius = 12.0
+		cap2.height = 28.0
+		cs2.shape = cap2
+		body.add_child(cs2)
+
+
+func _ensure_world_static(node: Node) -> void:
+	if node is StaticBody3D:
+		_ensure_static_collision(node as StaticBody3D)
+	for child in node.get_children():
+		_ensure_world_static(child)
+
+
+func _ensure_static_collision(body: StaticBody3D) -> void:
+	if body.find_child("CollisionShape3D", true, false):
+		return
+	var size: Vector3 = Vector3(1, 1, 1)
+	for child in body.get_children():
+		if child is MeshInstance3D and (child as MeshInstance3D).mesh is BoxMesh:
+			size = ((child as MeshInstance3D).mesh as BoxMesh).size
+			break
+	var cs: CollisionShape3D = CollisionShape3D.new()
+	cs.name = "StudioCollision"
+	var box: BoxShape3D = BoxShape3D.new()
+	box.size = size
+	cs.shape = box
+	body.add_child(cs)
 
 
 func _apply_ui_style() -> void:

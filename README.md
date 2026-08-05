@@ -1,6 +1,6 @@
 # AI Godot Studio
 
-Describe a game → **Create Game** builds a playable **Godot 4** project using templates, internet search, AI coding, and matching **CC0 textures, sprites, open addons, and sample projects**.
+Describe a game → **Create Game** builds a playable **Godot 4** project using templates, internet search, AI coding, and **visible art** (textures, sprites, and/or simple models).
 
 **Create defaults to C++ (GDExtension).** Games include `src/` godot-cpp gameplay plus a **GDScript fallback** so **Run Game** works before you compile.
 
@@ -15,7 +15,9 @@ Describe a game → **Create Game** builds a playable **Godot 4** project using 
 | **Open in Godot** | Opens the project in the editor |
 | **Show folder** | Reveals files on disk |
 
-Type new directions and press **Create Game** again to **modify** the same game (updates C++ sources and GDScript). Uncheck **Create with C++** in the Create tab or Settings for GDScript-only.
+After **Run Game**, type new directions and press **Create Game** / **Update / Edit Game** to **modify the same project**. **New Game** is the only full reset. Uncheck **Create with C++** in the Create tab or Settings for GDScript-only.
+
+On Create, check **Textures**, **Sprites**, and/or **Models**. Every game gets real `assets/` files (CC0 download when possible, generated colored PNGs + a simple character mesh otherwise) so Run Game is never untextured gray. In **Library**, choose/replace a texture, sprite, or model and Assign it.
 
 ## Pipeline (ChatGPT-driven)
 
@@ -24,7 +26,7 @@ Type new directions and press **Create Game** again to **modify** the same game 
 3. Overlay **C++ GDExtension** scaffolding (`src/`, `SConstruct`, `bin/game.gdextension`, `build_cpp.ps1`) unless C++ is turned off  
 4. Search the web for Godot / GDExtension tutorials / AssetLib / CC0 kits  
 5. **ChatGPT plan** — instructions, gameplay, C++ classes, several textures/sprites → `docs/AI_PLAN.md`  
-6. Download matching **CC0 textures & sprites** into `assets/` (wall, floor, sky, enemy/player sprites, …)  
+6. Write **wall / floor / character / enemy art** into `assets/` (Openverse/Wikimedia CC0 when available, generated fallback always)  
 7. Search **Godot Asset Library**; record hits in `docs/PLUGINS.md`; unpack a small MIT/CC0 addon zip into `addons/` when it looks like a real plugin  
 8. Fetch a small **open Godot 4 sample** (README + key scripts) into `refs/<name>/`  
 9. **ChatGPT code** — writes/merges C++ + GDScript using those asset/ref paths  
@@ -36,7 +38,7 @@ Downloads are parallel / time-capped so play is not blocked. Modify mode: type n
 
 | Path | What |
 |------|------|
-| `assets/*.png` | CC0 / Wikimedia / procedural textures & sprites |
+| `assets/*.png` + category folders | Wall/floor/sky, character/enemy sprites, generated `character.obj` |
 | `addons/` | Optional open Godot addon (only if zip contains `plugin.cfg` or `addons/`) |
 | `refs/<name>/` | Open MIT/CC0 sample README + scripts for the AI to study |
 | `docs/RESOURCES.md` | Inventory + licenses of downloaded art / refs / Kenney links |

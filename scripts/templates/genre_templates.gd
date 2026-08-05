@@ -43,6 +43,8 @@ config/features=PackedStringArray(\"4.3\", \"Forward Plus\")
 [display]
 window/size/viewport_width=1280
 window/size/viewport_height=720
+[physics]
+3d/physics_engine=\"Jolt Physics\"
 [rendering]
 environment/defaults/default_clear_color=Color(0.06, 0.08, 0.1, 1)
 """ % [title, main]
@@ -59,7 +61,25 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_wall_tex = _try_load_tex([\"wall.png\", \"wall.jpg\", \"material.png\", \"brick.png\"])
 	_floor_tex = _try_load_tex([\"floor.png\", \"floor.jpg\", \"dirt.png\", \"concrete.png\"])
+	_apply_skybox()
 	_level(); _enemies()
+func _apply_skybox() -> void:
+	var sky_tex: Texture2D = _try_load_tex([\"skybox.png\", \"sky.png\", \"background.png\"])
+	var env_node := WorldEnvironment.new()
+	env_node.name = \"StudioWorldEnv\"
+	var env := Environment.new()
+	if sky_tex:
+		var sky := Sky.new()
+		var pano := PanoramaSkyMaterial.new()
+		pano.panorama = sky_tex
+		sky.sky_material = pano
+		env.background_mode = Environment.BG_SKY
+		env.sky = sky
+	else:
+		env.background_mode = Environment.BG_COLOR
+		env.background_color = Color(0.42, 0.58, 0.86)
+	env_node.environment = env
+	add_child(env_node)
 func _try_load_tex(names: Array) -> Texture2D:
 	if Engine.get_main_loop() is SceneTree:
 		var rt: Node = (Engine.get_main_loop() as SceneTree).root.get_node_or_null(\"StudioRuntime\")
@@ -89,10 +109,16 @@ func _mat(color: Color, tex: Texture2D = null) -> StandardMaterial3D:
 		mat.albedo_texture = tex
 		mat.uv1_scale = Vector3(2, 2, 2)
 	return mat
-func _box(parent: Node, pos: Vector3, size: Vector3, color: Color, solid := true, tex: Texture2D = null) -> void:
+func _box(parent: Node, pos: Vector3, size: Vector3, color: Color, solid := true, tex: Texture2D = null, mesh_name := \"\") -> void:
 	var body: Node3D = StaticBody3D.new() if solid else Node3D.new()
 	body.position = pos
+	if mesh_name == \"Floor\":
+		body.name = \"FloorBody\"
+	elif mesh_name == \"Wall\":
+		body.name = \"WallBody\"
 	var mi := MeshInstance3D.new()
+	if not mesh_name.is_empty():
+		mi.name = mesh_name
 	var bm := BoxMesh.new(); bm.size = size; mi.mesh = bm
 	mi.material_override = _mat(color, tex)
 	body.add_child(mi)
@@ -100,9 +126,9 @@ func _box(parent: Node, pos: Vector3, size: Vector3, color: Color, solid := true
 		var c := CollisionShape3D.new(); var s := BoxShape3D.new(); s.size = size; c.shape = s; body.add_child(c)
 	parent.add_child(body)
 func _level() -> void:
-	_box(self, Vector3(0,-0.5,0), Vector3(40,1,40), Color(0.12, 0.1, 0.09), true, _floor_tex if _floor_tex else _wall_tex)
+	_box(self, Vector3(0,-0.5,0), Vector3(40,1,40), Color(0.12, 0.1, 0.09), true, _floor_tex if _floor_tex else _wall_tex, \"Floor\")
 	for w in [[Vector3(0,1.5,-14),Vector3(28,3,1)],[Vector3(0,1.5,14),Vector3(28,3,1)],[Vector3(-14,1.5,0),Vector3(1,3,28)],[Vector3(14,1.5,0),Vector3(1,3,28)],[Vector3(-5,1.5,-5),Vector3(10,3,1)],[Vector3(5,1.5,5),Vector3(1,3,10)]]:
-		_box(self, w[0], w[1], Color(0.55, 0.28, 0.2), true, _wall_tex)
+		_box(self, w[0], w[1], Color(0.55, 0.28, 0.2), true, _wall_tex, \"Wall\")
 	_box(self, Vector3(0, 1.2, -2), Vector3(2, 2.2, 0.4), Color(0.28, 0.32, 0.18))
 func _enemies() -> void:
 	for p in [Vector3(6,1,-6), Vector3(-6,1,6), Vector3(8,1,2), Vector3(-3,1,-8)]:
@@ -122,6 +148,29 @@ func _ready() -> void:
 	add_to_group(\"player\")
 	_setup_fx(muzzle, Color(1.0, 0.75, 0.2), 18, 0.08)
 	_setup_fx(impact_fx, Color(1.0, 0.55, 0.15), 28, 0.35)
+	_attach_body()
+func _attach_body() -> void:
+	if find_child(\"StudioBody\", true, false):
+		return
+	var mi := MeshInstance3D.new()
+	mi.name = \"StudioBody\"
+	var cap := CapsuleMesh.new(); cap.radius = 0.32; cap.height = 1.45; mi.mesh = cap
+	var mat := StandardMaterial3D.new(); mat.albedo_color = Color(0.25, 0.45, 0.85)
+	var tex: Texture2D = null
+	var rt := get_node_or_null(\"/root/StudioRuntime\")
+	if rt and rt.has_method(\"load_texture\"):
+		tex = rt.load_texture([\"sprite_player.png\", \"character.png\", \"player.png\"])
+	if tex == null:
+		for pth in [\"res://assets/character/sprite_player.png\", \"res://assets/character/character.png\", \"res://assets/sprite_player.png\"]:
+			if ResourceLoader.exists(pth) or FileAccess.file_exists(pth):
+				tex = load(pth) as Texture2D
+				break
+	if tex:
+		mat.albedo_texture = tex
+		mat.albedo_color = Color.WHITE
+	mi.material_override = mat
+	mi.visible = false
+	add_child(mi)
 func _studio_fx(key: String, fallback: bool = true) -> bool:
 	var rt := get_node_or_null(\"/root/StudioRuntime\")
 	if rt and rt.has_method(\"fx_on\"):
@@ -188,6 +237,8 @@ func _fire() -> void:
 		if h and h.has_method(\"take_damage\"): h.take_damage(34)
 func _spawn_debris(pos: Vector3, normal: Vector3) -> void:
 	# Real physics chips (RigidBody3D) — genre engine feel for shooters
+	if has_meta(\"studio_weapon_rigid\") and not bool(get_meta(\"studio_weapon_rigid\")):
+		return
 	for i in 4:
 		var rb := RigidBody3D.new()
 		rb.position = pos + normal * 0.05
@@ -205,9 +256,27 @@ var hp := 100
 var _hurt_flash := 0.0
 @onready var _mesh: MeshInstance3D
 func _ready() -> void:
+	add_to_group(\"enemy\")
 	var c := CollisionShape3D.new(); var s := CapsuleShape3D.new(); s.radius=0.4; s.height=1.6; c.shape=s; add_child(c)
-	_mesh = MeshInstance3D.new(); var m := CapsuleMesh.new(); m.radius=0.4; m.height=1.6; _mesh.mesh=m
-	var mat := StandardMaterial3D.new(); mat.albedo_color=Color(0.55,0.12,0.1); _mesh.material_override=mat; add_child(_mesh)
+	_mesh = MeshInstance3D.new(); _mesh.name = \"StudioBody\"; var m := CapsuleMesh.new(); m.radius=0.4; m.height=1.6; _mesh.mesh=m
+	var mat := StandardMaterial3D.new(); mat.albedo_color=Color(0.55,0.12,0.1)
+	var etex: Texture2D = _try_load_tex([\"enemy.png\", \"sprite_enemy.png\", \"character.png\"])
+	if etex:
+		mat.albedo_texture = etex
+		mat.albedo_color = Color.WHITE
+	_mesh.material_override=mat; add_child(_mesh)
+func _try_load_tex(names: Array) -> Texture2D:
+	var rt := get_node_or_null(\"/root/StudioRuntime\")
+	if rt and rt.has_method(\"load_texture\"):
+		var mapped: Texture2D = rt.load_texture(names)
+		if mapped:
+			return mapped
+	for n in names:
+		for folder in [\"enemy/\", \"character/\", \"sprites/\", \"\", \"textures/\"]:
+			var p := \"res://assets/%s%s\" % [folder, n]
+			if ResourceLoader.exists(p) or FileAccess.file_exists(p):
+				return load(p) as Texture2D
+	return null
 func _physics_process(d: float) -> void:
 	if _hurt_flash > 0.0:
 		_hurt_flash -= d
@@ -299,7 +368,7 @@ horizontal_alignment = 1
 		{"path": "scripts/world.gd", "content": world},
 		{"path": "scripts/player.gd", "content": player},
 		{"path": "scripts/enemy.gd", "content": enemy},
-		{"path": "docs/SHOOTER_FX.md", "content": "# Shooter genre engine notes\\n- Animation: camera walk-bob (fallback when no Blender/glTF anim)\\n- Bullet FX: GPUParticles3D muzzle + impact\\n- Physics: RigidBody3D debris chips on hit\\n- Materials: StandardMaterial3D + optional assets/wall.png from Asset Browser\\n- Godot is the game engine for this FPS template\\n"},
+		{"path": "docs/SHOOTER_FX.md", "content": "# Shooter genre engine notes\\n- Animation: camera walk-bob (fallback when no Blender/glTF anim)\\n- Bullet FX: GPUParticles3D muzzle + impact\\n- Physics: RigidBody3D debris chips on hit (Jolt if available)\\n- Materials: StandardMaterial3D + assets/materials/*.tres\\n- Skybox: WorldEnvironment panorama from skybox.png / sky.png\\n- Godot is the game engine for this FPS template\\n"},
 		{"path": "GENRE_REFS.md", "content": "Templates:\\n- https://github.com/KenneyNL/Starter-Kit-FPS\\n- https://github.com/bukkbeek/GodotFPS-Template\\nAssets: https://kenney.nl (CC0), Openverse CC0 textures, Wikimedia Commons\\n"},
 	])
 
@@ -314,8 +383,22 @@ var yaw := 0.0
 @onready var cam: Camera3D = $CamPivot/SpringArm3D/Camera3D
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	add_to_group(\"player\")
 	var mi := MeshInstance3D.new(); var cm := CapsuleMesh.new(); cm.radius=0.35; cm.height=1.5; mi.mesh=cm
-	var mat := StandardMaterial3D.new(); mat.albedo_color=Color(0.25,0.55,0.95); mi.material_override=mat; $Mesh.add_child(mi)
+	var mat := StandardMaterial3D.new(); mat.albedo_color=Color(0.25,0.55,0.95)
+	var tex: Texture2D = null
+	var rt := get_node_or_null(\"/root/StudioRuntime\")
+	if rt and rt.has_method(\"load_texture\"):
+		tex = rt.load_texture([\"sprite_player.png\", \"character.png\"])
+	if tex == null:
+		for pth in [\"res://assets/character/sprite_player.png\", \"res://assets/character/character.png\", \"res://assets/sprite_player.png\"]:
+			if ResourceLoader.exists(pth) or FileAccess.file_exists(pth):
+				tex = load(pth) as Texture2D
+				break
+	if tex:
+		mat.albedo_texture = tex
+		mat.albedo_color = Color.WHITE
+	mi.material_override=mat; $Mesh.add_child(mi)
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= e.relative.x * 0.004; pivot.rotation.y = yaw
@@ -412,9 +495,15 @@ const JUMP := -420.0
 const GRAV := 1100.0
 var coyote := 0.0
 func _ready() -> void:
+	add_to_group(\"player\")
 	var c := CollisionShape2D.new(); var r := RectangleShape2D.new(); r.size=Vector2(22,30); c.shape=r; add_child(c)
 	var spr_path := \"\"
-	for pth in [\"res://assets/character/sprite_player.png\", \"res://assets/sprites/sprite_player.png\", \"res://assets/sprite_player.png\"]:
+	var rt := get_node_or_null(\"/root/StudioRuntime\")
+	if rt and rt.has_method(\"load_texture\"):
+		var mapped: Texture2D = rt.load_texture([\"sprite_player.png\", \"character.png\"])
+		if mapped:
+			var spr0 := Sprite2D.new(); spr0.texture = mapped; add_child(spr0); return
+	for pth in [\"res://assets/character/sprite_player.png\", \"res://assets/sprites/sprite_player.png\", \"res://assets/sprite_player.png\", \"res://assets/character/character.png\"]:
 		if ResourceLoader.exists(pth) or FileAccess.file_exists(pth):
 			spr_path = pth
 			break
@@ -1021,12 +1110,30 @@ var palette: Array[Color] = [
 	Color(0.95, 0.85, 0.3), Color(0.22, 0.48, 0.9)
 ]
 var _root: Node3D
+var _tex_grass: Texture2D
+var _tex_dirt: Texture2D
+var _tex_stone: Texture2D
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_root = Node3D.new(); add_child(_root)
+	_tex_grass = _try_load_tex([\"grass.png\", \"floor.png\"])
+	_tex_dirt = _try_load_tex([\"dirt.png\", \"wall.png\"])
+	_tex_stone = _try_load_tex([\"stone.png\", \"wall.png\"])
 	_setup_particles()
 	_generate(); _rebuild(); _refresh_hud()
+func _try_load_tex(names: Array) -> Texture2D:
+	var rt := get_node_or_null(\"/root/StudioRuntime\")
+	if rt and rt.has_method(\"load_texture\"):
+		var mapped: Texture2D = rt.load_texture(names)
+		if mapped:
+			return mapped
+	for n in names:
+		for folder in [\"world/\", \"textures/\", \"\", \"materials/\"]:
+			var p := \"res://assets/%s%s\" % [folder, n]
+			if ResourceLoader.exists(p) or FileAccess.file_exists(p):
+				return load(p) as Texture2D
+	return null
 
 func _setup_particles() -> void:
 	fx.emitting = false
@@ -1076,6 +1183,14 @@ func _rebuild() -> void:
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = blocks[cell]
 		mat.roughness = 0.85
+		var tex: Texture2D = _tex_grass
+		if blocks[cell] == palette[1]:
+			tex = _tex_dirt
+		elif blocks[cell] == palette[2]:
+			tex = _tex_stone
+		if tex:
+			mat.albedo_texture = tex
+			mat.albedo_color = Color.WHITE
 		mi.material_override = mat
 		body.add_child(mi)
 		var col := CollisionShape3D.new(); var sh := BoxShape3D.new(); sh.size = Vector3.ONE; col.shape = sh; body.add_child(col)

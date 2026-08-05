@@ -24,13 +24,32 @@ const ASSIGN_SLOTS: PackedStringArray = [
 	"wall",
 	"floor",
 	"sky",
+	"skybox",
 	"character",
+	"character_sprite",
+	"character_texture",
+	"character_model",
+	"character_material",
 	"enemy",
+	"enemy_texture",
+	"enemy_model",
+	"enemy_anim",
+	"enemy_material",
 	"weapon",
+	"weapon_texture",
+	"weapon_model",
+	"weapon_sprite",
+	"weapon_material",
+	"wall_material",
+	"floor_material",
+	"skybox_material",
+	"room",
+	"room_model",
 	"menu_background",
 	"game_background",
 	"ui",
 	"material",
+	"physics",
 ]
 
 
@@ -261,37 +280,113 @@ static func slot_filename(slot: String) -> String:
 			return "floor.png"
 		"sky", "game_background":
 			return "sky.png"
-		"character":
+		"skybox":
+			return "skybox.png"
+		"character", "character_sprite":
 			return "sprite_player.png"
+		"character_texture":
+			return "character.png"
+		"character_model":
+			return "character.obj"
+		"character_material":
+			return "character.tres"
 		"enemy":
 			return "sprite_enemy.png"
-		"weapon":
+		"enemy_texture":
+			return "enemy.png"
+		"enemy_model":
+			return "enemy.obj"
+		"enemy_anim":
+			return "idle"
+		"enemy_material":
+			return "enemy.tres"
+		"weapon", "weapon_texture":
 			return "weapon.png"
+		"weapon_sprite":
+			return "sprite_weapon.png"
+		"weapon_model":
+			return "weapon.obj"
+		"weapon_material":
+			return "weapon.tres"
+		"wall_material":
+			return "wall.tres"
+		"floor_material":
+			return "floor.tres"
+		"skybox_material":
+			return "skybox.tres"
+		"room":
+			return "wall.png"
+		"room_model":
+			return "room.obj"
 		"menu_background":
 			return "menu_bg.png"
 		"ui":
 			return "ui_panel.png"
 		"material":
-			return "material.png"
+			return "material.tres"
+		"physics":
+			return "physics.json"
 		_:
 			return "%s.png" % slot
 
 
 static func slot_category(slot: String) -> String:
 	match slot:
-		"wall", "floor":
+		"wall", "floor", "room":
 			return "world"
-		"sky", "game_background", "menu_background":
+		"room_model":
+			return "models"
+		"sky", "skybox", "game_background", "menu_background":
 			return "background"
-		"character":
+		"character", "character_sprite", "character_texture", "character_model":
 			return "character"
-		"enemy":
+		"enemy", "enemy_texture", "enemy_model", "enemy_anim":
 			return "enemy"
-		"weapon":
+		"weapon", "weapon_texture", "weapon_model", "weapon_sprite":
 			return "weapon"
 		"ui":
 			return "ui"
-		"material":
+		"material", "character_material", "enemy_material", "weapon_material", "wall_material", "floor_material", "skybox_material":
 			return "materials"
+		"physics":
+			return "effects"
 		_:
 			return "textures"
+
+
+static func unique_filename(stem: String, ext: String) -> String:
+	var safe_stem: String = stem.get_file().get_basename()
+	if safe_stem.is_empty():
+		safe_stem = "asset"
+	var safe_ext: String = ext.lstrip(".")
+	if safe_ext.is_empty():
+		safe_ext = "png"
+	return "%s_%s.%s" % [safe_stem, str(Time.get_unix_time_from_system()).replace(".", ""), safe_ext]
+
+
+static func unique_sibling(abs_path: String) -> String:
+	if abs_path.is_empty():
+		return ""
+	var dir_path: String = abs_path.get_base_dir()
+	var base: String = abs_path.get_file().get_basename()
+	var ext: String = abs_path.get_extension()
+	var i: int = 2
+	var dest: String = dir_path.path_join("%s_v%s.%s" % [base, str(i), ext])
+	while FileAccess.file_exists(dest):
+		i += 1
+		dest = dir_path.path_join("%s_v%s.%s" % [base, str(i), ext])
+	return dest
+
+
+static func archive_as_variant(project_path: String, res_path: String) -> String:
+	var rel: String = res_path.trim_prefix("res://").lstrip("/").replace("\\", "/")
+	if rel.is_empty() or project_path.is_empty():
+		return ""
+	var abs_path: String = project_path.path_join(rel)
+	if not FileAccess.file_exists(abs_path):
+		return ""
+	var dest: String = unique_sibling(abs_path)
+	if dest.is_empty() or not copy_file(abs_path, dest):
+		return ""
+	var new_rel: String = dest.substr(project_path.length()).lstrip("/").lstrip("\\").replace("\\", "/")
+	return "res://%s" % new_rel

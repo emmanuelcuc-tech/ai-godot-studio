@@ -4,8 +4,12 @@ extends MarginContainer
 const LayoutScript = preload("res://scripts/editors/game_asset_layout.gd")
 const ConfigScript = preload("res://scripts/editors/studio_game_config.gd")
 const ImageClientScript = preload("res://scripts/ai/image_asset_client.gd")
+const GraphicStyleScript = preload("res://scripts/graphic_style.gd")
+const AddPanelScript = preload("res://scripts/editors/add_to_game_panel.gd")
 
 var _empty: Label
+var _outer: VBoxContainer
+var _kit: Control
 var _root: HSplitContainer
 var _cat_list: ItemList
 var _file_list: ItemList
@@ -45,11 +49,13 @@ func refresh() -> void:
 	var path: String = AIOrchestrator.get_project_path()
 	var active: bool = AIOrchestrator.has_active_session() and not path.is_empty()
 	_empty.visible = not active
-	_root.visible = active
+	_outer.visible = active
 	if not active:
 		return
 	LayoutScript.ensure_layout(path)
 	ConfigScript.ensure_on_disk(path)
+	if _kit and _kit.has_method("refresh"):
+		_kit.refresh()
 	_reload_files()
 
 
@@ -63,10 +69,17 @@ func _build() -> void:
 	_empty.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(_empty)
 
+	_outer = VBoxContainer.new()
+	_outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(_outer)
+	_kit = AddPanelScript.new()
+	_kit.custom_minimum_size = Vector2(0, 280)
+	_outer.add_child(_kit)
 	_root = HSplitContainer.new()
 	_root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_child(_root)
+	_outer.add_child(_root)
 
 	var left: VBoxContainer = VBoxContainer.new()
 	left.custom_minimum_size = Vector2(200, 0)
@@ -104,6 +117,11 @@ func _build() -> void:
 	prev_title.text = "Preview / replace / assign"
 	prev_title.add_theme_font_size_override("font_size", 16)
 	right.add_child(prev_title)
+	var lib_hint: Label = Label.new()
+	lib_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lib_hint.add_theme_color_override("font_color", Color(0.62, 0.7, 0.78))
+	lib_hint.text = "Top panel: Add to game / Change character → world → enemy → weapon (models, materials, physics). Below: browse folders and assign. Searches follow graphic style."
+	right.add_child(lib_hint)
 
 	_preview = TextureRect.new()
 	_preview.custom_minimum_size = Vector2(0, 180)
@@ -161,6 +179,32 @@ func _build() -> void:
 	assign_btn.text = "Assign to game"
 	assign_btn.pressed.connect(_on_assign)
 	slot_row.add_child(assign_btn)
+	var quick_row: HBoxContainer = HBoxContainer.new()
+	right.add_child(quick_row)
+	var as_tex: Button = Button.new()
+	as_tex.text = "Character texture"
+	as_tex.pressed.connect(func(): _assign_named("character_texture"))
+	quick_row.add_child(as_tex)
+	var as_model: Button = Button.new()
+	as_model.text = "Character model"
+	as_model.pressed.connect(func(): _assign_named("character_model"))
+	quick_row.add_child(as_model)
+	var as_wall: Button = Button.new()
+	as_wall.text = "Wall"
+	as_wall.pressed.connect(func(): _assign_named("wall"))
+	quick_row.add_child(as_wall)
+	var as_floor: Button = Button.new()
+	as_floor.text = "Floor"
+	as_floor.pressed.connect(func(): _assign_named("floor"))
+	quick_row.add_child(as_floor)
+	var as_room: Button = Button.new()
+	as_room.text = "Room"
+	as_room.pressed.connect(func(): _assign_named("room"))
+	quick_row.add_child(as_room)
+	var as_weapon: Button = Button.new()
+	as_weapon.text = "Weapon"
+	as_weapon.pressed.connect(func(): _assign_named("weapon"))
+	quick_row.add_child(as_weapon)
 
 	var local_row: HBoxContainer = HBoxContainer.new()
 	right.add_child(local_row)
@@ -180,7 +224,7 @@ func _build() -> void:
 	right.add_child(search_row)
 	_search_edit = LineEdit.new()
 	_search_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_search_edit.placeholder_text = "cc0 brick wall seamless"
+	_search_edit.placeholder_text = "cc0 brick wall / pixel hero sprite / character texture"
 	search_row.add_child(_search_edit)
 	var search_btn: Button = Button.new()
 	search_btn.text = "Search"
@@ -262,20 +306,31 @@ func _show_preview(item: Dictionary) -> void:
 
 
 func _on_assign() -> void:
+	_assign_named(_slot_option.get_item_text(_slot_option.selected))
+
+
+func _assign_named(slot: String) -> void:
 	var path: String = AIOrchestrator.get_project_path()
 	if path.is_empty() or _selected.is_empty():
 		_status.text = "Select an asset first."
 		return
-	var slot: String = _slot_option.get_item_text(_slot_option.selected)
 	var src: String = str(_selected.get("abs", ""))
 	var dest_name: String = LayoutScript.slot_filename(slot)
+	if slot == "character_model" or LayoutScript.MODEL_EXTS.has(src.get_extension().to_lower()):
+		dest_name = src.get_file()
+		if dest_name.get_extension().is_empty():
+			dest_name = "character.obj"
 	var cat: String = LayoutScript.slot_category(slot)
+	if slot == "character_model":
+		cat = "character"
 	var installed: Dictionary = LayoutScript.install_asset(path, src, dest_name, cat, true)
 	if not installed.get("ok", false):
 		_status.text = "Assign failed."
 		return
 	ConfigScript.assign_slot(path, slot, str(installed.get("res", "")))
-	_status.text = "Assigned %s → %s (%s)" % [slot, str(installed.get("res", "")), cat]
+	if slot == "character_texture" or slot == "character":
+		ConfigScript.assign_slot(path, "character", str(installed.get("res", "")))
+	_status.text = "Assigned %s → %s (%s). Run Game to see it." % [slot, str(installed.get("res", "")), cat]
 	_reload_files()
 
 
@@ -288,9 +343,17 @@ func _on_file_picked(src: String) -> void:
 	if path.is_empty():
 		return
 	var cat: String = _current_cat if _current_cat != "all" else LayoutScript.categorize(src.get_file())
+	if LayoutScript.MODEL_EXTS.has(src.get_extension().to_lower()) and cat == "all":
+		cat = "character"
 	var installed: Dictionary = LayoutScript.install_asset(path, src, src.get_file(), cat, true)
 	if installed.get("ok", false):
-		_status.text = "Imported %s" % str(installed.get("res", ""))
+		if cat == "character" or src.get_file().to_lower().contains("player") or src.get_file().to_lower().contains("character"):
+			if LayoutScript.MODEL_EXTS.has(src.get_extension().to_lower()):
+				ConfigScript.assign_slot(path, "character_model", str(installed.get("res", "")))
+			else:
+				ConfigScript.assign_slot(path, "character", str(installed.get("res", "")))
+				ConfigScript.assign_slot(path, "character_texture", str(installed.get("res", "")))
+		_status.text = "Imported %s — Run Game to see character/world art." % str(installed.get("res", ""))
 		_reload_files()
 	else:
 		_status.text = "Import failed."
@@ -310,6 +373,10 @@ func _on_search() -> void:
 		q = "CC0 game texture seamless"
 	if not q.to_lower().contains("cc0") and not q.to_lower().contains("public domain"):
 		q += " CC0"
+	var path: String = AIOrchestrator.get_project_path()
+	if not path.is_empty():
+		var styles: PackedStringArray = GraphicStyleScript.from_variant(ConfigScript.load_style(path).get("graphic_styles", []))
+		q += GraphicStyleScript.query_suffix(styles)
 	_status.text = "Searching open images…"
 	_images.search(q)
 

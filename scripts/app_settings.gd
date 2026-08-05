@@ -18,9 +18,14 @@ var use_claude: bool = true
 var use_gemini: bool = true
 var use_web_search: bool = true
 var create_with_cpp: bool = true
+var use_art_textures: bool = true
+var use_art_sprites: bool = true
+var use_art_models: bool = true
+var graphic_styles: PackedStringArray = PackedStringArray(["3d", "detailed"])
 var godot_executable: String = ""
 var blender_executable: String = ""
 var output_folder: String = "res://generated_games"
+var local_asset_folder: String = "F:/asset"
 
 
 func _ready() -> void:
@@ -63,9 +68,16 @@ func load_settings() -> void:
 	use_gemini = bool(cfg.get_value("providers", "gemini", use_gemini))
 	use_web_search = bool(cfg.get_value("providers", "web_search", use_web_search))
 	create_with_cpp = bool(cfg.get_value("providers", "create_with_cpp", create_with_cpp))
+	use_art_textures = bool(cfg.get_value("art", "textures", use_art_textures))
+	use_art_sprites = bool(cfg.get_value("art", "sprites", use_art_sprites))
+	use_art_models = bool(cfg.get_value("art", "models", use_art_models))
+	graphic_styles = PackedStringArray(str(cfg.get_value("art", "graphic_styles", ",".join(graphic_styles))).split(",", false))
 	godot_executable = str(cfg.get_value("paths", "godot", godot_executable))
 	blender_executable = str(cfg.get_value("paths", "blender", blender_executable))
 	output_folder = str(cfg.get_value("paths", "output", output_folder))
+	local_asset_folder = str(cfg.get_value("paths", "local_asset_folder", local_asset_folder)).replace("\\", "/")
+	if local_asset_folder.is_empty():
+		local_asset_folder = "F:/asset"
 	# Prefer project-local generated_games so users can see files in the repo.
 	if output_folder.begins_with("user://"):
 		output_folder = "res://generated_games"
@@ -85,9 +97,14 @@ func save_settings() -> void:
 	cfg.set_value("providers", "gemini", use_gemini)
 	cfg.set_value("providers", "web_search", use_web_search)
 	cfg.set_value("providers", "create_with_cpp", create_with_cpp)
+	cfg.set_value("art", "textures", use_art_textures)
+	cfg.set_value("art", "sprites", use_art_sprites)
+	cfg.set_value("art", "models", use_art_models)
+	cfg.set_value("art", "graphic_styles", ",".join(graphic_styles))
 	cfg.set_value("paths", "godot", godot_executable)
 	cfg.set_value("paths", "blender", blender_executable)
 	cfg.set_value("paths", "output", output_folder)
+	cfg.set_value("paths", "local_asset_folder", local_asset_folder)
 	cfg.save(CONFIG_PATH)
 	settings_changed.emit()
 
@@ -110,6 +127,17 @@ func available_providers() -> PackedStringArray:
 		list.append("Web Search")
 	if create_with_cpp:
 		list.append("C++ / GDExtension")
+	if not local_asset_folder.is_empty():
+		list.append("Local: " + local_asset_folder)
+	var art_bits: PackedStringArray = PackedStringArray()
+	if use_art_textures:
+		art_bits.append("textures")
+	if use_art_sprites:
+		art_bits.append("sprites")
+	if use_art_models:
+		art_bits.append("models")
+	if not art_bits.is_empty():
+		list.append("Art: " + "/".join(art_bits))
 	if list.is_empty():
 		list.append("Offline templates")
 	return list

@@ -26,6 +26,10 @@ const CppGdextensionScript = preload("res://scripts/templates/cpp_gdextension.gd
 const CppBuilderScript = preload("res://scripts/cpp_builder.gd")
 const GameAssetLayoutScript = preload("res://scripts/editors/game_asset_layout.gd")
 const StudioGameConfigScript = preload("res://scripts/editors/studio_game_config.gd")
+const ProceduralArtScript = preload("res://scripts/ai/procedural_art.gd")
+const GameProjectBriefScript = preload("res://scripts/game_project_brief.gd")
+const GraphicStyleScript = preload("res://scripts/graphic_style.gd")
+const ArtEditIntentScript = preload("res://scripts/art_edit_intent.gd")
 
 const MAX_TEXTURE_JOBS := 8
 const RESOURCE_WAIT_SEC := 28.0
@@ -36,7 +40,8 @@ From the player's directions, write a concrete BUILD PLAN the coder will follow.
 Engine is ALWAYS Godot 4 with **C++ GDExtension (godot-cpp)** as the intended implementation.
 Also plan a **playable GDScript 2.0 fallback** so the game runs before the native library is compiled.
 Never use Unity/Unreal/GameMaker as the runtime.
-List C++ classes/files (src/*.h, src/*.cpp), GDScript bootstrap, several matching textures/sprites, materials, plugins, and Asset Library ideas (CC0 / open only — never commercial ROMs or ripped assets).
+List C++ classes/files (src/*.h, src/*.cpp), GDScript bootstrap, textures/sprites/models the studio already wrote under assets/, materials, plugins, and Asset Library ideas (CC0 / open / generated only — never commercial ROMs or ripped assets).
+Wire wall.png / floor.png / character sprites or capsule meshes that exist on disk. Recreate feel with original art — do not copy proprietary files.
 Return ONLY JSON (no markdown fences):
 {
   "title":"short name",
@@ -64,7 +69,7 @@ Optional scenes/main_cpp.tscn may use native class names GamePlayer / GameWorld 
 Use assets already on disk via category folders:
 assets/character/, assets/enemy/, assets/weapon/, assets/world/, assets/ui/, assets/effects/, assets/background/, assets/materials/, assets/models/, assets/sprites/, assets/textures/
 Also keep root aliases like assets/wall.png when present. Wire StandardMaterial3D.albedo_texture or Sprite2D.texture. Honor res://studio_display.json, studio_effects.json, studio_controls.json, studio_anim.json and scripts/studio_runtime.gd autoload.
-Match feel of the described game with original/CC0 art — never commercial ROMs or ripped assets.
+Match feel with original/CC0/generated art already on disk — never commercial ROMs or ripped assets. Always load assets/wall.png, assets/floor.png, assets/character/* and assets/enemy/* when those files exist. Keep a visible mesh or sprite for the player (capsule/box + texture is fine).
 Study refs/<name>/ open Godot samples (README + scripts) for genre patterns. Do not copy proprietary assets.
 If addons/ contains a plugin.cfg, you may enable it in project.godot [editor_plugins] only when safe; gameplay must still run without it.
 Include collisions, materials, particles, simple FX when the plan asks (especially shooters).
@@ -105,7 +110,7 @@ Write or UPDATE a playable Godot 4 project in GDScript 2.0 only.
 Use assets already on disk via category folders:
 assets/character/, assets/enemy/, assets/weapon/, assets/world/, assets/ui/, assets/effects/, assets/background/, assets/materials/, assets/models/, assets/sprites/, assets/textures/
 Also keep root aliases like assets/wall.png when present. Wire StandardMaterial3D.albedo_texture or Sprite2D.texture. Honor res://studio_display.json, studio_effects.json, studio_controls.json, studio_anim.json and scripts/studio_runtime.gd autoload.
-Match feel of the described game with original/CC0 art — never commercial ROMs or ripped assets.
+Match feel with original/CC0/generated art already on disk — never commercial ROMs or ripped assets. Always load assets/wall.png, assets/floor.png, assets/character/* and assets/enemy/* when those files exist. Keep a visible mesh or sprite for the player.
 Study refs/<name>/ open Godot samples for genre patterns. Gameplay must run even if addons/ is empty.
 Include collisions, materials, particles, simple FX when the plan asks (especially shooters).
 Return ONLY JSON (no markdown fences):
@@ -134,6 +139,9 @@ var _description: String = ""
 var _genre_id: String = "fps"
 var _genre: Dictionary = {}
 var _inspiration: Dictionary = {}
+var _art_kinds: Dictionary = {"textures": true, "sprites": true, "models": true}
+var _graphic_styles: PackedStringArray = PackedStringArray(["3d", "detailed"])
+var _art_slots: PackedStringArray = PackedStringArray()
 var _base: Dictionary = {}
 var _research: String = ""
 var _asset_research: String = ""
@@ -160,6 +168,9 @@ var _waiting_resources: bool = false
 var _want_ai_after_resources: bool = false
 var _res_gen: int = 0
 var _resource_timer: Timer
+var _game_project: Dictionary = {}
+var _pending_url_jobs: Array = []
+var _url_active: bool = false
 
 
 func _ready() -> void:
@@ -229,6 +240,9 @@ func new_game() -> void:
 	_ref_summary = ""
 	_plan = {}
 	_plan_raw = ""
+	_game_project = {}
+	_pending_url_jobs.clear()
+	_url_active = false
 	if openrefs:
 		openrefs.cancel()
 	if _resource_timer:
@@ -238,7 +252,55 @@ func new_game() -> void:
 	session_changed.emit()
 
 
-func create_game(description: String, genre_index: int = 0) -> void:
+func apply_art_edit(options: Dictionary = {}) -> void:
+	if not session.active or session.project_path.is_empty():
+		status.emit("Create a game first.")
+		pipeline_finished.emit(false, {"ok": false, "error": "No active game"})
+		return
+	if _busy:
+		status.emit("Still creating — wait or press New Game.")
+		return
+	_art_kinds = ProceduralArtScript.normalize_kinds({
+		"textures": options.get("textures", true),
+		"sprites": options.get("sprites", false),
+		"models": options.get("models", false),
+	})
+	_graphic_styles = GraphicStyleScript.from_variant(options.get("graphic_styles", []))
+	if _graphic_styles.is_empty():
+		_graphic_styles = GraphicStyleScript.from_variant(StudioGameConfigScript.load_style(session.project_path).get("graphic_styles", []))
+	if _graphic_styles.is_empty():
+		_graphic_styles = GraphicStyleScript.defaults_for_genre(_genre_id)
+	ProceduralArtScript.set_styles(_graphic_styles)
+	StudioGameConfigScript.set_graphic_styles(session.project_path, _graphic_styles)
+	StudioGameConfigScript.set_art_kinds(session.project_path, _art_kinds)
+	_art_slots = PackedStringArray()
+	var slot_opt: Variant = options.get("art_slots", [])
+	if typeof(slot_opt) == TYPE_PACKED_STRING_ARRAY:
+		_art_slots = slot_opt
+	elif typeof(slot_opt) == TYPE_ARRAY:
+		for item in slot_opt:
+			_art_slots.append(str(item))
+	if _art_slots.is_empty():
+		status.emit("Pick Wall / Floor / Room / Character / Weapon first.")
+		pipeline_finished.emit(false, {"ok": false, "error": "No art slots"})
+		return
+	var note: String = str(options.get("description", "")).strip_edges()
+	if not note.is_empty():
+		_description = note
+	status.emit("Updating art slots (%s) in style %s…" % [", ".join(_art_slots), GraphicStyleScript.label(_graphic_styles)])
+	_refresh_art_slots(_art_slots, true)
+	_notes.append("Art edit applied: %s / %s" % [", ".join(_art_slots), GraphicStyleScript.label(_graphic_styles)])
+	session_changed.emit()
+	pipeline_finished.emit(true, {
+		"ok": true,
+		"art_edit": true,
+		"path": session.project_path,
+		"summary": "Art slots updated: %s" % ", ".join(_art_slots),
+		"session": session.label(),
+	})
+
+
+func create_game(description: String, genre_index: int = 0, options: Dictionary = {}) -> void:
 	if _busy:
 		status.emit("Already creating… press New Game to cancel.")
 		return
@@ -259,6 +321,8 @@ func create_game(description: String, genre_index: int = 0) -> void:
 	_queued_names.clear()
 	_downloaded_assets.clear()
 	_download_active = false
+	_pending_url_jobs.clear()
+	_url_active = false
 	_addon_busy = false
 	_ref_busy = false
 	_waiting_resources = false
@@ -267,16 +331,56 @@ func create_game(description: String, genre_index: int = 0) -> void:
 	_addon_installed = {}
 	_ref_result = {}
 	_ref_summary = ""
+	_game_project = {}
 	if openrefs:
 		openrefs.cancel()
 	if _resource_timer:
 		_resource_timer.stop()
 	_modify = session.active
+	_art_kinds = ProceduralArtScript.normalize_kinds({
+		"textures": options.get("textures", AppSettings.use_art_textures),
+		"sprites": options.get("sprites", AppSettings.use_art_sprites),
+		"models": options.get("models", AppSettings.use_art_models),
+	})
+	_graphic_styles = GraphicStyleScript.from_variant(options.get("graphic_styles", AppSettings.graphic_styles))
+	_art_slots = PackedStringArray()
+	var slot_opt: Variant = options.get("art_slots", [])
+	if typeof(slot_opt) == TYPE_PACKED_STRING_ARRAY:
+		_art_slots = slot_opt
+	elif typeof(slot_opt) == TYPE_ARRAY:
+		for item in slot_opt:
+			_art_slots.append(str(item))
+	var gp_parse: Dictionary = GameProjectBriefScript.try_parse_text(text)
+	if str(gp_parse.get("kind", "")) == "gameproject":
+		_game_project = gp_parse.get("data", {}) if typeof(gp_parse.get("data", {})) == TYPE_DICTIONARY else {}
+		text = GameProjectBriefScript.directions_text(_game_project)
+		if text.is_empty():
+			text = str(_game_project.get("title", "Studio game"))
+		var gp_genre: String = str(_game_project.get("genre", "")).strip_edges()
+		if not gp_genre.is_empty():
+			var mapped: int = GenreCatalogScript.index_for_text(gp_genre)
+			if mapped > 0:
+				genre_index = mapped
+		_notes.append("GameProject JSON applied.")
+	elif str(gp_parse.get("kind", "")) == "skipped":
+		_notes.append(str(gp_parse.get("reason", "skipped — not a game spec")))
+	elif str(gp_parse.get("kind", "")) == "site_only":
+		_notes.append("Ignored npm site config.")
+		var site_name: String = str(gp_parse.get("name", "")).strip_edges()
+		if not site_name.is_empty() and site_name.to_lower() != "untitled" and text.begins_with("{"):
+			text = site_name
+	elif str(gp_parse.get("kind", "")) == "name_only":
+		var only_name: String = str(gp_parse.get("name", "")).strip_edges()
+		if not only_name.is_empty() and text.begins_with("{"):
+			text = only_name
 	_description = text
 	_genre_id = GenreCatalogScript.id_at(genre_index)
 	_inspiration = GameInspirationsScript.detect(_description)
 	_genre = GenreCatalogScript.detect(_description, _genre_id)
 	_genre_id = str(_genre.get("id", _genre_id))
+	if _modify:
+		status.emit("Editing existing game from new directions…")
+		_notes.append("EDIT — merge new directions into the same project (not a new game).")
 	if not _inspiration.is_empty() and not _modify:
 		_genre_id = str(_inspiration.get("genre_id", _genre_id))
 		_description = GameInspirationsScript.enrich_prompt(_description, _inspiration)
@@ -285,6 +389,15 @@ func create_game(description: String, genre_index: int = 0) -> void:
 		_genre = GenreCatalogScript.by_id("fps")
 	if _description.is_empty():
 		_description = "Build a playable Godot 4 %s" % str(_genre.get("name", _genre_id))
+	if _graphic_styles.is_empty():
+		if _modify and not session.project_path.is_empty():
+			_graphic_styles = GraphicStyleScript.from_variant(StudioGameConfigScript.load_style(session.project_path).get("graphic_styles", []))
+		else:
+			_graphic_styles = GraphicStyleScript.defaults_for_genre(_genre_id)
+	ProceduralArtScript.set_styles(_graphic_styles)
+	if _modify and _art_slots.is_empty():
+		var detected_slots: Dictionary = ArtEditIntentScript.detect(_description)
+		_art_slots = ArtEditIntentScript.selected_slots(detected_slots.get("slots", {}))
 
 	if _modify:
 		_notes.append("MODIFY — ChatGPT will follow new directions on the active game.")
@@ -300,10 +413,14 @@ func create_game(description: String, genre_index: int = 0) -> void:
 	else:
 		_notes.append("CREATE — Godot template + C++ GDExtension + ChatGPT plan + code + assets" if AppSettings.create_with_cpp else "CREATE — Godot template + ChatGPT plan + code + assets")
 		status.emit("Loading Godot %s template…" % str(_genre.get("name", _genre_id)))
-		_base = GenreTemplatesScript.build(_genre_id)
+		var gp_title: String = str(_game_project.get("title", ""))
+		_base = GenreTemplatesScript.build(_genre_id, gp_title)
 		if _base.is_empty() or not _base.has("files"):
-			_base = GenreTemplatesScript.build("fps")
+			_base = GenreTemplatesScript.build("fps", gp_title)
 			_genre_id = "fps"
+		var pname: String = GameProjectBriefScript.sanitize_project_name(gp_title)
+		if not pname.is_empty():
+			_base["project_name"] = pname
 
 	var starter := _build_and_write_starter()
 	if not starter.get("ok", false):
@@ -312,6 +429,7 @@ func create_game(description: String, genre_index: int = 0) -> void:
 		return
 
 	_start_texture_download()
+	_queue_gameproject_urls()
 
 	if not AppSettings.has_any_ai_key():
 		status.emit("Game created (offline). Fetching open assets in the background…")
@@ -355,6 +473,20 @@ func _build_and_write_starter() -> Dictionary:
 		"path": "docs/PLUGINS.md",
 		"content": _plugins_stub_markdown(),
 	})
+	if not str(_game_project.get("setup_instructions", "")).strip_edges().is_empty():
+		files.append({
+			"path": "docs/SETUP.md",
+			"content": "# Setup\n\n%s\n" % str(_game_project.get("setup_instructions", "")),
+		})
+	var structure_files: Array = GameProjectBriefScript.parse_structure_files(_game_project.get("project_structure", null))
+	for sf in structure_files:
+		if typeof(sf) != TYPE_DICTIONARY:
+			continue
+		var rel: String = str(sf.get("path", ""))
+		if rel.is_empty():
+			continue
+		files.append({"path": rel, "content": str(sf.get("content", ""))})
+		_notes.append("GameProject file → %s" % rel)
 	built["files"] = files
 	built["ok"] = true
 	built["summary"] = "Playable %s from: %s" % [_genre_id, _description.left(100)]
@@ -370,6 +502,18 @@ func _build_and_write_starter() -> Dictionary:
 	if not session.project_path.is_empty():
 		GameAssetLayoutScript.ensure_layout(session.project_path)
 		StudioGameConfigScript.ensure_on_disk(session.project_path)
+		StudioGameConfigScript.set_art_kinds(session.project_path, _art_kinds)
+		StudioGameConfigScript.set_graphic_styles(session.project_path, _graphic_styles)
+		ProceduralArtScript.set_styles(_graphic_styles)
+		var art_written: Array = ProceduralArtScript.write_starter_art(session.project_path, _genre_id, _art_kinds)
+		for a in art_written:
+			if typeof(a) == TYPE_DICTIONARY:
+				_downloaded_assets.append(a)
+		_notes.append("Starter art on disk (%s files). Style: %s" % [str(art_written.size()), GraphicStyleScript.label(_graphic_styles)])
+		if _modify and not _art_slots.is_empty():
+			_refresh_art_slots(_art_slots, true)
+		_write_gameproject_snapshot(str(written.get("summary", "")))
+		status.emit("Wrote visible starter art (textures/sprites/models as chosen).")
 	if AppSettings.create_with_cpp:
 		_note_cpp_build(not _modify)
 	written["session"] = session.label()
@@ -421,15 +565,194 @@ func _start_texture_download() -> void:
 		var first: Dictionary = jobs[0]
 		first["query"] = hint
 		jobs[0] = first
+	var force_char: bool = _wants_character_improve(_description)
 	for job in jobs:
 		if typeof(job) != TYPE_DICTIONARY:
 			continue
-		_queue_texture_download(str(job.get("filename", "")), str(job.get("query", "")), false, str(job.get("category", "")))
+		var fname: String = str(job.get("filename", ""))
+		var cat: String = str(job.get("category", GameAssetLayoutScript.categorize(fname, str(job.get("query", "")), str(job.get("usage", "")))))
+		if not _job_matches_art_kinds(fname, cat):
+			continue
+		var force: bool = force_char and (cat == "character" or fname.contains("player") or fname.contains("character"))
+		_queue_texture_download(fname, str(job.get("query", "")), force, cat)
+	if force_char and not session.project_path.is_empty():
+		if bool(_art_kinds.get("sprites", true)) or bool(_art_kinds.get("textures", true)):
+			ProceduralArtScript.write_named(session.project_path, "sprite_player.png", "character", "hero", true)
+			ProceduralArtScript.write_named(session.project_path, "character.png", "character", "skin", true)
+			StudioGameConfigScript.assign_slot(session.project_path, "character", "res://assets/character/sprite_player.png")
+			StudioGameConfigScript.assign_slot(session.project_path, "character_texture", "res://assets/character/character.png")
+		if bool(_art_kinds.get("models", true)):
+			ProceduralArtScript.write_character_model(session.project_path, _genre_id, true)
+			StudioGameConfigScript.assign_slot(session.project_path, "character_model", "res://assets/character/character.obj")
+		status.emit("Updated character texture/model from your edit directions.")
+
+
+func _job_matches_art_kinds(filename: String, category: String) -> bool:
+	var blob: String = "%s %s" % [filename.to_lower(), category.to_lower()]
+	var is_sprite: bool = blob.contains("sprite") or category == "character" or category == "enemy" or category == "ui" or category == "weapon"
+	var is_model: bool = blob.ends_with(".glb") or blob.ends_with(".gltf") or blob.ends_with(".obj") or category == "models"
+	if is_model:
+		return bool(_art_kinds.get("models", true))
+	if is_sprite and not bool(_art_kinds.get("sprites", true)) and not bool(_art_kinds.get("textures", true)):
+		return false
+	if is_sprite:
+		return bool(_art_kinds.get("sprites", true)) or bool(_art_kinds.get("textures", true))
+	return bool(_art_kinds.get("textures", true))
+
+
+func _wants_character_improve(text: String) -> bool:
+	var q: String = text.to_lower()
+	if not (q.contains("character") or q.contains("player") or q.contains("hero") or q.contains("skin")):
+		return false
+	return q.contains("texture") or q.contains("sprite") or q.contains("model") or q.contains("better") or q.contains("improve") or q.contains("add")
+
+
+func _art_job_allowed(filename: String, category: String, query: String = "") -> bool:
+	var blob: String = "%s %s %s" % [filename.to_lower(), category.to_lower(), query.to_lower()]
+	var ext: String = filename.get_extension().to_lower()
+	if ext in ["glb", "gltf", "obj", "fbx"] or category == "models" or blob.contains("model"):
+		return bool(_art_kinds.get("models", true))
+	if category in ["character", "enemy", "weapon", "sprites", "ui"] or blob.contains("sprite") or filename.begins_with("sprite_"):
+		return bool(_art_kinds.get("sprites", true))
+	return bool(_art_kinds.get("textures", true))
+
+
+func _queue_gameproject_urls() -> void:
+	var urls = _game_project.get("texture_urls", [])
+	if typeof(urls) != TYPE_ARRAY:
+		return
+	var i: int = 0
+	for u in urls:
+		var url: String = str(u).strip_edges()
+		if url.is_empty():
+			continue
+		var fname: String = url.get_file()
+		if fname.is_empty() or not ResourceCatalogScript.is_image_filename(fname):
+			fname = "import_%s.png" % str(i)
+		if not _art_job_allowed(fname, GameAssetLayoutScript.categorize(fname, url), url):
+			i += 1
+			continue
+		_pending_url_jobs.append({
+			"url": url,
+			"filename": ResourceCatalogScript.sanitize_filename(fname),
+			"category": GameAssetLayoutScript.categorize(fname, url),
+		})
+		i += 1
+	if not _url_active:
+		_pump_url_jobs()
+
+
+func _pump_url_jobs() -> void:
+	if _pending_url_jobs.is_empty():
+		_url_active = false
+		_maybe_finish_resources()
+		return
+	if images == null:
+		_url_active = false
+		return
+	_url_active = true
+	var job: Dictionary = _pending_url_jobs.pop_front()
+	var dest: String = GameAssetLayoutScript.dest_abs(session.project_path, str(job.get("filename", "tex.png")), str(job.get("category", "textures")))
+	_tex_filename = str(job.get("filename", "tex.png"))
+	_tex_category = str(job.get("category", "textures"))
+	_tex_query = str(job.get("url", ""))
+	status.emit("Downloading GameProject texture…")
+	if images.download_url(str(job.get("url", "")), dest) != OK:
+		_url_active = false
+		_pump_url_jobs()
+
+
+func _write_gameproject_snapshot(summary: String) -> void:
+	if session.project_path.is_empty():
+		return
+	var gp: Dictionary = _game_project.duplicate(true) if not _game_project.is_empty() else {}
+	if gp.is_empty():
+		gp = {
+			"title": session.project_name,
+			"genre": _genre_id,
+			"description": _description,
+			"summary": summary,
+		}
+	var local_tex: Array = []
+	for item in GameAssetLayoutScript.list_all(session.project_path):
+		if typeof(item) == TYPE_DICTIONARY and str(item.get("kind", "")) == "image":
+			local_tex.append(str(item.get("rel", "")))
+	var snap: Dictionary = GameProjectBriefScript.snapshot(gp, {
+		"title": session.project_name,
+		"genre": _genre_id,
+		"description": _description,
+		"summary": summary,
+		"local_textures": local_tex,
+	})
+	var f: FileAccess = FileAccess.open(session.project_path.path_join("studio_gameproject.json"), FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(snap, "\t"))
+
+
+func _refresh_art_slots(slots: PackedStringArray, force: bool = true) -> void:
+	if session.project_path.is_empty():
+		return
+	ProceduralArtScript.set_styles(_graphic_styles)
+	var hint: String = _description.left(80) if not _description.is_empty() else _genre_id
+	for slot in slots:
+		match str(slot):
+			"wall":
+				if bool(_art_kinds.get("textures", true)):
+					ProceduralArtScript.write_named(session.project_path, "wall.png", "world", "brick", true)
+					_queue_texture_download("wall.png", "%s brick wall seamless texture CC0" % hint, force, "world")
+					StudioGameConfigScript.assign_slot(session.project_path, "wall", "res://assets/world/wall.png")
+			"floor":
+				if bool(_art_kinds.get("textures", true)):
+					ProceduralArtScript.write_named(session.project_path, "floor.png", "world", "concrete", true)
+					_queue_texture_download("floor.png", "%s floor seamless texture CC0" % hint, force, "world")
+					StudioGameConfigScript.assign_slot(session.project_path, "floor", "res://assets/world/floor.png")
+			"room":
+				if bool(_art_kinds.get("textures", true)):
+					ProceduralArtScript.write_named(session.project_path, "wall.png", "world", "brick", true)
+					ProceduralArtScript.write_named(session.project_path, "floor.png", "world", "concrete", true)
+					ProceduralArtScript.write_named(session.project_path, "ceiling.png", "world", "metal", true)
+					ProceduralArtScript.write_named(session.project_path, "sky.png", "background", "sky", true)
+					_queue_texture_download("wall.png", "%s room wall seamless texture CC0" % hint, force, "world")
+					_queue_texture_download("floor.png", "%s room floor seamless texture CC0" % hint, force, "world")
+					_queue_texture_download("sky.png", "%s sky backdrop CC0" % hint, force, "background")
+					StudioGameConfigScript.assign_slot(session.project_path, "room", "res://assets/world/wall.png")
+					StudioGameConfigScript.assign_slot(session.project_path, "wall", "res://assets/world/wall.png")
+					StudioGameConfigScript.assign_slot(session.project_path, "floor", "res://assets/world/floor.png")
+					StudioGameConfigScript.assign_slot(session.project_path, "sky", "res://assets/background/sky.png")
+				if bool(_art_kinds.get("models", true)):
+					ProceduralArtScript.write_room_model(session.project_path, true)
+					StudioGameConfigScript.assign_slot(session.project_path, "room_model", "res://assets/models/room.obj")
+			"character":
+				if bool(_art_kinds.get("textures", true)):
+					ProceduralArtScript.write_named(session.project_path, "character.png", "character", "skin", true)
+					_queue_texture_download("character.png", "%s character skin texture CC0" % hint, force, "character")
+					StudioGameConfigScript.assign_slot(session.project_path, "character_texture", "res://assets/character/character.png")
+				if bool(_art_kinds.get("sprites", true)):
+					ProceduralArtScript.write_named(session.project_path, "sprite_player.png", "character", "hero", true)
+					_queue_texture_download("sprite_player.png", "%s hero character sprite CC0" % hint, force, "character")
+					StudioGameConfigScript.assign_slot(session.project_path, "character", "res://assets/character/sprite_player.png")
+				if bool(_art_kinds.get("models", true)):
+					ProceduralArtScript.write_character_model(session.project_path, _genre_id, true)
+					StudioGameConfigScript.assign_slot(session.project_path, "character_model", "res://assets/character/character.obj")
+			"weapon":
+				if bool(_art_kinds.get("textures", true)) or bool(_art_kinds.get("sprites", true)):
+					ProceduralArtScript.write_named(session.project_path, "weapon.png", "weapon", "metal", true)
+					_queue_texture_download("weapon.png", "%s weapon texture CC0" % hint, force, "weapon")
+					StudioGameConfigScript.assign_slot(session.project_path, "weapon", "res://assets/weapon/weapon.png")
+					StudioGameConfigScript.assign_slot(session.project_path, "weapon_texture", "res://assets/weapon/weapon.png")
+				if bool(_art_kinds.get("models", true)):
+					ProceduralArtScript.write_weapon_model(session.project_path, true)
+					StudioGameConfigScript.assign_slot(session.project_path, "weapon_model", "res://assets/weapon/weapon.obj")
+			_:
+				pass
 
 
 func _queue_texture_download(filename: String, query: String, force: bool = false, category: String = "") -> void:
 	var fname: String = ResourceCatalogScript.sanitize_filename(filename if not filename.is_empty() else "wall.png")
 	var q: String = query.strip_edges()
+	var suffix: String = GraphicStyleScript.query_suffix(_graphic_styles)
+	if not suffix.is_empty() and not q.to_lower().contains(suffix.strip_edges().left(12).to_lower()):
+		q += suffix
 	if q.is_empty():
 		return
 	var cat: String = category if not category.is_empty() else GameAssetLayoutScript.categorize(fname, q)
@@ -479,6 +802,7 @@ func _on_images_found(ok: bool, _results: Array, _error: String) -> void:
 	if not _awaiting_tex:
 		return
 	if not ok or images.result_count() <= 0:
+		_write_procedural_fallback(_tex_filename, _tex_category)
 		_awaiting_tex = false
 		_pump_downloads()
 		return
@@ -487,10 +811,41 @@ func _on_images_found(ok: bool, _results: Array, _error: String) -> void:
 
 
 func _on_image_ready(ok: bool, index: int, texture: Texture2D, meta: Dictionary, _error: String) -> void:
+	if _url_active and str(meta.get("source", "")) == "direct":
+		_url_active = false
+		if ok and not session.project_path.is_empty():
+			var dest: String = GameAssetLayoutScript.dest_abs(session.project_path, _tex_filename, _tex_category)
+			var cache: String = str(meta.get("cache_path", ""))
+			if not cache.is_empty():
+				GameAssetLayoutScript.copy_file(cache, dest)
+				GameAssetLayoutScript.copy_file(cache, GameAssetLayoutScript.root_alias_abs(session.project_path, _tex_filename))
+			elif texture is ImageTexture:
+				var img: Image = (texture as ImageTexture).get_image()
+				if img:
+					img.save_png(dest)
+					img.save_png(GameAssetLayoutScript.root_alias_abs(session.project_path, _tex_filename))
+			var slot: String = _slot_for_filename(_tex_filename)
+			if not slot.is_empty():
+				StudioGameConfigScript.assign_slot(session.project_path, slot, GameAssetLayoutScript.dest_res(_tex_filename, _tex_category))
+			_downloaded_assets.append({
+				"filename": _tex_filename,
+				"query": _tex_query,
+				"license": str(meta.get("license", "provided")),
+				"source": "gameproject_url",
+				"category": _tex_category,
+				"path": dest,
+			})
+			_notes.append("GameProject URL → assets/%s/%s" % [_tex_category, _tex_filename])
+		_pump_url_jobs()
+		return
 	if not _awaiting_tex or index != _tex_index:
 		return
 	_awaiting_tex = false
-	if ok and texture != null and not session.project_path.is_empty():
+	if not ok or texture == null:
+		_write_procedural_fallback(_tex_filename, _tex_category)
+		_pump_downloads()
+		return
+	if not session.project_path.is_empty():
 		GameAssetLayoutScript.ensure_layout(session.project_path)
 		var cat: String = _tex_category if not _tex_category.is_empty() else GameAssetLayoutScript.categorize(_tex_filename, _tex_query)
 		var dest: String = GameAssetLayoutScript.dest_abs(session.project_path, _tex_filename, cat)
@@ -524,7 +879,25 @@ func _on_image_ready(ok: bool, index: int, texture: Texture2D, meta: Dictionary,
 			var slot: String = _slot_for_filename(_tex_filename)
 			if not slot.is_empty():
 				StudioGameConfigScript.assign_slot(session.project_path, slot, GameAssetLayoutScript.dest_res(_tex_filename, cat))
+		elif not saved:
+			_write_procedural_fallback(_tex_filename, cat)
 	_pump_downloads()
+
+
+func _write_procedural_fallback(filename: String, category: String) -> void:
+	if session.project_path.is_empty() or filename.is_empty():
+		return
+	if filename.get_extension().to_lower() in ["glb", "gltf", "obj"]:
+		ProceduralArtScript.write_character_model(session.project_path, _genre_id)
+		return
+	var row: Dictionary = ProceduralArtScript.write_named(session.project_path, filename, category, filename.get_basename())
+	if row.is_empty():
+		return
+	_downloaded_assets.append(row)
+	var slot: String = _slot_for_filename(filename)
+	if not slot.is_empty():
+		StudioGameConfigScript.assign_slot(session.project_path, slot, str(row.get("res", GameAssetLayoutScript.dest_res(filename, category))))
+	status.emit("Generated fallback art: %s" % filename)
 
 
 func _begin_asset_search() -> void:
@@ -557,6 +930,8 @@ MODE: %s
 GENRE: %s
 ENGINE REQUIRED: %s
 
+%s
+
 GODOT / TUTORIAL RESEARCH:
 %s
 
@@ -564,12 +939,14 @@ ASSET / TEXTURE RESEARCH:
 %s
 
 Write the BUILD PLAN JSON now — instructions the coder must follow, plus required textures/sprites/addons.
+Match download_queries and assets_required to the graphic style.
 If C++ mode: list src/*.cpp classes to implement or update, plus GDScript fallback files.
 """ % [
 		_description,
 		"MODIFY existing game" if _modify or session.active else "CREATE new game",
 		"%s — %s" % [_genre_id, str(_genre.get("inspiration_notes", ""))],
 		engine_req,
+		GraphicStyleScript.prompt_block(_graphic_styles),
 		_research.left(3500),
 		_asset_research.left(2500),
 	]
@@ -607,6 +984,8 @@ MODE: %s
 PROJECT NAME: %s
 ENGINE: %s
 
+%s
+
 GODOT RESEARCH:
 %s
 
@@ -629,6 +1008,7 @@ Write/update the Godot 4 project JSON now.
 If ENGINE includes C++, update src/*.h / src/*.cpp gameplay to match new directions (merge, do not drop GDExtension glue).
 Keep scripts/*.gd + scenes/main.tscn playable without a compiled .dll/.so.
 Wire StandardMaterial3D / Sprite2D to assets/*.png listed above when present.
+Honor graphic style for materials, sprites, and meshes.
 Include download_queries for any extra CC0 textures still needed.
 """ % [
 		_description,
@@ -637,6 +1017,7 @@ Include download_queries for any extra CC0 textures still needed.
 		"MODIFY — merge into current files" if _modify or session.active else "CREATE from template + plan",
 		session.project_name if session.active else str(_base.get("project_name", "ai_game")),
 		engine_line,
+		GraphicStyleScript.prompt_block(_graphic_styles),
 		_research.left(2500),
 		_asset_research.left(1800),
 		_asset_inventory_text(),
@@ -798,6 +1179,7 @@ func _handle_code_reply(ok: bool, text: String, error: String) -> void:
 	if written.get("ok", false) and not session.project_path.is_empty():
 		GameAssetLayoutScript.ensure_layout(session.project_path)
 		StudioGameConfigScript.ensure_on_disk(session.project_path)
+		StudioGameConfigScript.set_graphic_styles(session.project_path, _graphic_styles)
 	_busy = false
 	_awaiting = ""
 	if written.get("ok", false):
@@ -877,7 +1259,7 @@ func _begin_resource_enrichment(then_ai: bool) -> void:
 		_finish_resources_and_continue()
 		return
 	_write_resource_docs()
-	var extra_terms: PackedStringArray = PackedStringArray()
+	var extra_terms: PackedStringArray = PackedStringArray(["physics"])
 	var plugins = _plan.get("plugins_or_addons", [])
 	if typeof(plugins) == TYPE_ARRAY:
 		for p in plugins:
@@ -906,6 +1288,11 @@ func _on_addon_finished(_ok: bool, result: Dictionary) -> void:
 	_addon_installed = installed if typeof(installed) == TYPE_DICTIONARY else {}
 	if not _addon_installed.is_empty():
 		_notes.append("Addon → addons/ (%s)" % str(_addon_installed.get("title", "plugin")))
+		var title_l: String = str(_addon_installed.get("title", "")).to_lower()
+		if title_l.contains("physics") or title_l.contains("jolt") or title_l.contains("rigid"):
+			var phys: Dictionary = StudioGameConfigScript.load_physics(session.project_path)
+			phys["addon"] = str(_addon_installed.get("title", ""))
+			StudioGameConfigScript.save_physics(session.project_path, phys)
 	_write_resource_docs()
 	_maybe_finish_resources()
 
@@ -931,7 +1318,8 @@ func _on_resource_timeout() -> void:
 
 func _resources_idle() -> bool:
 	var tex_idle: bool = (not _download_active) and (not _awaiting_tex) and _pending_downloads.is_empty()
-	return tex_idle and (not _addon_busy) and (not _ref_busy)
+	var url_idle: bool = (not _url_active) and _pending_url_jobs.is_empty()
+	return tex_idle and url_idle and (not _addon_busy) and (not _ref_busy)
 
 
 func _maybe_finish_resources() -> void:
@@ -966,6 +1354,8 @@ func _slot_for_filename(filename: String) -> String:
 	if n.begins_with("sky") or n.contains("background"):
 		return "sky"
 	if n.contains("player") or n.contains("character") or n.contains("hero"):
+		if n.get_extension() in ["glb", "gltf", "obj"]:
+			return "character_model"
 		return "character"
 	if n.contains("enemy") or n.contains("monster"):
 		return "enemy"

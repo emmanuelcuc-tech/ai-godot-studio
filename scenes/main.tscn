@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://ai_godot_studio_main"]
+[gd_scene load_steps=9 format=3 uid="uid://ai_godot_studio_main"]
 
 [ext_resource type="Script" path="res://scripts/main_ui.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/editors/asset_library_ui.gd" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/editors/animation_editor_ui.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/editors/display_controls_ui.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/editors/effects_editor_ui.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/editors/add_to_game_panel.gd" id="7"]
 
 [sub_resource type="StyleBoxFlat" id="panel"]
 bg_color = Color(0.07, 0.1, 0.14, 0.94)
@@ -151,7 +152,7 @@ autowrap_mode = 3
 layout_mode = 2
 theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
 theme_override_font_sizes/font_size = 13
-text = "Create Game writes a Godot 4 + C++ GDExtension project (plus GDScript fallback), searches tutorials, plans with AI, and downloads matching CC0 textures, sprites, open addons, and sample projects. Type again + Create to modify. New Game starts fresh."
+text = "Paste a description or GameProject JSON. Check Textures / Sprites / Models (default on). Create writes real art into the game. After Run, type changes + Create to edit the same project. Load JSON only for game specs — User-role / npm site files are skipped."
 autowrap_mode = 3
 
 [node name="GenreRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
@@ -173,12 +174,159 @@ layout_mode = 2
 button_pressed = true
 text = "Create with C++ (GDExtension) — default on"
 
+[node name="ArtKindRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ArtKindLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtKindRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.78, 0.85, 1)
+text = "Use art"
+
+[node name="ArtTextures" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtKindRow"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Textures"
+
+[node name="ArtSprites" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtKindRow"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Sprites"
+
+[node name="ArtModels" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtKindRow"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Models"
+
+[node name="StyleLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.78, 0.85, 1)
+text = "Graphic style"
+
+[node name="StyleRow1" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="StyleRealistic" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow1"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Realistic"
+
+[node name="StyleCartoon" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow1"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Cartoon"
+
+[node name="StylePixel" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow1"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Pixel"
+
+[node name="Style2D" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow1"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "2D"
+
+[node name="StyleRow2" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Style3D" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow2"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "3D"
+
+[node name="StyleMinimal" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow2"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Minimal"
+
+[node name="StyleDetailed" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow2"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Detailed"
+
+[node name="ArtEditLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.78, 0.85, 1)
+text = "Edit art slots (after test)"
+
+[node name="ArtSlotRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SlotWall" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtSlotRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Wall"
+
+[node name="SlotFloor" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtSlotRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Floor"
+
+[node name="SlotRoom" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtSlotRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Room"
+
+[node name="SlotCharacter" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtSlotRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Character"
+
+[node name="SlotWeapon" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtSlotRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Weapon"
+
+[node name="ArtEditKindRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="EditAsTexture" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtEditKindRow"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Texture"
+
+[node name="EditAsSprite" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtEditKindRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Sprite"
+
+[node name="EditAsModel" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtEditKindRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Model"
+
+[node name="MakeArtEditBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Make this edit"
+
+[node name="JsonRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+
+[node name="LoadJsonBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/JsonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Load JSON"
+
 [node name="Prompt" type="TextEdit" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 160)
 layout_mode = 2
 size_flags_vertical = 3
-placeholder_text = "e.g. first person shooter with brick walls and dark corridors…"
+placeholder_text = "Describe a game, or paste GameProject JSON (title + description)…"
 wrap_mode = 1
 
 [node name="BtnRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
@@ -225,9 +373,21 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "Show folder"
 
+[node name="AddToGameHost" type="PanelContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.15
+theme_override_styles/panel = SubResource("panel")
+
+[node name="AddToGamePanel" type="MarginContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/AddToGameHost"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("7")
+
 [node name="RightPanel" type="PanelContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.9
 theme_override_styles/panel = SubResource("panel")
 
 [node name="RightVBox" type="VBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/RightPanel"]

@@ -173,25 +173,25 @@ static func kenney_links(genre_id: String) -> Array:
 static func assetlib_queries(genre_id: String) -> PackedStringArray:
 	match genre_id:
 		"fps", "tps":
-			return PackedStringArray(["fps controller", "first person", "hitscan"])
+			return PackedStringArray(["physics", "fps controller", "first person", "hitscan"])
 		"platformer":
-			return PackedStringArray(["platformer", "coyote jump"])
+			return PackedStringArray(["physics", "platformer", "coyote jump"])
 		"space_shooter":
-			return PackedStringArray(["space shooter", "shmup"])
+			return PackedStringArray(["physics", "space shooter", "shmup"])
 		"racing":
-			return PackedStringArray(["vehicle", "racing"])
+			return PackedStringArray(["physics", "vehicle", "racing"])
 		"voxel":
-			return PackedStringArray(["voxel", "gridmap"])
+			return PackedStringArray(["physics", "voxel", "gridmap"])
 		"beat_em_up":
-			return PackedStringArray(["beat em up", "brawler"])
+			return PackedStringArray(["physics", "beat em up", "brawler"])
 		"fighting":
-			return PackedStringArray(["fighting", "hitbox"])
+			return PackedStringArray(["physics", "fighting", "hitbox"])
 		"open_world":
-			return PackedStringArray(["exploration", "third person controller"])
+			return PackedStringArray(["physics", "exploration", "third person controller"])
 		"simulation":
-			return PackedStringArray(["inventory", "ui toolkit"])
+			return PackedStringArray(["physics", "inventory", "ui toolkit"])
 		_:
-			return PackedStringArray(["controller", "godot 4 addon"])
+			return PackedStringArray(["physics", "controller", "godot 4 addon"])
 
 
 static func open_refs(genre_id: String) -> Array:
@@ -306,7 +306,10 @@ static func sanitize_filename(name: String) -> String:
 	base = base.validate_filename()
 	if base.is_empty():
 		return "asset.png"
-	if not is_image_filename(base):
+	var ext: String = base.get_extension()
+	if ext.is_empty():
+		base = base.get_basename() + ".png"
+	elif not is_image_filename(base) and not ["glb", "gltf", "obj", "tres", "res"].has(ext):
 		base = base.get_basename() + ".png"
 	return base
 
