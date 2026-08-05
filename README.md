@@ -11,7 +11,7 @@ Describe a game → **Create Game** builds a playable **Godot 4** project using 
 | **Create Game** | Starts the full pipeline (template + C++ scaffold + search + AI + assets) |
 | **Run Game** | Plays the project with your Godot executable (GDScript fallback, or native C++ after build) |
 | **New Game** | Clears the session and previous directions |
-| **Save Game** | Copies the project to a dated folder under `generated_games/` |
+| **Save Game** | Saves over the original generated project (same folder) |
 | **Open in Godot** | Opens the project in the editor |
 | **Show folder** | Reveals files on disk |
 

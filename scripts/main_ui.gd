@@ -540,15 +540,23 @@ func _on_save() -> void:
 	if path.is_empty():
 		_on_status("Nothing to save yet.")
 		return
-	var stamp: String = Time.get_datetime_string_from_system().replace(":", "-").replace(" ", "_")
-	var dest_root: String = ProjectSettings.globalize_path("res://generated_games")
-	var name: String = path.get_file()
-	var dest: String = dest_root.path_join("%s_save_%s" % [name, stamp])
-	var err: Error = _copy_dir(path, dest)
-	if err != OK:
-		_log("[color=#E76F51]Save failed.[/color]\n")
+	var stamp: String = Time.get_datetime_string_from_system()
+	var man_path: String = path.path_join("studio_manifest.json")
+	var manifest: Dictionary = {}
+	if FileAccess.file_exists(man_path):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(man_path))
+		if typeof(parsed) == TYPE_DICTIONARY:
+			manifest = parsed
+	manifest["project_name"] = str(manifest.get("project_name", path.get_file()))
+	manifest["saved_at"] = stamp
+	manifest["updated_at"] = stamp
+	manifest["saved_over_original"] = true
+	var man: FileAccess = FileAccess.open(man_path, FileAccess.WRITE)
+	if man == null:
+		_log("[color=#E76F51]Save failed — could not write manifest.[/color]\n")
 		return
-	_log("[color=#3DDC97]Saved copy:[/color] %s\n" % dest)
+	man.store_string(JSON.stringify(manifest, "\t"))
+	_log("[color=#3DDC97]Saved over original project:[/color] %s\n" % path)
 
 
 func _copy_dir(src: String, dest: String) -> Error:
