@@ -19,8 +19,52 @@ const GameInspirationsScript = preload("res://scripts/game_inspirations.gd")
 const GameSessionScript = preload("res://scripts/game_session.gd")
 const OfflineEnhancerScript = preload("res://scripts/offline_enhancer.gd")
 const ArtPipelineScript = preload("res://scripts/art_pipeline.gd")
+const CppGdextensionScript = preload("res://scripts/templates/cpp_gdextension.gd")
+const CppBuilderScript = preload("res://scripts/cpp_builder.gd")
 
 const SYSTEM_PLAN := """You are a lead Godot 4 game designer working with ChatGPT-style instructions.
+From the player's directions, write a concrete BUILD PLAN the coder will follow.
+Engine is ALWAYS Godot 4 with **C++ GDExtension (godot-cpp)** as the intended implementation.
+Also plan a **playable GDScript 2.0 fallback** so the game runs before the native library is compiled.
+Never use Unity/Unreal/GameMaker as the runtime.
+List C++ classes/files (src/*.h, src/*.cpp), GDScript bootstrap, textures, sprites, materials, plugins, and Asset Library ideas that MATCH the described game (CC0 / open only — never commercial ROMs or ripped assets).
+Return ONLY JSON (no markdown fences):
+{
+  "title":"short name",
+  "instructions":["step-by-step build instructions the coder must follow"],
+  "gameplay":["core loops / controls / win-lose"],
+  "godot_features":["GDExtension classes, nodes, systems, scenes needed"],
+  "cpp_classes":["GameApp","GamePlayer","GameWorld","GameEnemy"],
+  "assets_required":[
+    {"name":"wall.png","type":"texture","query":"cc0 brick wall seamless","usage":"corridor walls"}
+  ],
+  "plugins_or_addons":["optional Godot AssetLib ideas"],
+  "modify_notes":"if updating an existing game, what to change vs keep (update C++ sources + GDScript fallback together)"
+}"""
+
+const SYSTEM_CODE := """You are a Godot 4 + GDExtension (C++ / godot-cpp) programmer. Follow the BUILD PLAN and USER DIRECTIONS exactly.
+Write or UPDATE a playable Godot 4 project whose **intended gameplay is C++**:
+- src/register_types.h + src/register_types.cpp (entry symbol game_library_init)
+- src/game_app.*, src/game_player.*, src/game_world.*, src/game_enemy.* matching the genre/description
+- bin/game.gdextension, SConstruct and/or CMakeLists.txt, docs/CPP_BUILD.md
+Also keep a **playable GDScript 2.0 fallback** (scripts/*.gd + scenes/main.tscn) so Run Game works without a compiler.
+Optional scenes/main_cpp.tscn may use native class names GamePlayer / GameWorld after the extension is built.
+Use assets already on disk (assets/wall.png, assets/floor.png, etc.) via StandardMaterial3D.albedo_texture or Sprite2D.texture.
+Match feel of the described game with original/CC0 art — never commercial ROMs or ripped assets.
+Include collisions, materials, particles, simple FX when the plan asks (especially shooters).
+Return ONLY JSON (no markdown fences):
+{
+  "project_name":"snake_case",
+  "summary":"what changed",
+  "howto":["how to play"],
+  "files":[{"path":"relative/path","content":"full file text"}],
+  "download_queries":[{"filename":"wall.png","query":"cc0 brick wall seamless"}]
+}
+Under 28 files. Always playable via GDScript fallback. If CURRENT FILES are provided, MERGE updates — keep working systems unless directions say replace them.
+On MODIFY, update existing C++ sources in src/ (not only GDScript).
+Always include project.godot and a main scene that runs. Do not dump godot-cpp submodule files into the JSON."""
+
+const SYSTEM_PLAN_GDSCRIPT := """You are a lead Godot 4 game designer working with ChatGPT-style instructions.
 From the player's directions, write a concrete BUILD PLAN the coder will follow.
 Engine is ALWAYS Godot 4 (GDScript 2.0) — never Unity/Unreal/GameMaker as the runtime.
 List textures, sprites, materials, plugins, and Asset Library ideas that MATCH the described game (CC0 / open only — never commercial ROMs or ripped assets).
@@ -37,7 +81,7 @@ Return ONLY JSON (no markdown fences):
   "modify_notes":"if updating an existing game, what to change vs keep"
 }"""
 
-const SYSTEM_CODE := """You are a Godot 4 programmer. Follow the BUILD PLAN and USER DIRECTIONS exactly.
+const SYSTEM_CODE_GDSCRIPT := """You are a Godot 4 programmer. Follow the BUILD PLAN and USER DIRECTIONS exactly.
 Write or UPDATE a playable Godot 4 project in GDScript 2.0 only.
 Use assets already on disk (assets/wall.png, assets/floor.png, etc.) via StandardMaterial3D.albedo_texture or Sprite2D.texture.
 Match feel of the described game with original/CC0 art — never commercial ROMs or ripped assets.
@@ -173,7 +217,7 @@ func create_game(description: String, genre_index: int = 0) -> void:
 			"files": existing if not existing.is_empty() else GenreTemplatesScript.build(_genre_id).get("files", []),
 		}
 	else:
-		_notes.append("CREATE — Godot template + ChatGPT plan + code + assets")
+		_notes.append("CREATE — Godot template + C++ GDExtension + ChatGPT plan + code + assets" if AppSettings.create_with_cpp else "CREATE — Godot template + ChatGPT plan + code + assets")
 		status.emit("Loading Godot %s template…" % str(_genre.get("name", _genre_id)))
 		_base = GenreTemplatesScript.build(_genre_id)
 		if _base.is_empty() or not _base.has("files"):
@@ -199,7 +243,7 @@ func create_game(description: String, genre_index: int = 0) -> void:
 	if AppSettings.use_web_search:
 		_awaiting = "search_godot"
 		status.emit("Searching Godot tutorials, assets, engines docs…")
-		var q := "Godot 4 %s tutorial gdscript template CC0 textures sprites %s" % [
+		var q: String = "Godot 4 %s tutorial GDExtension C++ godot-cpp gdscript template CC0 textures sprites %s" % [
 			str(_genre.get("name", _genre_id)), _description.left(80)
 		]
 		if search.search(q) != OK:
@@ -213,19 +257,26 @@ func _build_and_write_starter() -> Dictionary:
 	var files: Array = built.get("files", []).duplicate()
 	files = OfflineEnhancerScript.apply(files, _description, _genre_id)
 	files = ArtPipelineScript.write_guides_into_files(files)
+	if AppSettings.create_with_cpp:
+		files = _ensure_cpp_scaffold(files)
+	var engine_line: String = "Godot 4 + C++ GDExtension (GDScript fallback until native lib is built)" if AppSettings.create_with_cpp else "Godot 4"
 	files.append({
 		"path": "PLAYER_BRIEF.md",
-		"content": "# Game brief (player directions)\n\n%s\n\nGenre: %s\nEngine: Godot 4\n" % [_description, _genre_id],
+		"content": "# Game brief (player directions)\n\n%s\n\nGenre: %s\nEngine: %s\n" % [_description, _genre_id, engine_line],
 	})
 	files.append({
 		"path": "docs/RESOURCES.md",
 		"content": """# Resources / engine
 - **Game engine:** Godot 4 (your installed executable)
+- **Gameplay code:** %s
 - Studio genre template: %s
-- ChatGPT / Claude / Gemini write scripts when API keys are set
+- ChatGPT / Claude / Gemini write C++ + GDScript when API keys are set
 - CC0 textures via Openverse; kits: Kenney, OpenGameArt, Godot Asset Library
 - Directions are applied as AI instructions on Create / Modify
-""" % _genre_id,
+""" % [
+			"C++ GDExtension in src/ (intended) + GDScript fallback in scripts/" if AppSettings.create_with_cpp else "GDScript in scripts/",
+			_genre_id,
+		],
 	})
 	built["files"] = files
 	built["ok"] = true
@@ -239,6 +290,8 @@ func _build_and_write_starter() -> Dictionary:
 		session.start(str(written.get("path", "")), str(written.get("project_name", "")), _genre_id)
 	else:
 		session.bump(_description)
+	if AppSettings.create_with_cpp:
+		_note_cpp_build(not _modify)
 	written["session"] = session.label()
 	written["summary"] = built.get("summary", "")
 	written["howto"] = built.get("howto", ["Run Game", "WASD / mouse as shown in HUD"])
@@ -252,6 +305,33 @@ func _build_and_write_starter() -> Dictionary:
 				_description, str(built.get("summary", ""))
 			)
 	return written
+
+
+func _ensure_cpp_scaffold(files: Array) -> Array:
+	for f in files:
+		if typeof(f) != TYPE_DICTIONARY:
+			continue
+		if str(f.get("path", "")).begins_with("src/"):
+			return files
+	_notes.append("C++ GDExtension scaffold (src/, SConstruct, bin/game.gdextension) + GDScript fallback")
+	return CppGdextensionScript.overlay(files, _genre_id, _description)
+
+
+func _note_cpp_build(start_build: bool) -> void:
+	if session.project_path.is_empty():
+		return
+	if start_build:
+		var result: Dictionary = CppBuilderScript.try_start_build(session.project_path)
+		_notes.append(str(result.get("message", "C++ build status written.")))
+		status.emit(str(result.get("message", "C++ scaffolding ready.")))
+		return
+	var info: Dictionary = CppBuilderScript.detect()
+	var status_path: String = session.project_path.path_join("docs/CPP_STATUS.md")
+	DirAccess.make_dir_recursive_absolute(status_path.get_base_dir())
+	var f: FileAccess = FileAccess.open(status_path, FileAccess.WRITE)
+	if f:
+		f.store_string(CppBuilderScript.status_markdown(info))
+	_notes.append("C++ sources updated — rebuild with build_cpp.ps1 / build_cpp.sh to refresh the native extension.")
 
 
 func _start_texture_download() -> void:
@@ -358,12 +438,13 @@ func _on_search(ok: bool, text: String, error: String) -> void:
 
 func _begin_ai_plan() -> void:
 	status.emit("ChatGPT writing build plan (instructions + assets)…")
+	var engine_req: String = "Godot 4 + C++ GDExtension (godot-cpp). Also specify GDScript fallback bootstrap." if AppSettings.create_with_cpp else "Godot 4 (GDScript 2.0)"
 	var user := """PLAYER DIRECTIONS (follow exactly):
 %s
 
 MODE: %s
 GENRE: %s
-ENGINE REQUIRED: Godot 4 (GDScript 2.0)
+ENGINE REQUIRED: %s
 
 GODOT / TUTORIAL RESEARCH:
 %s
@@ -372,20 +453,22 @@ ASSET / TEXTURE RESEARCH:
 %s
 
 Write the BUILD PLAN JSON now — instructions the coder must follow, plus required textures/sprites/addons.
+If C++ mode: list src/*.cpp classes to implement or update, plus GDScript fallback files.
 """ % [
 		_description,
 		"MODIFY existing game" if _modify or session.active else "CREATE new game",
 		"%s — %s" % [_genre_id, str(_genre.get("inspiration_notes", ""))],
+		engine_req,
 		_research.left(3500),
 		_asset_research.left(2500),
 	]
 	_awaiting = "plan"
-	if not _dispatch_ai(SYSTEM_PLAN, user):
+	if not _dispatch_ai(SYSTEM_PLAN if AppSettings.create_with_cpp else SYSTEM_PLAN_GDSCRIPT, user):
 		_begin_ai_code()
 
 
 func _begin_ai_code() -> void:
-	status.emit("ChatGPT writing Godot scripts from plan + directions…")
+	status.emit("ChatGPT writing Godot C++ / GDScript from plan + directions…" if AppSettings.create_with_cpp else "ChatGPT writing Godot scripts from plan + directions…")
 	var files_blob := ""
 	if session.active:
 		var live: Array = ProjectWriterScript.read_project_files(session.project_path)
@@ -398,6 +481,7 @@ func _begin_ai_code() -> void:
 			files_blob += "\n----- %s -----\n%s\n" % [str(f.get("path", "")), str(f.get("content", ""))]
 
 	var plan_text := _plan_raw if not _plan_raw.is_empty() else JSON.stringify(_plan)
+	var engine_line: String = "Godot 4 + C++ GDExtension (update src/ C++ AND scripts/ GDScript fallback)" if AppSettings.create_with_cpp else "Godot 4 GDScript"
 	var user := """PLAYER DIRECTIONS (highest priority — implement these):
 %s
 
@@ -407,7 +491,7 @@ BUILD PLAN FROM CHATGPT (follow these instructions):
 GENRE: %s
 MODE: %s
 PROJECT NAME: %s
-ENGINE: Godot 4
+ENGINE: %s
 
 GODOT RESEARCH:
 %s
@@ -419,6 +503,8 @@ CURRENT FILES:
 %s
 
 Write/update the Godot 4 project JSON now.
+If ENGINE includes C++, update src/*.h / src/*.cpp gameplay to match new directions (merge, do not drop GDExtension glue).
+Keep scripts/*.gd + scenes/main.tscn playable without a compiled .dll/.so.
 Use assets/wall.png (and other assets/*.png listed) for materials/sprites when present.
 Include download_queries for any extra CC0 textures still needed.
 """ % [
@@ -427,12 +513,13 @@ Include download_queries for any extra CC0 textures still needed.
 		_genre_id,
 		"MODIFY — merge into current files" if _modify or session.active else "CREATE from template + plan",
 		session.project_name if session.active else str(_base.get("project_name", "ai_game")),
+		engine_line,
 		_research.left(3000),
 		_asset_research.left(2000),
 		files_blob.left(26000),
 	]
 	_awaiting = "code"
-	if not _dispatch_ai(SYSTEM_CODE, user):
+	if not _dispatch_ai(SYSTEM_CODE if AppSettings.create_with_cpp else SYSTEM_CODE_GDSCRIPT, user):
 		_busy = false
 		status.emit("No AI key — starter game ready. Run Game.")
 
@@ -492,7 +579,7 @@ func _write_plan_docs() -> void:
 	var body := "# AI Build Plan (ChatGPT)\n\n"
 	body += "## Title\n%s\n\n" % str(_plan.get("title", session.project_name))
 	body += "## Player directions\n%s\n\n" % _description
-	body += "## Engine\nGodot 4 (GDScript 2.0)\n\n"
+	body += "## Engine\n%s\n\n" % ("Godot 4 + C++ GDExtension (godot-cpp) with GDScript fallback" if AppSettings.create_with_cpp else "Godot 4 (GDScript 2.0)")
 	body += "## Instructions\n"
 	for i in instructions:
 		body += "- %s\n" % str(i)
@@ -562,16 +649,24 @@ func _handle_code_reply(ok: bool, text: String, error: String) -> void:
 		if not _plan.is_empty():
 			files.append({
 				"path": "PLAYER_BRIEF.md",
-				"content": "# Game brief (player directions)\n\n%s\n\nGenre: %s\nEngine: Godot 4\n" % [_description, _genre_id],
+				"content": "# Game brief (player directions)\n\n%s\n\nGenre: %s\nEngine: %s\n" % [
+					_description, _genre_id,
+					"Godot 4 + C++ GDExtension" if AppSettings.create_with_cpp else "Godot 4",
+				],
 			})
 		parsed["files"] = files
 	var written: Dictionary = ProjectWriterScript.write_project(parsed, session.project_path)
+	if written.get("ok", false) and AppSettings.create_with_cpp:
+		_repair_cpp_glue()
 	_busy = false
 	_awaiting = ""
 	if written.get("ok", false):
 		session.bump(_description)
 		written["session"] = session.label()
-		written["notes"] = "ChatGPT updated Godot scripts from your directions.\n" + "\n".join(_notes)
+		if AppSettings.create_with_cpp:
+			written["notes"] = "ChatGPT updated Godot C++ / GDScript from your directions.\n" + "\n".join(_notes)
+		else:
+			written["notes"] = "ChatGPT updated Godot scripts from your directions.\n" + "\n".join(_notes)
 		written["summary"] = str(parsed.get("summary", written.get("summary", "")))
 		_queue_ai_download_queries(parsed)
 		status.emit("Game built by ChatGPT — Run Game (or type changes + Create to modify)")
@@ -580,6 +675,38 @@ func _handle_code_reply(ok: bool, text: String, error: String) -> void:
 	else:
 		status.emit("AI write failed — starter still on disk.")
 		pipeline_finished.emit(false, written)
+
+
+func _repair_cpp_glue() -> void:
+	if session.project_path.is_empty():
+		return
+	var pg_path: String = session.project_path.path_join("project.godot")
+	if FileAccess.file_exists(pg_path):
+		var pg: String = FileAccess.get_file_as_string(pg_path)
+		var patched: String = CppGdextensionScript.ensure_project_autoload(pg)
+		if patched != pg:
+			var f: FileAccess = FileAccess.open(pg_path, FileAccess.WRITE)
+			if f:
+				f.store_string(patched)
+	var bridge_path: String = session.project_path.path_join("scripts/cpp_bridge.gd")
+	var gdext_path: String = session.project_path.path_join("bin/game.gdextension")
+	if FileAccess.file_exists(bridge_path) and FileAccess.file_exists(gdext_path):
+		return
+	var glued: Array = CppGdextensionScript.overlay([], _genre_id, _description)
+	var repair_files: Array = []
+	for f2 in glued:
+		if typeof(f2) != TYPE_DICTIONARY:
+			continue
+		var rel: String = str(f2.get("path", ""))
+		if rel == "scripts/cpp_bridge.gd" or rel == "bin/game.gdextension" or rel == "SConstruct" or rel == "docs/CPP_BUILD.md":
+			if not FileAccess.file_exists(session.project_path.path_join(rel)):
+				repair_files.append(f2)
+	if not repair_files.is_empty():
+		ProjectWriterScript.write_project({
+			"ok": true,
+			"project_name": session.project_name,
+			"files": repair_files,
+		}, session.project_path)
 
 
 func _queue_ai_download_queries(parsed: Dictionary) -> void:

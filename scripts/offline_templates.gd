@@ -32,5 +32,5 @@ static func tutor_fallback(question: String) -> String:
 Drop .gd / .tscn / .md template files into Learn so Create can modify them.
 Genre Create uses open Godot templates (Kenney FPS/Racing, Quiver beat-em-up, Godot docs).
 HakkoAI (https://www.hakko.ai/) is a gameplay companion — use it for genre feel; this studio builds Godot projects.
-Commercial sources like Doom engine code are never copied — mechanics are recreated in GDScript.
+Commercial sources like Doom engine code are never copied — mechanics are recreated in C++ GDExtension + GDScript.
 """ % question

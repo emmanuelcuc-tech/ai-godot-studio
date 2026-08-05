@@ -28,6 +28,8 @@ const GenreCatalogScript = preload("res://scripts/genre_catalog.gd")
 @onready var use_claude: CheckButton = %UseClaude
 @onready var use_gemini: CheckButton = %UseGemini
 @onready var use_search: CheckButton = %UseSearch
+@onready var use_cpp: CheckButton = %UseCpp
+@onready var use_cpp_settings: CheckButton = %UseCppSettings
 @onready var save_settings_btn: Button = %SaveSettings
 
 var _last_project_path: String = ""
@@ -46,6 +48,8 @@ func _ready() -> void:
 	open_btn.pressed.connect(_on_open)
 	folder_btn.pressed.connect(_on_folder)
 	save_settings_btn.pressed.connect(_on_save_settings)
+	use_cpp.toggled.connect(_on_cpp_toggled)
+	use_cpp_settings.toggled.connect(_on_cpp_toggled)
 	AIOrchestrator.status.connect(_on_status)
 	AIOrchestrator.pipeline_finished.connect(_on_pipeline_finished)
 	AIOrchestrator.session_changed.connect(_refresh_session)
@@ -55,7 +59,7 @@ func _ready() -> void:
 	open_btn.disabled = true
 	folder_btn.disabled = true
 	_refresh_session()
-	_log("[b]AI Godot Studio[/b]\n1. Describe a game — ChatGPT turns it into [i]instructions + asset list[/i]\n2. [b]Create Game[/b] — Godot engine template → search → AI plan → AI scripts → download textures/sprites\n3. [b]Run Game[/b] to play in Godot\n4. New directions + Create → ChatGPT [i]modifies[/i] the same project\n5. [b]New Game[/b] clears · [b]Save Game[/b] keeps a copy\n")
+	_log("[b]AI Godot Studio[/b]\n1. Describe a game — ChatGPT turns it into [i]instructions + asset list[/i]\n2. [b]Create Game[/b] — Godot 4 + [i]C++ GDExtension[/i] template → search → AI plan → C++ & GDScript → textures\n3. [b]Run Game[/b] plays immediately (GDScript fallback). Build `build_cpp.ps1` for native C++.\n4. New directions + Create → modifies C++ sources and fallback scripts\n5. [b]New Game[/b] clears · [b]Save Game[/b] keeps a copy\n")
 	if not AppSettings.has_any_ai_key():
 		_log("[color=#F4A261]Add your ChatGPT / OpenAI key in Settings so Create Game uses AI instructions to code and pull assets.[/color]\n")
 	if AppSettings.godot_executable.is_empty():
@@ -86,6 +90,8 @@ func _load_settings_into_form() -> void:
 	use_claude.button_pressed = AppSettings.use_claude
 	use_gemini.button_pressed = AppSettings.use_gemini
 	use_search.button_pressed = AppSettings.use_web_search
+	use_cpp.set_pressed_no_signal(AppSettings.create_with_cpp)
+	use_cpp_settings.set_pressed_no_signal(AppSettings.create_with_cpp)
 	openai_key.secret = true
 	claude_key.secret = true
 	gemini_key.secret = true
@@ -107,9 +113,17 @@ func _on_save_settings() -> void:
 	AppSettings.use_claude = use_claude.button_pressed
 	AppSettings.use_gemini = use_gemini.button_pressed
 	AppSettings.use_web_search = use_search.button_pressed
+	AppSettings.create_with_cpp = use_cpp.button_pressed
 	AppSettings.save_settings()
 	_refresh_providers()
 	_log("[color=#3DDC97]Settings saved.[/color]\n")
+
+
+func _on_cpp_toggled(pressed: bool) -> void:
+	AppSettings.create_with_cpp = pressed
+	use_cpp.set_pressed_no_signal(pressed)
+	use_cpp_settings.set_pressed_no_signal(pressed)
+	_refresh_providers()
 
 
 func _compose() -> String:
@@ -156,7 +170,10 @@ func _on_create() -> void:
 	new_game_btn.disabled = true
 	var mode := "Modifying game" if AIOrchestrator.has_active_session() else "Creating game"
 	_log("\n[b]%s:[/b] %s\n" % [mode, idea])
-	_log("[color=#8FA3B8]Godot engine + ChatGPT plan (instructions/assets) + scripts + texture download…[/color]\n")
+	if AppSettings.create_with_cpp:
+		_log("[color=#8FA3B8]Godot 4 + C++ GDExtension + ChatGPT plan + GDScript fallback + texture download…[/color]\n")
+	else:
+		_log("[color=#8FA3B8]Godot engine + ChatGPT plan (instructions/assets) + scripts + texture download…[/color]\n")
 	AIOrchestrator.create_game(idea, genre_option.selected)
 
 

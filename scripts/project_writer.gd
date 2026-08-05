@@ -59,15 +59,15 @@ static func read_project_files(root: String, max_chars_each: int = 14000) -> Arr
 	for rel in _list_rel_files(root):
 		if rel == "studio_manifest.json":
 			continue
-		var full := root.path_join(rel)
-		var ext := rel.get_extension().to_lower()
-		if ext in ["png", "jpg", "jpeg", "webp", "wav", "ogg", "mp3", "import"]:
+		var full: String = root.path_join(rel)
+		var ext: String = rel.get_extension().to_lower()
+		if ext in ["png", "jpg", "jpeg", "webp", "wav", "ogg", "mp3", "import", "dll", "so", "dylib", "lib", "exp", "pdb", "ilk", "obj", "o", "a"]:
 			files.append({
 				"path": rel,
 				"content": "[binary asset on disk: %s — keep path; do not remove]" % rel,
 			})
 			continue
-		var body := FileAccess.get_file_as_string(full)
+		var body: String = FileAccess.get_file_as_string(full)
 		if body.length() > max_chars_each:
 			body = body.left(max_chars_each) + "\n...[truncated]..."
 		files.append({"path": rel, "content": body})
@@ -92,8 +92,10 @@ static func _walk(root: String, dir_path: String, out: PackedStringArray) -> voi
 			continue
 		var full := dir_path.path_join(n)
 		if d.current_is_dir():
-			if n != ".godot":
-				_walk(root, full, out)
+			if n in [".godot", "godot-cpp", ".scons_cache", ".sconf_temp", "__pycache__", "build"]:
+				n = d.get_next()
+				continue
+			_walk(root, full, out)
 		else:
 			var rel := full.substr(root.length()).lstrip("/").lstrip("\\").replace("\\", "/")
 			out.append(rel)

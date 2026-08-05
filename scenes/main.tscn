@@ -81,7 +81,7 @@ text = "AI GODOT STUDIO"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
 theme_override_font_sizes/font_size = 14
-text = "Describe a game. Create builds it with Godot + AI + internet resources. Run to play."
+text = "Describe a game. Create builds Godot 4 + C++ (GDExtension) with a playable GDScript fallback. Run to play."
 
 [node name="StatusBox" type="VBoxContainer" parent="Margin/RootVBox/Header"]
 layout_mode = 2
@@ -146,7 +146,7 @@ autowrap_mode = 3
 layout_mode = 2
 theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
 theme_override_font_sizes/font_size = 13
-text = "Create Game searches Godot tutorials + AI + CC0 textures/sprites, writes scripts, and builds a playable project. Type again + Create to modify. New Game starts fresh."
+text = "Create Game writes a Godot 4 + C++ GDExtension project (plus GDScript fallback), searches tutorials, plans with AI, and downloads CC0 textures. Type again + Create to modify C++ and scripts. New Game starts fresh."
 autowrap_mode = 3
 
 [node name="GenreRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
@@ -161,6 +161,12 @@ text = "Genre"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="UseCpp" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Create with C++ (GDExtension) — default on"
 
 [node name="Prompt" type="TextEdit" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
 unique_name_in_owner = true
@@ -263,7 +269,7 @@ text = "API keys & Godot path"
 [node name="SettingsHint" type="Label" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
-text = "Add ChatGPT / Claude / Gemini keys for AI coding. Godot exe is required for Run Game. Web search finds tutorials and asset links."
+text = "Add ChatGPT / Claude / Gemini keys for AI coding. Create defaults to C++ GDExtension + GDScript fallback. Godot exe is required for Run Game. Web search finds tutorials and asset links."
 autowrap_mode = 3
 
 [node name="UseOpenAI" type="CheckButton" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
@@ -304,6 +310,12 @@ unique_name_in_owner = true
 layout_mode = 2
 button_pressed = true
 text = "Use web search (Godot tutorials / assets)"
+
+[node name="UseCppSettings" type="CheckButton" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Create with C++ / GDExtension (playable GDScript fallback until compiled)"
 
 [node name="TavilyKey" type="LineEdit" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
 unique_name_in_owner = true

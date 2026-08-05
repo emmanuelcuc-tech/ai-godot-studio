@@ -17,6 +17,7 @@ var use_openai: bool = true
 var use_claude: bool = true
 var use_gemini: bool = true
 var use_web_search: bool = true
+var create_with_cpp: bool = true
 var godot_executable: String = ""
 var blender_executable: String = ""
 var output_folder: String = "res://generated_games"
@@ -61,6 +62,7 @@ func load_settings() -> void:
 	use_claude = bool(cfg.get_value("providers", "claude", use_claude))
 	use_gemini = bool(cfg.get_value("providers", "gemini", use_gemini))
 	use_web_search = bool(cfg.get_value("providers", "web_search", use_web_search))
+	create_with_cpp = bool(cfg.get_value("providers", "create_with_cpp", create_with_cpp))
 	godot_executable = str(cfg.get_value("paths", "godot", godot_executable))
 	blender_executable = str(cfg.get_value("paths", "blender", blender_executable))
 	output_folder = str(cfg.get_value("paths", "output", output_folder))
@@ -82,6 +84,7 @@ func save_settings() -> void:
 	cfg.set_value("providers", "claude", use_claude)
 	cfg.set_value("providers", "gemini", use_gemini)
 	cfg.set_value("providers", "web_search", use_web_search)
+	cfg.set_value("providers", "create_with_cpp", create_with_cpp)
 	cfg.set_value("paths", "godot", godot_executable)
 	cfg.set_value("paths", "blender", blender_executable)
 	cfg.set_value("paths", "output", output_folder)
@@ -105,6 +108,8 @@ func available_providers() -> PackedStringArray:
 		list.append("Gemini / Google")
 	if use_web_search:
 		list.append("Web Search")
+	if create_with_cpp:
+		list.append("C++ / GDExtension")
 	if list.is_empty():
 		list.append("Offline templates")
 	return list
