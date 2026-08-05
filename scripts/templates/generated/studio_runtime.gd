@@ -110,6 +110,7 @@ func _apply_all() -> void:
 	_apply_enemy_anims()
 	_apply_physics()
 	_apply_ui_style()
+	_apply_iteration_note()
 
 
 func _apply_backgrounds() -> void:
@@ -743,6 +744,29 @@ func _ensure_static_collision(body: StaticBody3D) -> void:
 	box.size = size
 	cs.shape = box
 	body.add_child(cs)
+
+
+func _apply_iteration_note() -> void:
+	var scene: Node = get_tree().current_scene
+	if scene == null:
+		return
+	var data: Dictionary = _load_json("res://studio_iteration.json")
+	var latest: String = str(data.get("latest", "")).strip_edges()
+	if latest.is_empty():
+		return
+	var hud: Label = scene.find_child("HUD", true, false) as Label
+	var note: Label = scene.find_child("StudioIterationNote", true, false) as Label
+	if note == null:
+		note = Label.new()
+		note.name = "StudioIterationNote"
+		if hud and hud.get_parent():
+			hud.get_parent().add_child(note)
+		else:
+			scene.add_child(note)
+		note.position = Vector2(16, 48)
+	note.text = "Update r%s: %s" % [str(data.get("revision", "?")), latest.left(120)]
+	note.add_theme_font_size_override("font_size", 14)
+	note.add_theme_color_override("font_color", Color(0.95, 0.85, 0.45))
 
 
 func _apply_ui_style() -> void:

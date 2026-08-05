@@ -6,7 +6,7 @@
 [ext_resource type="Script" path="res://scripts/editors/animation_editor_ui.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/editors/display_controls_ui.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/editors/effects_editor_ui.gd" id="6"]
-[ext_resource type="Script" path="res://scripts/editors/add_to_game_panel.gd" id="7"]
+[ext_resource type="Script" path="res://scripts/editors/edit_game_ui.gd" id="8"]
 
 [sub_resource type="StyleBoxFlat" id="panel"]
 bg_color = Color(0.07, 0.1, 0.14, 0.94)
@@ -152,7 +152,7 @@ autowrap_mode = 3
 layout_mode = 2
 theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
 theme_override_font_sizes/font_size = 13
-text = "Paste a description or GameProject JSON. Check Textures / Sprites / Models (default on). Create writes real art into the game. After Run, type changes + Create to edit the same project. Load JSON only for game specs — User-role / npm site files are skipped."
+text = "Paste a description or GameProject JSON. Check Textures / Sprites / Models (default on). Create writes starter art and copies useful files from F:/asset. After testing, open Edit Game to add more. Load JSON only for game specs — User-role / npm site files are skipped."
 autowrap_mode = 3
 
 [node name="GenreRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
@@ -376,13 +376,36 @@ text = "Show folder"
 [node name="AddToGameHost" type="PanelContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 1.15
+size_flags_stretch_ratio = 0.72
 theme_override_styles/panel = SubResource("panel")
 
-[node name="AddToGamePanel" type="MarginContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/AddToGameHost"]
+[node name="CreateEditHint" type="VBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/AddToGameHost"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HintTitle" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/AddToGameHost/CreateEditHint"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "After testing"
+
+[node name="HintBody" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/AddToGameHost/CreateEditHint"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.7, 0.78, 1)
+theme_override_font_sizes/font_size = 13
+text = "After testing, open Edit Game to add more from F:\\asset (textures, materials, models, character, physics)."
+autowrap_mode = 3
+
+[node name="OpenEditGameBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/AddToGameHost/CreateEditHint"]
 unique_name_in_owner = true
 layout_mode = 2
-script = ExtResource("7")
+text = "Open Edit Game"
+
+[node name="LocalHint" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/AddToGameHost/CreateEditHint"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.58, 0.66, 1)
+theme_override_font_sizes/font_size = 12
+text = "Create auto-copies a matching subset into the new game. Path is set in Settings (default F:/asset). Nothing stays linked to F: at runtime."
+autowrap_mode = 3
 
 [node name="RightPanel" type="PanelContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit"]
 layout_mode = 2
@@ -404,6 +427,16 @@ layout_mode = 2
 size_flags_vertical = 3
 bbcode_enabled = true
 scroll_active = true
+
+[node name="EditGame" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+script = ExtResource("8")
 
 [node name="Library" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
 unique_name_in_owner = true
@@ -554,6 +587,16 @@ text = "Blender (optional)"
 unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "Optional blender.exe path"
+
+[node name="LocalAssetCaption" type="Label" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+layout_mode = 2
+text = "Local asset folder (only this path — default F:/asset, never whole F:)"
+
+[node name="LocalAssetFolder" type="LineEdit" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "F:/asset"
+text = "F:/asset"
 
 [node name="SaveSettings" type="Button" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
 unique_name_in_owner = true

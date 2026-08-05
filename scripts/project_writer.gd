@@ -19,6 +19,13 @@ static func write_project(project: Dictionary, force_path: String = "") -> Dicti
 		if rel.is_empty() or rel.contains(".."):
 			continue
 		var content: String = str(f.get("content", ""))
+		if content.begins_with("[binary asset on disk:"):
+			continue
+		if content.contains("...[truncated]..."):
+			continue
+		var ext: String = rel.get_extension().to_lower()
+		if ext in ["png", "jpg", "jpeg", "webp", "wav", "ogg", "mp3", "import", "dll", "so", "dylib", "glb", "gltf", "bin"]:
+			continue
 		var full: String = root.path_join(rel)
 		_ensure_dir(full.get_base_dir())
 		var file: FileAccess = FileAccess.open(full, FileAccess.WRITE)

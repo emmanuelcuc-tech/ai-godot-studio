@@ -1,5 +1,5 @@
 extends MarginContainer
-## Create / Library — Add to game / Change: character → world → enemy → weapon.
+## Edit Game — Add to game / Change: Character → World → Enemy → Weapon → Materials → Physics.
 
 const LayoutScript = preload("res://scripts/editors/game_asset_layout.gd")
 const ConfigScript = preload("res://scripts/editors/studio_game_config.gd")
@@ -61,6 +61,10 @@ var _mat_opt: OptionButton
 var _mat_slot: OptionButton
 var _phys_list: ItemList
 var _phys_local_items: Array = []
+var _more_dialog: AcceptDialog
+var _more_list: ItemList
+var _more_items: Array = []
+var _more_section: String = ""
 
 
 func _ready() -> void:
@@ -151,7 +155,7 @@ func _build() -> void:
 		_labeled_row("Material", _char_mat),
 		_labeled_row("New model shape", _char_shape),
 		_phys_char,
-	], func(): _on_section_add("character"), func(): _on_section_change("character"), func(): _generate_section("character"), func(): _download_section("character"), func(): _import_section("character")))
+	], func(): _on_section_add("character"), func(): _on_section_change("character"), func(): _generate_section("character"), func(): _download_section("character"), func(): _import_section("character"), func(): _open_add_more("character")))
 
 	_world_preview = TextureRect.new()
 	_floor_opt = OptionButton.new()
@@ -171,7 +175,7 @@ func _build() -> void:
 		_labeled_row("Wall material", _wall_mat),
 		_labeled_row("Skybox material", _sky_mat),
 		_phys_world,
-	], func(): _on_section_add("world"), func(): _on_section_change("world"), func(): _generate_section("world"), func(): _download_section("world"), func(): _import_section("world")))
+	], func(): _on_section_add("world"), func(): _on_section_change("world"), func(): _generate_section("world"), func(): _download_section("world"), func(): _import_section("world"), func(): _open_add_more("world")))
 
 	_enemy_preview = TextureRect.new()
 	_enemy_tex = OptionButton.new()
@@ -196,7 +200,7 @@ func _build() -> void:
 		_labeled_row("Anim clip", _enemy_anim),
 		_anim_row(),
 		_phys_enemy,
-	], func(): _on_section_add("enemy"), func(): _on_section_change("enemy"), func(): _generate_section("enemy"), func(): _download_section("enemy"), func(): _import_section("enemy")))
+	], func(): _on_section_add("enemy"), func(): _on_section_change("enemy"), func(): _generate_section("enemy"), func(): _download_section("enemy"), func(): _import_section("enemy"), func(): _open_add_more("enemy")))
 
 	_wep_preview = TextureRect.new()
 	_wep_tex = OptionButton.new()
@@ -212,7 +216,7 @@ func _build() -> void:
 		_labeled_row("Sprite (2D)", _wep_spr),
 		_labeled_row("Material", _wep_mat),
 		_phys_wep,
-	], func(): _on_section_add("weapon"), func(): _on_section_change("weapon"), func(): _generate_section("weapon"), func(): _download_section("weapon"), func(): _import_section("weapon")))
+	], func(): _on_section_add("weapon"), func(): _on_section_change("weapon"), func(): _generate_section("weapon"), func(): _download_section("weapon"), func(): _import_section("weapon"), func(): _open_add_more("weapon")))
 
 	_mat_preview = TextureRect.new()
 	_mat_opt = OptionButton.new()
@@ -222,7 +226,7 @@ func _build() -> void:
 	col.add_child(_section_box("6. Materials — .tres / StandardMaterial3D", _mat_preview, [
 		_labeled_row("Material", _mat_opt),
 		_labeled_row("Assign as", _mat_slot),
-	], func(): _on_section_add("materials"), func(): _on_section_change("materials"), func(): _generate_section("materials"), func(): _download_section("world"), func(): _import_section("materials")))
+	], func(): _on_section_add("materials"), func(): _on_section_change("materials"), func(): _generate_section("materials"), func(): _download_section("world"), func(): _import_section("materials"), func(): _open_add_more("materials")))
 
 	_phys_list = ItemList.new()
 	_phys_list.custom_minimum_size = Vector2(0, 90)
@@ -247,6 +251,10 @@ func _build() -> void:
 	pch.text = "Change"
 	pch.pressed.connect(_on_section_change.bind("physics"))
 	prow.add_child(pch)
+	var pmore: Button = Button.new()
+	pmore.text = "Add more"
+	pmore.pressed.connect(_open_add_more.bind("physics"))
+	prow.add_child(pmore)
 	col.add_child(phys_box)
 
 	_status = Label.new()
@@ -284,6 +292,24 @@ func _build() -> void:
 	_search_dialog.add_child(sbox)
 	add_child(_search_dialog)
 
+	_more_dialog = AcceptDialog.new()
+	_more_dialog.title = "Add more from F:/asset"
+	_more_dialog.ok_button_text = "Copy into game"
+	_more_dialog.confirmed.connect(_on_more_confirmed)
+	var mbox: VBoxContainer = VBoxContainer.new()
+	mbox.custom_minimum_size = Vector2(460, 280)
+	var mhint: Label = Label.new()
+	mhint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mhint.text = "Select one or more local files. Copy keeps the current slot; then Add to game / Change to assign."
+	mbox.add_child(mhint)
+	_more_list = ItemList.new()
+	_more_list.select_mode = ItemList.SELECT_MULTI
+	_more_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_more_list.custom_minimum_size = Vector2(0, 200)
+	mbox.add_child(_more_list)
+	_more_dialog.add_child(mbox)
+	add_child(_more_dialog)
+
 	_char_tex.item_selected.connect(func(_i): _preview_from(_char_tex, _char_preview))
 	_char_spr.item_selected.connect(func(_i): _preview_from(_char_spr, _char_preview))
 	_floor_opt.item_selected.connect(func(_i): _preview_from(_floor_opt, _world_preview))
@@ -295,7 +321,7 @@ func _build() -> void:
 	_enemy_anim.item_selected.connect(_on_enemy_anim_selected)
 
 
-func _section_box(title_text: String, preview: TextureRect, rows: Array, add_cb: Callable, change_cb: Callable, gen_cb: Callable, dl_cb: Callable, imp_cb: Callable) -> Control:
+func _section_box(title_text: String, preview: TextureRect, rows: Array, add_cb: Callable, change_cb: Callable, gen_cb: Callable, dl_cb: Callable, imp_cb: Callable, more_cb: Callable) -> Control:
 	var box: VBoxContainer = VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	var head: Label = Label.new()
@@ -335,6 +361,11 @@ func _section_box(title_text: String, preview: TextureRect, rows: Array, add_cb:
 	ch_btn.tooltip_text = "Replace this section’s slot only. Other sections stay."
 	ch_btn.pressed.connect(change_cb)
 	actions.add_child(ch_btn)
+	var more_btn: Button = Button.new()
+	more_btn.text = "Add more"
+	more_btn.tooltip_text = "Copy extra files from F:/asset into this game without replacing the current slot."
+	more_btn.pressed.connect(more_cb)
+	actions.add_child(more_btn)
 	var sep: HSeparator = HSeparator.new()
 	box.add_child(sep)
 	return box
@@ -653,7 +684,8 @@ func _apply_section(section: String, replace: bool) -> void:
 			var spr_res: String = str(_selected_item(_char_spr).get("res", ""))
 			if not spr_res.is_empty():
 				ConfigScript.assign_slot(path, "character", spr_res)
-			_write_mat_from_tex(path, "character_material", "character_texture")
+			if not _has_explicit_mat(_char_mat):
+				_write_mat_from_tex(path, "character_material", "character_texture")
 			_save_phys(path, "character_collision", _phys_char.button_pressed)
 		"world":
 			_apply_pick(path, "floor", _floor_opt, replace)
@@ -663,9 +695,12 @@ func _apply_section(section: String, replace: bool) -> void:
 			_apply_pick(path, "floor_material", _floor_mat, replace)
 			_apply_pick(path, "wall_material", _wall_mat, replace)
 			_apply_pick(path, "skybox_material", _sky_mat, replace)
-			_write_mat_from_tex(path, "wall_material", "wall")
-			_write_mat_from_tex(path, "floor_material", "floor")
-			_write_mat_from_tex(path, "skybox_material", "skybox")
+			if not _has_explicit_mat(_wall_mat):
+				_write_mat_from_tex(path, "wall_material", "wall")
+			if not _has_explicit_mat(_floor_mat):
+				_write_mat_from_tex(path, "floor_material", "floor")
+			if not _has_explicit_mat(_sky_mat):
+				_write_mat_from_tex(path, "skybox_material", "skybox")
 			_save_phys(path, "world_static", _phys_world.button_pressed)
 		"enemy":
 			_apply_pick(path, "enemy_texture", _enemy_tex, replace)
@@ -673,7 +708,8 @@ func _apply_section(section: String, replace: bool) -> void:
 			_apply_pick(path, "enemy_model", _enemy_mdl, replace)
 			_apply_pick(path, "enemy_material", _enemy_mat, replace)
 			_apply_enemy_anim(path)
-			_write_mat_from_tex(path, "enemy_material", "enemy_texture")
+			if not _has_explicit_mat(_enemy_mat):
+				_write_mat_from_tex(path, "enemy_material", "enemy_texture")
 			_save_phys(path, "enemy_collision", _phys_enemy.button_pressed)
 		"weapon":
 			_apply_pick(path, "weapon_texture", _wep_tex, replace)
@@ -688,15 +724,29 @@ func _apply_section(section: String, replace: bool) -> void:
 					ConfigScript.change_slot(path, "weapon", spr)
 				else:
 					ConfigScript.add_to_slot(path, "weapon", spr)
-			_write_mat_from_tex(path, "weapon_material", "weapon_texture")
+			if not _has_explicit_mat(_wep_mat):
+				_write_mat_from_tex(path, "weapon_material", "weapon_texture")
 			_save_phys(path, "weapon_rigid", _phys_wep.button_pressed)
 		"materials":
 			if _mat_slot.item_count > 0:
 				_apply_pick(path, _mat_slot.get_item_text(_mat_slot.selected), _mat_opt, replace)
 		"physics":
 			var phys_info: Dictionary = LocalLibScript.install_physics_helpers(path)
+			var sel: PackedInt32Array = _phys_list.get_selected_items()
+			if not sel.is_empty() and sel[0] >= 0 and sel[0] < _phys_local_items.size():
+				var row: Dictionary = _phys_local_items[sel[0]]
+				if str(row.get("kind", "")) != "cs":
+					var addon_abs: String = path.path_join("addons/f_asset_physics")
+					DirAccess.make_dir_recursive_absolute(addon_abs)
+					var dest_name: String = str(row.get("name", "extra")).to_lower().replace(" ", "_")
+					LayoutScript.copy_file(str(row.get("abs", "")), addon_abs.path_join(dest_name))
 			_status.text = "Physics helpers → %s (C# skipped)." % str(phys_info.get("addon", "addons/f_asset_physics"))
 	_reload_all_options()
+
+
+func _has_explicit_mat(opt: OptionButton) -> bool:
+	var item: Dictionary = _selected_item(opt)
+	return bool(item.get("local", false)) or not str(item.get("res", "")).strip_edges().is_empty()
 
 
 func _write_mat_from_tex(path: String, mat_slot: String, tex_slot: String) -> void:
@@ -719,10 +769,16 @@ func _apply_pick(path: String, slot: String, opt: OptionButton, replace: bool) -
 	var res_p: String = str(item.get("res", "")).strip_edges()
 	if bool(item.get("local", false)):
 		var cat: String = LayoutScript.slot_category(slot)
+		if cat.is_empty():
+			cat = "textures"
 		var installed: Dictionary = LocalLibScript.import_file(path, str(item.get("abs", "")), cat)
 		if not installed.get("ok", false):
 			return
 		res_p = str(installed.get("res", ""))
+		item["res"] = res_p
+		var items: Array = _opt_items.get(opt.get_instance_id(), [])
+		if opt.selected >= 0 and opt.selected < items.size():
+			items[opt.selected] = item
 	if res_p.is_empty():
 		return
 	if replace:
@@ -778,6 +834,20 @@ func _generate_section(section: String) -> void:
 			if bool(kinds.get("models", true)):
 				ProceduralArtScript.write_shape_model(path, "weapon", "weapon", "box")
 			_write_mat_from_tex(path, "weapon_material", "weapon_texture")
+		"materials":
+			var slot: String = "wall_material"
+			if _mat_slot.item_count > 0:
+				slot = _mat_slot.get_item_text(_mat_slot.selected)
+			var tex_slot: String = slot.trim_suffix("_material")
+			if tex_slot == "character":
+				tex_slot = "character_texture"
+			elif tex_slot == "enemy":
+				tex_slot = "enemy_texture"
+			elif tex_slot == "weapon":
+				tex_slot = "weapon_texture"
+			elif tex_slot == "skybox":
+				tex_slot = "skybox"
+			_write_mat_from_tex(path, slot, tex_slot)
 	_reload_all_options()
 	_status.text = "Generated new %s variant(s). Pick in the list, then Add to game or Change." % section
 
@@ -876,8 +946,71 @@ func _on_search_download() -> void:
 	_status.text = "Downloaded CC0 into assets/%s/. Select it, then Add or Change." % cat
 
 
+func _open_add_more(section: String) -> void:
+	_more_section = section
+	_more_items.clear()
+	_more_list.clear()
+	if section == "physics":
+		for row in LocalLibScript.list_for("physics"):
+			if typeof(row) != TYPE_DICTIONARY:
+				continue
+			if str(row.get("kind", "")) == "cs":
+				continue
+			_more_items.append(row)
+			_more_list.add_item(str(row.get("label", row.get("name", "?"))))
+	else:
+		for row in LocalLibScript.list_for(section):
+			if typeof(row) != TYPE_DICTIONARY:
+				continue
+			if str(row.get("kind", "")) in ["cs", "plugin", "script"]:
+				continue
+			_more_items.append(row)
+			_more_list.add_item(str(row.get("label", row.get("name", "?"))))
+	if _more_items.is_empty():
+		_status.text = "No matching F:/asset files for %s." % section
+		return
+	_more_dialog.popup_centered()
+
+
+func _on_more_confirmed() -> void:
+	var path: String = AIOrchestrator.get_project_path()
+	if path.is_empty():
+		return
+	if _more_section == "physics":
+		var phys_info: Dictionary = LocalLibScript.install_physics_helpers(path)
+		_finish("Added more physics helpers → %s" % str(phys_info.get("addon", "addons/f_asset_physics")))
+		_reload_all_options()
+		return
+	var copied: int = 0
+	var idxs: PackedInt32Array = _more_list.get_selected_items()
+	if idxs.is_empty() and _more_list.item_count > 0:
+		idxs = PackedInt32Array([0])
+	for idx in idxs:
+		if idx < 0 or idx >= _more_items.size():
+			continue
+		var row: Dictionary = _more_items[idx]
+		var cat: String = "textures"
+		match _more_section:
+			"character", "enemy", "weapon":
+				cat = _more_section
+			"materials":
+				cat = "materials"
+			"world":
+				cat = "world" if str(row.get("kind", "")) != "model" else "models"
+				if str(row.get("kind", "")) == "material":
+					cat = "materials"
+		var installed: Dictionary = LocalLibScript.import_file(path, str(row.get("abs", "")), cat)
+		if installed.get("ok", false):
+			copied += 1
+	_reload_all_options()
+	_finish("Added more (%s) from F:/asset into assets/. Pick in the list, then Add to game or Change." % str(copied))
+
+
 func _import_section(section: String) -> void:
 	_import_ctx = {"section": section}
+	var root: String = LocalLibScript.configured_root()
+	if DirAccess.dir_exists_absolute(root):
+		_file_dialog.current_dir = root
 	_file_dialog.popup_centered_ratio(0.7)
 
 
@@ -900,7 +1033,15 @@ func _on_file_picked(src: String) -> void:
 			else:
 				var nm: String = src.get_file().to_lower()
 				cat = "background" if nm.contains("sky") or nm.contains("skybox") else "world"
-	var installed: Dictionary = LayoutScript.install_asset(path, src, src.get_file(), cat, true)
+		"materials":
+			cat = "materials"
+	var root_l: String = LocalLibScript.configured_root().replace("\\", "/").to_lower().rstrip("/")
+	var src_l: String = src.replace("\\", "/").to_lower()
+	var installed: Dictionary
+	if LocalLibScript.is_allowed_root(LocalLibScript.configured_root()) and src_l.begins_with(root_l + "/"):
+		installed = LocalLibScript.import_file(path, src, cat)
+	else:
+		installed = LayoutScript.install_asset(path, src, src.get_file(), cat, true)
 	if not installed.get("ok", false):
 		_status.text = "Import failed."
 		return

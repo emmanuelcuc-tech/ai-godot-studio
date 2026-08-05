@@ -64,7 +64,9 @@ const ArtEditIntentScript = preload("res://scripts/art_edit_intent.gd")
 @onready var animation_tab: Control = %Animation
 @onready var controls_tab: Control = %Controls
 @onready var effects_tab: Control = %Effects
-@onready var add_to_game_panel: Control = %AddToGamePanel
+@onready var edit_game_tab: Control = %EditGame
+@onready var open_edit_game_btn: Button = %OpenEditGameBtn
+@onready var local_asset_folder: LineEdit = %LocalAssetFolder
 
 var _last_project_path: String = ""
 var _pulse: float = 0.0
@@ -75,13 +77,15 @@ var _style_user_set: bool = false
 func _ready() -> void:
 	brand.text = "AI GODOT STUDIO"
 	tabs.set_tab_title(0, "Create")
-	tabs.set_tab_title(1, "Library / Assets")
-	tabs.set_tab_title(2, "Scripts")
-	tabs.set_tab_title(3, "Animation")
-	tabs.set_tab_title(4, "Controls / Display")
-	tabs.set_tab_title(5, "Effects")
-	tabs.set_tab_title(6, "Settings")
+	tabs.set_tab_title(1, "Edit Game")
+	tabs.set_tab_title(2, "Library / Assets")
+	tabs.set_tab_title(3, "Scripts")
+	tabs.set_tab_title(4, "Animation")
+	tabs.set_tab_title(5, "Controls / Display")
+	tabs.set_tab_title(6, "Effects")
+	tabs.set_tab_title(7, "Settings")
 	tabs.tab_changed.connect(_on_tab_changed)
+	open_edit_game_btn.pressed.connect(_on_open_edit_game)
 	_load_settings_into_form()
 	_refresh_providers()
 	_fill_genres()
@@ -120,7 +124,7 @@ func _ready() -> void:
 	_refresh_editors()
 	if not _style_user_set:
 		_apply_styles_to_checks(GraphicStyleScript.defaults_for_genre(GenreCatalogScript.id_at(genre_option.selected)))
-	_log("[b]AI Godot Studio[/b]\n1. Pick [b]Graphic style[/b] (Realistic / Cartoon / Pixel / 2D / 3D / Minimal / Detailed) plus Textures/Sprites/Models\n2. Describe a game or paste GameProject JSON, then Create — art matches the style\n3. [b]Run Game[/b] — session stays. Type art changes + Create to edit slots\n4. [b]Add to game / Change[/b] — character → world → enemy → weapon (models, materials, physics). Library can do the same.\n")
+	_log("[b]AI Godot Studio[/b]\n1. Pick [b]Graphic style[/b] (Realistic / Cartoon / Pixel / 2D / 3D / Minimal / Detailed) plus Textures/Sprites/Models\n2. Describe a game or paste GameProject JSON, then Create — starter art + useful files from F:/asset\n3. [b]Run Game[/b] — session stays. Type art changes + Create to edit the same project\n4. After testing, open [b]Edit Game[/b] to add more from F:/asset (Character → World → Enemy → Weapon → Materials → Physics).\n")
 	if not AppSettings.has_any_ai_key():
 		_log("[color=#F4A261]Add your ChatGPT / OpenAI key in Settings so Create Game uses AI instructions to code and pull assets.[/color]\n")
 	if AppSettings.godot_executable.is_empty():
@@ -147,6 +151,7 @@ func _load_settings_into_form() -> void:
 	tavily_key.text = AppSettings.tavily_api_key
 	godot_path.text = AppSettings.godot_executable
 	blender_path.text = AppSettings.blender_executable
+	local_asset_folder.text = AppSettings.local_asset_folder if not AppSettings.local_asset_folder.is_empty() else "F:/asset"
 	use_openai.button_pressed = AppSettings.use_openai
 	use_claude.button_pressed = AppSettings.use_claude
 	use_gemini.button_pressed = AppSettings.use_gemini
@@ -174,6 +179,10 @@ func _on_save_settings() -> void:
 	AppSettings.tavily_api_key = tavily_key.text.strip_edges()
 	AppSettings.godot_executable = godot_path.text.strip_edges()
 	AppSettings.blender_executable = blender_path.text.strip_edges()
+	AppSettings.local_asset_folder = local_asset_folder.text.strip_edges().replace("\\", "/")
+	if AppSettings.local_asset_folder.is_empty():
+		AppSettings.local_asset_folder = "F:/asset"
+		local_asset_folder.text = "F:/asset"
 	AppSettings.use_openai = use_openai.button_pressed
 	AppSettings.use_claude = use_claude.button_pressed
 	AppSettings.use_gemini = use_gemini.button_pressed
@@ -406,8 +415,8 @@ func _refresh_session() -> void:
 	session_label.text = AIOrchestrator.get_session_label()
 	if AIOrchestrator.has_active_session():
 		session_label.text += " — Tested? Type changes and press Create Game to edit."
-		create_btn.text = "Update / Edit Game"
-		create_btn.tooltip_text = "Edits the current game (same folder). New Game starts over."
+		create_btn.text = "Update Game"
+		create_btn.tooltip_text = "Edits the current game (same folder). Use the Edit Game tab to add more from F:/asset. New Game starts over."
 		prompt.placeholder_text = "Type edits after testing, then Create…"
 		_set_art_edit_visible(true)
 	else:
@@ -449,8 +458,7 @@ func _on_create() -> void:
 		_on_status("Describe a game in the search box (or pick a genre).")
 		return
 	if AIOrchestrator.is_busy():
-		_log("[color=#F4A261]Still creating — wait or press New Game to cancel.[/color]\n")
-		return
+		_log("[color=#F4A261]Still working — applying your new text on the same game…[/color]\n")
 	create_btn.disabled = true
 	new_game_btn.disabled = true
 	_sync_art_kinds_to_settings(false)
@@ -490,15 +498,15 @@ func _on_pipeline_finished(success: bool, result: Dictionary) -> void:
 	_refresh_session()
 	_refresh_editors()
 	if not bool(result.get("art_edit", false)):
-		prompt.text = ""
-		prompt.placeholder_text = "Type edits after testing, then Create…"
+		prompt.placeholder_text = "Type more description or comments, then Update Game…"
+	create_btn.disabled = false
 	var proj: String = _last_project_path if not _last_project_path.is_empty() else AIOrchestrator.get_project_path()
 	if not proj.is_empty():
 		var style_data: Dictionary = StudioGameConfigScript.load_style(proj)
 		_apply_styles_to_checks(GraphicStyleScript.from_variant(style_data.get("graphic_styles", _selected_styles())))
 		_style_user_set = true
 	_log("[color=#3DDC97]Game ready:[/color] %s\n" % _last_project_path)
-	_log("[color=#8FA3B8]Tested? Type changes and press Create Game to edit. New Game is the only full reset.[/color]\n")
+	_log("[color=#8FA3B8]After Run Game, type more description or comments and press Update Game — the same project keeps improving. New Game is the only full reset.[/color]\n")
 	if result.has("session"):
 		_log("[color=#8FA3B8]%s[/color]\n" % str(result.get("session", "")))
 	var files = result.get("files", [])
@@ -588,8 +596,13 @@ func _on_tab_changed(_idx: int) -> void:
 	_refresh_editors()
 
 
+func _on_open_edit_game() -> void:
+	tabs.current_tab = 1
+	_refresh_editors()
+
+
 func _refresh_editors() -> void:
-	for node in [library_tab, scripts_tab, animation_tab, controls_tab, effects_tab, add_to_game_panel]:
+	for node in [edit_game_tab, library_tab, scripts_tab, animation_tab, controls_tab, effects_tab]:
 		if node and node.has_method("refresh"):
 			node.refresh()
 

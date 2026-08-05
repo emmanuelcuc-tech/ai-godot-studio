@@ -17,7 +17,9 @@ Describe a game → **Create Game** builds a playable **Godot 4** project using 
 
 After **Run Game**, type new directions and press **Create Game** / **Update / Edit Game** to **modify the same project**. **New Game** is the only full reset. Uncheck **Create with C++** in the Create tab or Settings for GDScript-only.
 
-On Create, check **Textures**, **Sprites**, and/or **Models**. Every game gets real `assets/` files (CC0 download when possible, generated colored PNGs + a simple character mesh otherwise) so Run Game is never untextured gray. In **Library**, choose/replace a texture, sprite, or model and Assign it.
+On Create, check **Textures**, **Sprites**, and/or **Models**. Every game gets real `assets/` files (CC0 download when possible, generated colored PNGs + a simple character mesh otherwise) so Run Game is never untextured gray. Create also copies matching useful files from **`F:/asset`** (Settings → Local asset folder) into the new game — materials, textures, models, character/player hits, and a GDScript-safe physics helper addon when compatible. Attribution lands in `docs/F_ASSET_ATTRIBUTION.md`. Runtime never links to `F:`.
+
+After Create, open the **Edit Game** tab to **Add more / Change** Character · World · Enemy · Weapon · Materials · Physics from `F:/asset` or the project’s `assets/`. Create keeps a short link: “Open Edit Game to add more from F:\\asset”. **Library** browses the generated project folders only.
 
 ## Pipeline (ChatGPT-driven)
 
@@ -27,6 +29,7 @@ On Create, check **Textures**, **Sprites**, and/or **Models**. Every game gets r
 4. Search the web for Godot / GDExtension tutorials / AssetLib / CC0 kits  
 5. **ChatGPT plan** — instructions, gameplay, C++ classes, several textures/sprites → `docs/AI_PLAN.md`  
 6. Write **wall / floor / character / enemy art** into `assets/` (Openverse/Wikimedia CC0 when available, generated fallback always)  
+6b. Copy matching useful files from local **`F:/asset`** into `assets/` + optional `addons/f_asset_physics/`  
 7. Search **Godot Asset Library**; record hits in `docs/PLUGINS.md`; unpack a small MIT/CC0 addon zip into `addons/` when it looks like a real plugin  
 8. Fetch a small **open Godot 4 sample** (README + key scripts) into `refs/<name>/`  
 9. **ChatGPT code** — writes/merges C++ + GDScript using those asset/ref paths  
@@ -43,8 +46,10 @@ Downloads are parallel / time-capped so play is not blocked. Modify mode: type n
 | `refs/<name>/` | Open MIT/CC0 sample README + scripts for the AI to study |
 | `docs/RESOURCES.md` | Inventory + licenses of downloaded art / refs / Kenney links |
 | `docs/PLUGINS.md` | AssetLib search results + any installed addon |
+| `docs/F_ASSET_ATTRIBUTION.md` | LICENSE / ATTRIBUTION copied from local `F:/asset` |
+| `addons/f_asset_physics/` | Optional GDScript-safe joints/grab from `F:/asset` (C# skipped) |
 
-**Not auto-installed:** Kenney all-in-one packs (linked only — grab from [kenney.nl](https://kenney.nl/assets)), GPL AssetLib plugins, full demo zips over ~8 MB, commercial ROMs/WADs/ripped art.
+**Not auto-installed:** Kenney all-in-one packs (linked only — grab from [kenney.nl](https://kenney.nl/assets)), GPL AssetLib plugins, full demo zips over ~8 MB, commercial ROMs/WADs/ripped art. Other `F:\` dumps (Battlefield, zips, ROMs) are never scanned — only `F:/asset`.
 
 ## C++ / GDExtension
 
@@ -76,6 +81,7 @@ If a compiler is detected, Create may start this build in the background. First 
 - Godot 4 executable path (required for Run)  
 - **Create with C++ / GDExtension** (default on)  
 - Optional web search (DuckDuckGo / Tavily)  
+- **Local asset folder** (default `F:/asset` only — never whole `F:` / Battlefield / ROMs)  
 
 ## Run the studio
 

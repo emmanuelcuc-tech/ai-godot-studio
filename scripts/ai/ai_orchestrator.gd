@@ -27,6 +27,7 @@ const CppBuilderScript = preload("res://scripts/cpp_builder.gd")
 const GameAssetLayoutScript = preload("res://scripts/editors/game_asset_layout.gd")
 const StudioGameConfigScript = preload("res://scripts/editors/studio_game_config.gd")
 const ProceduralArtScript = preload("res://scripts/ai/procedural_art.gd")
+const LocalAssetLibraryScript = preload("res://scripts/editors/local_asset_library.gd")
 const GameProjectBriefScript = preload("res://scripts/game_project_brief.gd")
 const GraphicStyleScript = preload("res://scripts/graphic_style.gd")
 const ArtEditIntentScript = preload("res://scripts/art_edit_intent.gd")
@@ -60,6 +61,7 @@ Return ONLY JSON (no markdown fences):
 }"""
 
 const SYSTEM_CODE := """You are a Godot 4 + GDExtension (C++ / godot-cpp) programmer. Follow the BUILD PLAN and USER DIRECTIONS exactly.
+If MODE is MODIFY, MERGE the new description and all player comments into the existing game — do not create a new project or wipe unrelated systems. Keep improving the same game.
 Write or UPDATE a playable Godot 4 project whose **intended gameplay is C++**:
 - src/register_types.h + src/register_types.cpp (entry symbol game_library_init)
 - src/game_app.*, src/game_player.*, src/game_world.*, src/game_enemy.* matching the genre/description
@@ -106,6 +108,7 @@ Return ONLY JSON (no markdown fences):
 }"""
 
 const SYSTEM_CODE_GDSCRIPT := """You are a Godot 4 programmer. Follow the BUILD PLAN and USER DIRECTIONS exactly.
+If MODE is MODIFY, MERGE the new description and all player comments into the existing game — do not start over or wipe unrelated systems. Keep improving the same game.
 Write or UPDATE a playable Godot 4 project in GDScript 2.0 only.
 Use assets already on disk via category folders:
 assets/character/, assets/enemy/, assets/weapon/, assets/world/, assets/ui/, assets/effects/, assets/background/, assets/materials/, assets/models/, assets/sprites/, assets/textures/
@@ -300,10 +303,30 @@ func apply_art_edit(options: Dictionary = {}) -> void:
 	})
 
 
+func _interrupt_keep_session() -> void:
+	_res_gen += 1
+	_busy = false
+	_awaiting = ""
+	_awaiting_tex = false
+	_download_active = false
+	_pending_downloads.clear()
+	_queued_names.clear()
+	_addon_busy = false
+	_ref_busy = false
+	_waiting_resources = false
+	_want_ai_after_resources = false
+	_url_active = false
+	_pending_url_jobs.clear()
+	if openrefs:
+		openrefs.cancel()
+	if _resource_timer:
+		_resource_timer.stop()
+	status.emit("Applying your new directions on the same game…")
+
+
 func create_game(description: String, genre_index: int = 0, options: Dictionary = {}) -> void:
 	if _busy:
-		status.emit("Already creating… press New Game to cancel.")
-		return
+		_interrupt_keep_session()
 	var text := description.strip_edges()
 	if text.is_empty() and genre_index <= 0:
 		status.emit("Type a game description in the search box.")
@@ -400,15 +423,14 @@ func create_game(description: String, genre_index: int = 0, options: Dictionary 
 		_art_slots = ArtEditIntentScript.selected_slots(detected_slots.get("slots", {}))
 
 	if _modify:
-		_notes.append("MODIFY — ChatGPT will follow new directions on the active game.")
-		status.emit("ChatGPT modifying game from new directions…")
-		var existing: Array = ProjectWriterScript.read_project_files(session.project_path)
+		_notes.append("MODIFY — merge new description/comments into the same project.")
+		status.emit("Updating the same game from your new description…")
 		_base = {
 			"ok": true,
 			"project_name": session.project_name,
 			"summary": "Modified from new directions",
 			"howto": [],
-			"files": existing if not existing.is_empty() else GenreTemplatesScript.build(_genre_id).get("files", []),
+			"files": [],
 		}
 	else:
 		_notes.append("CREATE — Godot template + C++ GDExtension + ChatGPT plan + code + assets" if AppSettings.create_with_cpp else "CREATE — Godot template + ChatGPT plan + code + assets")
@@ -455,24 +477,27 @@ func create_game(description: String, genre_index: int = 0, options: Dictionary 
 func _build_and_write_starter() -> Dictionary:
 	var built: Dictionary = _base.duplicate(true)
 	var files: Array = built.get("files", []).duplicate()
+	if _modify:
+		files = _iteration_files(_description)
 	files = OfflineEnhancerScript.apply(files, _description, _genre_id)
 	files = ArtPipelineScript.write_guides_into_files(files)
-	if AppSettings.create_with_cpp:
+	if AppSettings.create_with_cpp and not _modify:
 		files = _ensure_cpp_scaffold(files)
 	files = StudioGameConfigScript.inject_into_files(files)
 	var engine_line: String = "Godot 4 + C++ GDExtension (GDScript fallback until native lib is built)" if AppSettings.create_with_cpp else "Godot 4"
-	files.append({
-		"path": "PLAYER_BRIEF.md",
-		"content": "# Game brief (player directions)\n\n%s\n\nGenre: %s\nEngine: %s\n" % [_description, _genre_id, engine_line],
-	})
-	files.append({
-		"path": "docs/RESOURCES.md",
-		"content": _resources_stub_markdown(),
-	})
-	files.append({
-		"path": "docs/PLUGINS.md",
-		"content": _plugins_stub_markdown(),
-	})
+	if not _modify:
+		files.append({
+			"path": "PLAYER_BRIEF.md",
+			"content": "# Game brief (player directions)\n\n%s\n\nGenre: %s\nEngine: %s\n" % [_description, _genre_id, engine_line],
+		})
+		files.append({
+			"path": "docs/RESOURCES.md",
+			"content": _resources_stub_markdown(),
+		})
+		files.append({
+			"path": "docs/PLUGINS.md",
+			"content": _plugins_stub_markdown(),
+		})
 	if not str(_game_project.get("setup_instructions", "")).strip_edges().is_empty():
 		files.append({
 			"path": "docs/SETUP.md",
@@ -497,6 +522,8 @@ func _build_and_write_starter() -> Dictionary:
 		return written
 	if not session.active:
 		session.start(str(written.get("path", "")), str(written.get("project_name", "")), _genre_id)
+		if not _description.is_empty():
+			session.comments.append(_description)
 	else:
 		session.bump(_description)
 	if not session.project_path.is_empty():
@@ -505,11 +532,22 @@ func _build_and_write_starter() -> Dictionary:
 		StudioGameConfigScript.set_art_kinds(session.project_path, _art_kinds)
 		StudioGameConfigScript.set_graphic_styles(session.project_path, _graphic_styles)
 		ProceduralArtScript.set_styles(_graphic_styles)
-		var art_written: Array = ProceduralArtScript.write_starter_art(session.project_path, _genre_id, _art_kinds)
-		for a in art_written:
-			if typeof(a) == TYPE_DICTIONARY:
-				_downloaded_assets.append(a)
-		_notes.append("Starter art on disk (%s files). Style: %s" % [str(art_written.size()), GraphicStyleScript.label(_graphic_styles)])
+		if not _modify:
+			var art_written: Array = ProceduralArtScript.write_starter_art(session.project_path, _genre_id, _art_kinds)
+			for a in art_written:
+				if typeof(a) == TYPE_DICTIONARY:
+					_downloaded_assets.append(a)
+			_notes.append("Starter art on disk (%s files). Style: %s" % [str(art_written.size()), GraphicStyleScript.label(_graphic_styles)])
+		if not _modify:
+			var local_art: Dictionary = LocalAssetLibraryScript.apply_on_create(session.project_path, _genre_id, _art_kinds)
+			if local_art.get("ok", false):
+				_notes.append("Copied %s useful files from local F:/asset into the project (no runtime F: link). Physics: %s" % [
+					str(local_art.get("copied", 0)),
+					str(local_art.get("physics", "none")),
+				])
+				status.emit("Copied local F:/asset textures/materials/models/physics into the new game.")
+			elif not str(local_art.get("error", "")).is_empty():
+				_notes.append("Local F:/asset skipped: %s" % str(local_art.get("error", "")))
 		if _modify and not _art_slots.is_empty():
 			_refresh_art_slots(_art_slots, true)
 		_write_gameproject_snapshot(str(written.get("summary", "")))
@@ -529,6 +567,31 @@ func _build_and_write_starter() -> Dictionary:
 				_description, str(built.get("summary", ""))
 			)
 	return written
+
+
+func _iteration_files(direction: String) -> Array:
+	var prev_brief: String = ""
+	var brief_path: String = session.project_path.path_join("PLAYER_BRIEF.md")
+	if FileAccess.file_exists(brief_path):
+		prev_brief = FileAccess.get_file_as_string(brief_path)
+	if prev_brief.strip_edges().is_empty():
+		prev_brief = "# Game brief (player directions)\n\nGenre: %s\n" % _genre_id
+	var stamp: String = Time.get_datetime_string_from_system()
+	var brief: String = prev_brief.strip_edges() + "\n\n## Update %s (rev %s)\n%s\n" % [
+		stamp, str(session.revision + 1), direction.strip_edges(),
+	]
+	var iter_json: String = JSON.stringify({
+		"revision": session.revision + 1,
+		"latest": direction.strip_edges(),
+		"updated_at": stamp,
+		"comments": session.comments,
+	}, "\t")
+	var comments_md: String = "# Player comments / iteration log\n\nEach Update Game pass appends here.\n\n" + session.comments_blob(20000) + "\n\n## Latest\n%s\n" % direction.strip_edges()
+	return [
+		{"path": "PLAYER_BRIEF.md", "content": brief},
+		{"path": "studio_iteration.json", "content": iter_json},
+		{"path": "docs/COMMENTS.md", "content": comments_md},
+	]
 
 
 func _ensure_cpp_scaffold(files: Array) -> Array:
@@ -976,6 +1039,9 @@ func _begin_ai_code() -> void:
 	var user: String = """PLAYER DIRECTIONS (highest priority — implement these):
 %s
 
+ALL PLAYER COMMENTS / ITERATIONS (keep improving the same game; do not start over):
+%s
+
 BUILD PLAN FROM CHATGPT (follow these instructions):
 %s
 
@@ -1012,6 +1078,7 @@ Honor graphic style for materials, sprites, and meshes.
 Include download_queries for any extra CC0 textures still needed.
 """ % [
 		_description,
+		session.comments_blob(3500),
 		plan_text.left(6000),
 		_genre_id,
 		"MODIFY — merge into current files" if _modify or session.active else "CREATE from template + plan",
@@ -1412,6 +1479,7 @@ func _resources_stub_markdown() -> String:
 - Studio genre template: %s
 - ChatGPT / Claude / Gemini write C++ + GDScript when API keys are set
 - Create downloads several CC0 textures/sprites into `assets/` (Openverse / Wikimedia / procedural fallback)
+- Create also copies matching useful files from local `F:/asset` (Settings path) into `assets/` + optional `addons/f_asset_physics/`
 - Open Godot samples may land in `refs/` for the coder to study
 - Kenney / AssetLib links are listed in `docs/PLUGINS.md` (CC0 / MIT only — never commercial ROMs or ripped assets)
 - Directions are applied as AI instructions on Create / Modify

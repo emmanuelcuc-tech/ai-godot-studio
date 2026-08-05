@@ -5,11 +5,8 @@ const LayoutScript = preload("res://scripts/editors/game_asset_layout.gd")
 const ConfigScript = preload("res://scripts/editors/studio_game_config.gd")
 const ImageClientScript = preload("res://scripts/ai/image_asset_client.gd")
 const GraphicStyleScript = preload("res://scripts/graphic_style.gd")
-const AddPanelScript = preload("res://scripts/editors/add_to_game_panel.gd")
-
 var _empty: Label
 var _outer: VBoxContainer
-var _kit: Control
 var _root: HSplitContainer
 var _cat_list: ItemList
 var _file_list: ItemList
@@ -54,14 +51,12 @@ func refresh() -> void:
 		return
 	LayoutScript.ensure_layout(path)
 	ConfigScript.ensure_on_disk(path)
-	if _kit and _kit.has_method("refresh"):
-		_kit.refresh()
 	_reload_files()
 
 
 func _build() -> void:
 	_empty = Label.new()
-	_empty.text = "No active game yet.\nCreate a game in the Create tab — Library browses that project's assets/ folders."
+	_empty.text = "No active game yet.\nCreate a game, then use Edit Game to add more from F:/asset. Library browses this project's assets/ folders."
 	_empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_empty.add_theme_color_override("font_color", Color(0.56, 0.64, 0.72))
 	_empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -73,9 +68,11 @@ func _build() -> void:
 	_outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(_outer)
-	_kit = AddPanelScript.new()
-	_kit.custom_minimum_size = Vector2(0, 280)
-	_outer.add_child(_kit)
+	var kit_hint: Label = Label.new()
+	kit_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	kit_hint.add_theme_color_override("font_color", Color(0.62, 0.7, 0.78))
+	kit_hint.text = "To add more from F:/asset or change Character / World / Enemy / Weapon / Materials / Physics, open the Edit Game tab."
+	_outer.add_child(kit_hint)
 	_root = HSplitContainer.new()
 	_root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -120,7 +117,7 @@ func _build() -> void:
 	var lib_hint: Label = Label.new()
 	lib_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lib_hint.add_theme_color_override("font_color", Color(0.62, 0.7, 0.78))
-	lib_hint.text = "Top panel: Add to game / Change character → world → enemy → weapon (models, materials, physics). Below: browse folders and assign. Searches follow graphic style."
+	lib_hint.text = "Browse this game’s assets/ folders and assign. Use the Edit Game tab to add more from F:/asset. Searches follow graphic style."
 	right.add_child(lib_hint)
 
 	_preview = TextureRect.new()

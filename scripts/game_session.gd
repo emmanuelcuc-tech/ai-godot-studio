@@ -10,6 +10,7 @@ var project_name: String = ""
 var genre_id: String = ""
 var revision: int = 0
 var history: PackedStringArray = []
+var comments: PackedStringArray = []
 
 
 func start(path: String, name: String, genre: String) -> void:
@@ -19,14 +20,32 @@ func start(path: String, name: String, genre: String) -> void:
 	genre_id = genre
 	revision = 1
 	history.clear()
+	comments.clear()
 	history.append("Started %s (%s)" % [name, genre])
 	changed.emit()
 
 
 func bump(direction: String) -> void:
 	revision += 1
-	history.append("r%s: %s" % [str(revision), direction.left(200)])
+	var note: String = direction.strip_edges()
+	history.append("r%s: %s" % [str(revision), note.left(240)])
+	if not note.is_empty():
+		comments.append(note)
 	changed.emit()
+
+
+func comments_blob(max_chars: int = 4000) -> String:
+	if comments.is_empty():
+		return "(no extra comments yet)"
+	var lines: PackedStringArray = PackedStringArray()
+	var i: int = 1
+	for c in comments:
+		lines.append("%s. %s" % [str(i), c])
+		i += 1
+	var blob: String = "\n".join(lines)
+	if blob.length() > max_chars:
+		return blob.substr(blob.length() - max_chars)
+	return blob
 
 
 func clear() -> void:
@@ -36,6 +55,7 @@ func clear() -> void:
 	genre_id = ""
 	revision = 0
 	history.clear()
+	comments.clear()
 	changed.emit()
 
 
