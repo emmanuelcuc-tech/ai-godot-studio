@@ -24,6 +24,7 @@ var use_art_models: bool = true
 var graphic_styles: PackedStringArray = PackedStringArray(["3d", "detailed"])
 var godot_executable: String = ""
 var blender_executable: String = ""
+var unity_executable: String = ""
 var output_folder: String = "res://generated_games"
 var local_asset_folder: String = "F:/asset"
 
@@ -35,6 +36,8 @@ func _ready() -> void:
 		godot_executable = _guess_godot_path()
 	if blender_executable.is_empty():
 		blender_executable = ArtPipelineScript.guess_blender_path()
+	if unity_executable.is_empty():
+		unity_executable = _guess_unity_path()
 
 
 func _load_from_env() -> void:
@@ -74,6 +77,7 @@ func load_settings() -> void:
 	graphic_styles = PackedStringArray(str(cfg.get_value("art", "graphic_styles", ",".join(graphic_styles))).split(",", false))
 	godot_executable = str(cfg.get_value("paths", "godot", godot_executable))
 	blender_executable = str(cfg.get_value("paths", "blender", blender_executable))
+	unity_executable = str(cfg.get_value("paths", "unity", unity_executable))
 	output_folder = str(cfg.get_value("paths", "output", output_folder))
 	local_asset_folder = str(cfg.get_value("paths", "local_asset_folder", local_asset_folder)).replace("\\", "/")
 	if local_asset_folder.is_empty():
@@ -103,6 +107,7 @@ func save_settings() -> void:
 	cfg.set_value("art", "graphic_styles", ",".join(graphic_styles))
 	cfg.set_value("paths", "godot", godot_executable)
 	cfg.set_value("paths", "blender", blender_executable)
+	cfg.set_value("paths", "unity", unity_executable)
 	cfg.set_value("paths", "output", output_folder)
 	cfg.set_value("paths", "local_asset_folder", local_asset_folder)
 	cfg.save(CONFIG_PATH)
@@ -161,4 +166,21 @@ func _guess_godot_path() -> String:
 	for path in candidates:
 		if FileAccess.file_exists(path):
 			return path
+	return ""
+
+
+func _guess_unity_path() -> String:
+	var p := "C:/Program Files/Unity/Hub/Editor/6000.3.18f1/Editor/Unity.exe"
+	if FileAccess.file_exists(p):
+		return p
+	var base := "C:/Program Files/Unity/Hub/Editor"
+	var d := DirAccess.open(base)
+	if d:
+		d.list_dir_begin()
+		var n := d.get_next()
+		while n != "":
+			var exe := base.path_join(n).path_join("Editor/Unity.exe")
+			if FileAccess.file_exists(exe):
+				return exe
+			n = d.get_next()
 	return ""

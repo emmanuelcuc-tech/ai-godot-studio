@@ -127,6 +127,20 @@ static func open_blender(exe_path: String) -> Error:
 	return OS.create_process(exe, PackedStringArray())
 
 
+static func run_python(exe_path: String, script_path: String, extra_args: PackedStringArray = PackedStringArray()) -> int:
+	var exe := exe_path
+	if exe.is_empty() or not FileAccess.file_exists(exe):
+		exe = guess_blender_path()
+	if exe.is_empty() or not FileAccess.file_exists(exe):
+		return ERR_FILE_NOT_FOUND
+	if not FileAccess.file_exists(script_path):
+		return ERR_FILE_NOT_FOUND
+	var args := PackedStringArray(["--background", "--python", script_path, "--"])
+	args.append_array(extra_args)
+	var output: Array = []
+	return OS.execute(exe, args, output, true, false)
+
+
 static func open_blender_docs() -> void:
 	OS.shell_open("https://docs.blender.org/manual/en/latest/")
 	OS.shell_open("https://docs.godotengine.org/en/stable/tutorials/assets_pipeline/importing_3d_scenes/index.html")

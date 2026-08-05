@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://ai_godot_studio_main"]
+[gd_scene load_steps=10 format=3 uid="uid://ai_godot_studio_main"]
 
 [ext_resource type="Script" path="res://scripts/main_ui.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/editors/asset_library_ui.gd" id="2"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/editors/display_controls_ui.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/editors/effects_editor_ui.gd" id="6"]
 [ext_resource type="Script" path="res://scripts/editors/edit_game_ui.gd" id="8"]
+[ext_resource type="Script" path="res://scripts/editors/model_forge_ui.gd" id="9"]
 
 [sub_resource type="StyleBoxFlat" id="panel"]
 bg_color = Color(0.07, 0.1, 0.14, 0.94)
@@ -468,6 +469,16 @@ theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 10
 script = ExtResource("4")
 
+[node name="ModelForge" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+script = ExtResource("9")
+
 [node name="Controls" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
 unique_name_in_owner = true
 visible = false
@@ -587,6 +598,15 @@ text = "Blender (optional)"
 unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "Optional blender.exe path"
+
+[node name="UnityCaption" type="Label" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+layout_mode = 2
+text = "Unity editor (optional, for Model Forge import)"
+
+[node name="UnityPath" type="LineEdit" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "C:/Program Files/Unity/Hub/Editor/6000.3.18f1/Editor/Unity.exe"
 
 [node name="LocalAssetCaption" type="Label" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
 layout_mode = 2

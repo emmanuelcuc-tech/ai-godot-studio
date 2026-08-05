@@ -28,6 +28,7 @@ const ArtEditIntentScript = preload("res://scripts/art_edit_intent.gd")
 @onready var tavily_key: LineEdit = %TavilyKey
 @onready var godot_path: LineEdit = %GodotPath
 @onready var blender_path: LineEdit = %BlenderPath
+@onready var unity_path: LineEdit = %UnityPath
 @onready var use_openai: CheckButton = %UseOpenAI
 @onready var use_claude: CheckButton = %UseClaude
 @onready var use_gemini: CheckButton = %UseGemini
@@ -81,9 +82,10 @@ func _ready() -> void:
 	tabs.set_tab_title(2, "Library / Assets")
 	tabs.set_tab_title(3, "Scripts")
 	tabs.set_tab_title(4, "Animation")
-	tabs.set_tab_title(5, "Controls / Display")
-	tabs.set_tab_title(6, "Effects")
-	tabs.set_tab_title(7, "Settings")
+	tabs.set_tab_title(5, "Model Forge")
+	tabs.set_tab_title(6, "Controls / Display")
+	tabs.set_tab_title(7, "Effects")
+	tabs.set_tab_title(8, "Settings")
 	tabs.tab_changed.connect(_on_tab_changed)
 	open_edit_game_btn.pressed.connect(_on_open_edit_game)
 	_load_settings_into_form()
@@ -151,6 +153,8 @@ func _load_settings_into_form() -> void:
 	tavily_key.text = AppSettings.tavily_api_key
 	godot_path.text = AppSettings.godot_executable
 	blender_path.text = AppSettings.blender_executable
+	if unity_path:
+		unity_path.text = AppSettings.unity_executable
 	local_asset_folder.text = AppSettings.local_asset_folder if not AppSettings.local_asset_folder.is_empty() else "F:/asset"
 	use_openai.button_pressed = AppSettings.use_openai
 	use_claude.button_pressed = AppSettings.use_claude
@@ -179,6 +183,8 @@ func _on_save_settings() -> void:
 	AppSettings.tavily_api_key = tavily_key.text.strip_edges()
 	AppSettings.godot_executable = godot_path.text.strip_edges()
 	AppSettings.blender_executable = blender_path.text.strip_edges()
+	if unity_path:
+		AppSettings.unity_executable = unity_path.text.strip_edges()
 	AppSettings.local_asset_folder = local_asset_folder.text.strip_edges().replace("\\", "/")
 	if AppSettings.local_asset_folder.is_empty():
 		AppSettings.local_asset_folder = "F:/asset"
