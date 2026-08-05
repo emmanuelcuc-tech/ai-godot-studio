@@ -1,0 +1,334 @@
+[gd_scene load_steps=3 format=3 uid="uid://ai_godot_studio_main"]
+
+[ext_resource type="Script" path="res://scripts/main_ui.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="panel"]
+bg_color = Color(0.07, 0.1, 0.14, 0.94)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.24, 0.86, 0.59, 0.4)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+content_margin_left = 18
+content_margin_top = 18
+content_margin_right = 18
+content_margin_bottom = 18
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Backdrop" type="ColorRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.05, 0.07, 0.1, 1)
+
+[node name="Accent" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 5.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.24, 0.86, 0.59, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 28
+
+[node name="RootVBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="HBoxContainer" parent="Margin/RootVBox"]
+layout_mode = 2
+
+[node name="BrandBlock" type="VBoxContainer" parent="Margin/RootVBox/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Brand" type="Label" parent="Margin/RootVBox/Header/BrandBlock"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.97, 0.98, 1)
+theme_override_font_sizes/font_size = 34
+text = "AI GODOT STUDIO"
+
+[node name="Tagline" type="Label" parent="Margin/RootVBox/Header/BrandBlock"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = "Describe a game. Create builds it with Godot + AI + internet resources. Run to play."
+
+[node name="StatusBox" type="VBoxContainer" parent="Margin/RootVBox/Header"]
+layout_mode = 2
+alignment = 1
+
+[node name="Status" type="Label" parent="Margin/RootVBox/Header/StatusBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.64, 0.28, 1)
+theme_override_font_sizes/font_size = 14
+text = "Idle"
+horizontal_alignment = 2
+
+[node name="Providers" type="Label" parent="Margin/RootVBox/Header/StatusBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.78, 0.65, 1)
+theme_override_font_sizes/font_size = 12
+text = "Active: Offline"
+horizontal_alignment = 2
+
+[node name="Tabs" type="TabContainer" parent="Margin/RootVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Create" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="CreateSplit" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="LeftPanel" type="PanelContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.05
+theme_override_styles/panel = SubResource("panel")
+
+[node name="LeftVBox" type="VBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="AskLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Search / describe your game"
+
+[node name="SessionLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.64, 0.28, 1)
+theme_override_font_sizes/font_size = 13
+text = "No active game"
+autowrap_mode = 3
+
+[node name="AskHint" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
+theme_override_font_sizes/font_size = 13
+text = "Create Game searches Godot tutorials + AI + CC0 textures/sprites, writes scripts, and builds a playable project. Type again + Create to modify. New Game starts fresh."
+autowrap_mode = 3
+
+[node name="GenreRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+
+[node name="GenreCaption" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/GenreRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.78, 0.85, 1)
+text = "Genre"
+
+[node name="GenreOption" type="OptionButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/GenreRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Prompt" type="TextEdit" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+size_flags_vertical = 3
+placeholder_text = "e.g. first person shooter with brick walls and dark corridors…"
+wrap_mode = 1
+
+[node name="BtnRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CreateBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/BtnRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Create Game"
+
+[node name="RunBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/BtnRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Run Game"
+
+[node name="NewGameBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/BtnRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "New Game"
+
+[node name="ActionRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SaveBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ActionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Save Game"
+
+[node name="OpenBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ActionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Open in Godot"
+
+[node name="FolderBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ActionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Show folder"
+
+[node name="RightPanel" type="PanelContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("panel")
+
+[node name="RightVBox" type="VBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/RightPanel"]
+layout_mode = 2
+
+[node name="LogTitle" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/RightPanel/RightVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Studio log"
+
+[node name="LogView" type="RichTextLabel" parent="Margin/RootVBox/Tabs/Create/CreateSplit/RightPanel/RightVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_active = true
+
+[node name="Settings" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
+visible = false
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="SettingsPanel" type="PanelContainer" parent="Margin/RootVBox/Tabs/Settings"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("panel")
+
+[node name="SettingsScroll" type="ScrollContainer" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SettingsVBox" type="VBoxContainer" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="SettingsTitle" type="Label" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "API keys & Godot path"
+
+[node name="SettingsHint" type="Label" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
+text = "Add ChatGPT / Claude / Gemini keys for AI coding. Godot exe is required for Run Game. Web search finds tutorials and asset links."
+autowrap_mode = 3
+
+[node name="UseOpenAI" type="CheckButton" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Use ChatGPT / OpenAI"
+
+[node name="OpenAIKey" type="LineEdit" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "OpenAI API key"
+
+[node name="UseClaude" type="CheckButton" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Use Claude"
+
+[node name="ClaudeKey" type="LineEdit" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Anthropic API key"
+
+[node name="UseGemini" type="CheckButton" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Use Gemini"
+
+[node name="GeminiKey" type="LineEdit" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Gemini API key"
+
+[node name="UseSearch" type="CheckButton" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Use web search (Godot tutorials / assets)"
+
+[node name="TavilyKey" type="LineEdit" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Optional Tavily API key"
+
+[node name="GodotCaption" type="Label" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+layout_mode = 2
+text = "Godot executable (Run Game / Open)"
+
+[node name="GodotPath" type="LineEdit" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "C:/path/to/Godot_v4.x-stable_win64.exe"
+
+[node name="BlenderCaption" type="Label" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+layout_mode = 2
+text = "Blender (optional)"
+
+[node name="BlenderPath" type="LineEdit" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Optional blender.exe path"
+
+[node name="SaveSettings" type="Button" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Save settings"
