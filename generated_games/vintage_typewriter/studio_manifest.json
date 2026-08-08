@@ -1,0 +1,20 @@
+{
+	"project_name": "vintage_typewriter",
+	"summary": "Full-screen iPad vintage typewriter with spring haptic key feedback (peak then soft settle).",
+	"howto": [
+		"Open generated_games/vintage_typewriter in Godot 4.7",
+		"Run fullscreen — tap keys for spring haptics",
+		"Export to iOS/iPad for real Core Haptics feel"
+	],
+	"files": [
+		"project.godot",
+		"scenes/main.tscn",
+		"scripts/typewriter.gd",
+		"scripts/haptic_spring.gd",
+		"icon.svg",
+		"PLAYER_BRIEF.md",
+		"export_presets.cfg"
+	],
+	"revision": 1,
+	"updated_at": "2026-08-07T22:12:00"
+}
