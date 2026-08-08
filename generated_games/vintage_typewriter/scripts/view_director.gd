@@ -44,22 +44,23 @@ func set_striker_texture(tex: Texture2D) -> void:
 
 
 func _load_striker_tex() -> void:
+	## Drop-in only — no packaged cinema atlases. Missing = scale/shadow feedback only.
 	for path in [
-		"res://assets/keys/striker_h.png",
-		"res://assets/keys/slug_h.png",
-		"res://assets/keys/striker_blur.png",
+		"res://assets/images/striker.png",
+		"res://assets/keys/striker.png",
 	]:
 		if ResourceLoader.exists(path):
 			var r := load(path)
 			if r is Texture2D:
 				_striker_tex = r
 				return
-		var abs := ProjectSettings.globalize_path(path)
-		if FileAccess.file_exists(abs):
+		var abs_path := ProjectSettings.globalize_path(path)
+		if FileAccess.file_exists(abs_path):
 			var img := Image.new()
-			if img.load(abs) == OK:
+			if img.load(abs_path) == OK:
 				_striker_tex = ImageTexture.create_from_image(img)
 				return
+	_striker_tex = null
 
 
 func set_mode(m: int) -> void:
@@ -245,6 +246,9 @@ func _spawn_key_drop(key_btn: Control, strength: float) -> void:
 func _spawn_strike(key_btn: Control, letter: String, quick: bool, strength: float = 0.85) -> void:
 	if _strike_layer == null or letter.is_empty():
 		return
+	## Without drop-in striker.png, skip flying sprite (scale/shadow still run).
+	if _striker_tex == null:
+		return
 	var start := Vector2.ZERO
 	if key_btn:
 		var r := key_btn.get_global_rect()
@@ -257,13 +261,11 @@ func _spawn_strike(key_btn: Control, letter: String, quick: bool, strength: floa
 		end = Vector2(pr.get_center().x, pr.position.y + pr.size.y * 0.55) - _strike_layer.global_position
 		end.x += randf_range(-40.0, 40.0)
 
-	## Metal striker / typebar sprite
 	var striker := TextureRect.new()
 	striker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	striker.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	striker.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	if _striker_tex:
-		striker.texture = _striker_tex
+	striker.texture = _striker_tex
 	striker.custom_minimum_size = Vector2(lerpf(48, 72, strength), lerpf(64, 96, strength))
 	striker.size = striker.custom_minimum_size
 	striker.pivot_offset = striker.size * 0.5
@@ -287,7 +289,6 @@ func _spawn_strike(key_btn: Control, letter: String, quick: bool, strength: floa
 	var fly := 0.18 + (0.0 if quick else 0.08) + strength * 0.06
 	var tw := _machine.create_tween()
 	tw.set_parallel(true)
-	# Typebar strike: shoot up then stamp onto paper
 	tw.tween_property(striker, "position", start + Vector2(0, -80) - striker.size * 0.5, 0.07).set_trans(Tween.TRANS_QUAD)
 	tw.tween_property(lab, "position", start + Vector2(0, -70), 0.08).set_trans(Tween.TRANS_QUAD)
 	tw.chain().tween_property(striker, "position", end - striker.size * 0.5, fly).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)

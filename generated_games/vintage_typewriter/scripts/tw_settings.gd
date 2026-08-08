@@ -6,7 +6,9 @@ signal changed
 const SAVE_PATH := "user://typewriter_settings.cfg"
 
 var hq_assets: bool = true
-var paper_type: String = "vintage"
+## dropin = bake from assets/images when present · procedural = cream/chrome
+var key_sprite_style: String = "procedural"
+var paper_type: String = "beige"
 var paper_color: Color = Color(0.93, 0.86, 0.70)
 var use_custom_paper_color: bool = false
 var font_color: Color = Color(0.12, 0.1, 0.08)
@@ -16,6 +18,14 @@ var line_spacing: String = "single" # single | double
 var haptics_enabled: bool = true
 var key_fx_enabled: bool = true
 var sound_enabled: bool = true
+## Prefer res://assets/audio/{key,erase,return,bell,feed}.ogg when present; else silent
+var use_asset_sounds: bool = true
+var erase_sound_enabled: bool = true
+## Master key SFX level 0..1 (separate from click_feel spring bias)
+var sound_volume: float = 0.85
+## Ambient room bed removed — kept for save-file compat (no-op in SFX)
+var ambient_room: bool = false
+var ambient_volume: float = 0.12
 var click_feel: float = 0.85
 var auto_paper_move: bool = false ## typing must NOT slide the sheet; text scrolls in place
 var paper_physics: bool = true
@@ -50,6 +60,9 @@ func _ready() -> void:
 func effective_paper_color() -> Color:
 	if use_custom_paper_color:
 		return paper_color
+	## Textured paper types carry their look in the image — keep modulate white.
+	if HQAssets.is_textured_paper(paper_type):
+		return Color.WHITE
 	var presets: Dictionary = HQAssets.PAPER_PRESETS
 	return presets.get(paper_type, Color(0.93, 0.86, 0.70))
 
@@ -63,6 +76,12 @@ func load_settings() -> void:
 	if cfg.load(SAVE_PATH) != OK:
 		return
 	hq_assets = bool(cfg.get_value("gfx", "hq", hq_assets))
+	key_sprite_style = str(cfg.get_value("gfx", "key_style", key_sprite_style))
+	## Migrate old Underwood/ref style → drop-in images folder
+	if key_sprite_style == "underwood":
+		key_sprite_style = "dropin"
+	if key_sprite_style not in ["dropin", "procedural"]:
+		key_sprite_style = "procedural"
 	paper_type = str(cfg.get_value("paper", "type", paper_type))
 	use_custom_paper_color = bool(cfg.get_value("paper", "custom", use_custom_paper_color))
 	paper_color = cfg.get_value("paper", "color", paper_color)
@@ -73,6 +92,11 @@ func load_settings() -> void:
 	haptics_enabled = bool(cfg.get_value("feel", "haptics", haptics_enabled))
 	key_fx_enabled = bool(cfg.get_value("feel", "key_fx", key_fx_enabled))
 	sound_enabled = bool(cfg.get_value("feel", "sound", sound_enabled))
+	use_asset_sounds = bool(cfg.get_value("feel", "asset_sfx", use_asset_sounds))
+	erase_sound_enabled = bool(cfg.get_value("feel", "erase_sfx", erase_sound_enabled))
+	sound_volume = float(cfg.get_value("feel", "volume", sound_volume))
+	ambient_room = bool(cfg.get_value("feel", "ambient", ambient_room))
+	ambient_volume = float(cfg.get_value("feel", "ambient_vol", ambient_volume))
 	surround_max = bool(cfg.get_value("feel", "surround_max", surround_max))
 	reverb_amount = float(cfg.get_value("feel", "reverb", reverb_amount))
 	mic_reverb_monitor = bool(cfg.get_value("feel", "mic_reverb", mic_reverb_monitor))
@@ -93,12 +117,17 @@ func load_settings() -> void:
 	auto_paper_move = false
 	surround_max = false
 	mic_reverb_monitor = false
+	## Ambient stays off — room bed removed in fresh-start reset
+	ambient_room = false
 	reverb_amount = mini(reverb_amount, 0.25)
+	sound_volume = clampf(sound_volume, 0.0, 1.0)
+	ambient_volume = clampf(ambient_volume, 0.0, 0.4)
 
 
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("gfx", "hq", hq_assets)
+	cfg.set_value("gfx", "key_style", key_sprite_style)
 	cfg.set_value("paper", "type", paper_type)
 	cfg.set_value("paper", "custom", use_custom_paper_color)
 	cfg.set_value("paper", "color", paper_color)
@@ -109,6 +138,11 @@ func save_settings() -> void:
 	cfg.set_value("feel", "haptics", haptics_enabled)
 	cfg.set_value("feel", "key_fx", key_fx_enabled)
 	cfg.set_value("feel", "sound", sound_enabled)
+	cfg.set_value("feel", "asset_sfx", use_asset_sounds)
+	cfg.set_value("feel", "erase_sfx", erase_sound_enabled)
+	cfg.set_value("feel", "volume", sound_volume)
+	cfg.set_value("feel", "ambient", ambient_room)
+	cfg.set_value("feel", "ambient_vol", ambient_volume)
 	cfg.set_value("feel", "surround_max", surround_max)
 	cfg.set_value("feel", "reverb", reverb_amount)
 	cfg.set_value("feel", "mic_reverb", mic_reverb_monitor)

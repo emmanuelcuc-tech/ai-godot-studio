@@ -1,9 +1,13 @@
-# Audio
+# Audio (drop-in)
 
-- `typewriter_room.ogg` — converted from `F:\videoplayback.m4a` (AAC → Vorbis). Optional room bed.
-- `key_strike.ogg` — short strike clip from `videoplayback.m4a`
-- `erase.ogg` — backspace / erase scrape
-- `enter_bell.ogg` — return / margin bell
-- `page_feed.ogg` — platen / paper feed clunk
+Place new typewriter sounds here. The machine is **silent** until these files exist.
 
-`typewriter_sfx.gd` loads these first and falls back to synthetic WAV tones if missing.
+| File | Use |
+|------|-----|
+| `key.ogg` | Key strike |
+| `erase.ogg` | Backspace / erase |
+| `return.ogg` | Carriage return (falls back to `feed.ogg` if missing) |
+| `bell.ogg` | Margin / return bell |
+| `feed.ogg` | Platen / paper feed |
+
+`typewriter_sfx.gd` loads these when present; otherwise plays nothing.

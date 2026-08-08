@@ -2,7 +2,7 @@
 
 importer="oggvorbisstr"
 type="AudioStreamOggVorbis"
-uid="uid://buy0x1oepvb6g"
+uid="uid://cb8ppc8xluxkh"
 path="res://.godot/imported/typewriter_room.ogg-f86d35c9d2283bf86756337ae093f38a.oggvorbisstr"
 
 [deps]
@@ -12,8 +12,8 @@ dest_files=["res://.godot/imported/typewriter_room.ogg-f86d35c9d2283bf86756337ae
 
 [params]
 
-loop=true
-loop_offset=0.0
+loop=false
+loop_offset=0
 bpm=0
 beat_count=0
 bar_beats=4

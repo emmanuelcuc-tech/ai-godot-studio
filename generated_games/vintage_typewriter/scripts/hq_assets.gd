@@ -1,7 +1,7 @@
 class_name HQAssets
 extends RefCounted
-## Procedural HQ textures: 4K paper + Underwood cream/chrome keys.
-## Prefers sliced ref sprites under res://assets/keys/ when present.
+## Procedural HQ textures: paper + cream/chrome keys.
+## Prefers drop-in sprites under res://assets/images/ (or assets/keys/) when present.
 
 const PAPER_DIR := "user://tw_assets/paper"
 const KEY_DIR := "user://tw_assets/keys"
@@ -10,13 +10,13 @@ const PAPER_2K := 2048
 const KEY_2K := 2048
 const KEY_1K := 1024
 
-## Packaged ref sprites (from Copilot / Underwood photos)
-const REF_KEY_REST := "res://assets/keys/key_rest_ref.png"
-const REF_KEY_PRESS := "res://assets/keys/key_press_ref.png"
-const REF_STRIKER := "res://assets/keys/striker_h.png"
-const REF_SLUG := "res://assets/keys/slug_h.png"
-const REF_SPACE_FALLBACK := "res://assets/keys/key_rest_ref.png"
+## Conventional drop-in paths (fresh start — no packaged cinema atlases).
+const DROP_KEY := ["res://assets/images/key.png", "res://assets/keys/key.png"]
+const DROP_KEY_PRESS := ["res://assets/images/key_pressed.png", "res://assets/keys/key_pressed.png"]
+const DROP_STRIKER := ["res://assets/images/striker.png", "res://assets/keys/striker.png"]
+const DROP_PAPER := ["res://assets/images/paper.png", "res://assets/keys/paper.png"]
 
+## Color-tint procedural papers (baked to user://).
 const PAPER_PRESETS := {
 	"white": Color(0.97, 0.97, 0.95),
 	"tinted_yellow": Color(0.96, 0.92, 0.78),
@@ -28,8 +28,51 @@ const PAPER_PRESETS := {
 	"black": Color(0.08, 0.08, 0.09),
 }
 
+## Textured paper TYPES (drop-in JPGs under assets/images/paper/).
+## Sourced beside TypingSimulator on F:\ — not owned by that MIT auto-typer;
+## treated here as selectable paper types for Settings.
+const PAPER_TEXTURES := {
+	"recycled": "res://assets/images/paper/recycled.jpg",
+	"kraft": "res://assets/images/paper/kraft.jpg",
+	"beige": "res://assets/images/paper/beige.jpg",
+	"underwood_desk": "res://assets/images/paper/underwood_desk.jpg",
+}
 
-static func ensure_assets(hq: bool = true) -> Dictionary:
+## Display order + labels for Settings OptionButton.
+const PAPER_TYPE_ORDER := [
+	"recycled", "kraft", "beige", "underwood_desk",
+	"white", "tinted_yellow", "vintage", "green", "blue", "red", "yellow", "black",
+]
+
+const PAPER_TYPE_LABELS := {
+	"recycled": "Recycled fiber",
+	"kraft": "Kraft gray",
+	"beige": "Plain beige",
+	"underwood_desk": "Underwood desk (photo)",
+	"white": "White",
+	"tinted_yellow": "Tinted yellow",
+	"vintage": "Vintage cream",
+	"green": "Green",
+	"blue": "Blue",
+	"red": "Red",
+	"yellow": "Yellow",
+	"black": "Black",
+}
+
+
+static func paper_type_ids() -> Array:
+	return PAPER_TYPE_ORDER.duplicate()
+
+
+static func paper_type_label(id: String) -> String:
+	return str(PAPER_TYPE_LABELS.get(id, id.replace("_", " ").capitalize()))
+
+
+static func is_textured_paper(id: String) -> bool:
+	return PAPER_TEXTURES.has(id)
+
+
+static func ensure_assets(hq: bool = true, use_dropin_sprites: bool = true) -> Dictionary:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(PAPER_DIR))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(KEY_DIR))
 	var paper_size := PAPER_4K if hq else PAPER_2K
@@ -40,31 +83,59 @@ static func ensure_assets(hq: bool = true) -> Dictionary:
 		if not FileAccess.file_exists(path):
 			_write_paper(path, PAPER_PRESETS[id], paper_size)
 		papers[id] = path
-	## Versioned cream/chrome bake so old black keycaps are replaced
-	var key_path := KEY_DIR.path_join("keycap_cream_%d.png" % key_size)
-	var key_press := KEY_DIR.path_join("keycap_cream_pressed_%d.png" % key_size)
-	var space_path := KEY_DIR.path_join("spacebar_cream_%d.png" % key_size)
-	var striker_path := KEY_DIR.path_join("striker_%d.png" % key_size)
+	## Textured paper types — prefer res:// drop-ins; bake resized cache when needed
+	for tid in PAPER_TEXTURES.keys():
+		var src := str(PAPER_TEXTURES[tid])
+		var cache := PAPER_DIR.path_join("%s_%d.png" % [tid, paper_size])
+		if FileAccess.file_exists(ProjectSettings.globalize_path(src)) or ResourceLoader.exists(src):
+			if not FileAccess.file_exists(cache):
+				_bake_from_ref(src, cache, paper_size, paper_size, false)
+			papers[tid] = cache if FileAccess.file_exists(cache) else src
+		elif FileAccess.file_exists(cache):
+			papers[tid] = cache
+	## Prefer drop-in PNGs when requested; else procedural cream/chrome
+	var tag := "drop" if use_dropin_sprites else "proc"
+	var key_path := KEY_DIR.path_join("keycap_%s_%d.png" % [tag, key_size])
+	var key_press := KEY_DIR.path_join("keycap_%s_pressed_%d.png" % [tag, key_size])
+	var space_path := KEY_DIR.path_join("spacebar_%s_%d.png" % [tag, key_size])
+	var striker_path := KEY_DIR.path_join("striker_%s_%d.png" % [tag, key_size])
 	if not FileAccess.file_exists(key_path):
-		if not _bake_from_ref(REF_KEY_REST, key_path, key_size, key_size, true):
+		var ok := false
+		if use_dropin_sprites:
+			ok = _bake_from_first(DROP_KEY, key_path, key_size, key_size, true)
+		if not ok:
 			_write_keycap(key_path, key_size, false)
 	if not FileAccess.file_exists(key_press):
-		if not _bake_from_ref(REF_KEY_PRESS, key_press, key_size, key_size, true):
+		var ok2 := false
+		if use_dropin_sprites:
+			ok2 = _bake_from_first(DROP_KEY_PRESS, key_press, key_size, key_size, true)
+		if not ok2:
 			_write_keycap(key_press, key_size, true)
 	if not FileAccess.file_exists(space_path):
 		_write_spacebar(space_path, key_size)
 	if not FileAccess.file_exists(striker_path):
-		if not _bake_from_ref(REF_STRIKER, striker_path, key_size, key_size, false):
-			if not _bake_from_ref(REF_SLUG, striker_path, key_size, key_size, false):
-				_write_striker(striker_path, key_size)
+		var ok3 := false
+		if use_dropin_sprites:
+			ok3 = _bake_from_first(DROP_STRIKER, striker_path, key_size, key_size, false)
+		if not ok3:
+			## No loud cinema striker without drop-in — leave missing (null load)
+			pass
+	## Optional paper override
+	var paper_override := ""
+	for p in DROP_PAPER:
+		if ResourceLoader.exists(p) or FileAccess.file_exists(ProjectSettings.globalize_path(p)):
+			paper_override = p
+			break
 	return {
 		"papers": papers,
+		"paper_override": paper_override,
 		"key": key_path,
 		"key_pressed": key_press,
 		"space": space_path,
-		"striker": striker_path,
+		"striker": striker_path if FileAccess.file_exists(striker_path) else "",
 		"paper_px": paper_size,
 		"key_px": key_size,
+		"key_style": tag,
 	}
 
 
@@ -83,9 +154,15 @@ static func load_tex(path: String) -> Texture2D:
 	return ImageTexture.create_from_image(img)
 
 
+static func _bake_from_first(candidates: Array, out_path: String, w: int, h: int, circular_mask: bool) -> bool:
+	for res_path in candidates:
+		if _bake_from_ref(str(res_path), out_path, w, h, circular_mask):
+			return true
+	return false
+
+
 static func _bake_from_ref(res_path: String, out_path: String, w: int, h: int, circular_mask: bool) -> bool:
 	if not ResourceLoader.exists(res_path) and not FileAccess.file_exists(res_path):
-		## Also try absolute via ProjectSettings when .import not yet scanned
 		var abs := ProjectSettings.globalize_path(res_path) if res_path.begins_with("res://") else res_path
 		if not FileAccess.file_exists(abs):
 			return false
@@ -135,13 +212,11 @@ static func _apply_round_key_mask(img: Image) -> void:
 				c.a = 0.0
 			elif d > 0.94:
 				c.a *= clampf(1.0 - (d - 0.94) / 0.06, 0.0, 1.0)
-				## Soft chrome rim lift
 				c = c.lerp(Color(0.78, 0.76, 0.70, c.a), (d - 0.94) / 0.06 * 0.55)
 			img.set_pixel(x, y, c)
 
 
 static func _write_paper(path: String, base: Color, size: int) -> void:
-	# Bake at 512 then upscale to 2K/4K for HQ output without multi-second waits.
 	var src_n := 512
 	var img := Image.create(src_n, src_n, false, Image.FORMAT_RGBA8)
 	var fiber := 0.035 if base.v > 0.3 else 0.02
@@ -164,7 +239,7 @@ static func _write_paper(path: String, base: Color, size: int) -> void:
 
 
 static func _write_keycap(path: String, size: int, pressed: bool) -> void:
-	## Underwood cream face + chrome rim (matches P1020390)
+	## Underwood-ish cream face + chrome rim (procedural)
 	var src_n := 256
 	var img := Image.create(src_n, src_n, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
@@ -180,12 +255,10 @@ static func _write_keycap(path: String, size: int, pressed: bool) -> void:
 				continue
 			var rim := smoothstep(0.88, 1.0, d)
 			var bowl := smoothstep(0.0, 0.72, d)
-			## Cream / ivory key face
 			var cream := Color(0.92, 0.88, 0.78)
 			cream = cream.darkened(bowl * 0.10 + (0.06 if pressed else 0.0))
 			var highlight := (1.0 - d) * 0.18 if dy < -0.12 else 0.0
 			cream = cream.lightened(highlight * 0.35)
-			## Chrome / nickel rim
 			var chrome := Color(0.72, 0.71, 0.66).lightened(highlight * 0.4).darkened(rim * 0.15)
 			var c := cream.lerp(chrome, rim * 0.95)
 			var a := 1.0 if d < 0.97 else clampf(1.0 - (d - 0.97) / 0.03, 0.0, 1.0)
@@ -211,31 +284,10 @@ static func _write_spacebar(path: String, size: int) -> void:
 				var a := clampf(minf(edge_x / 0.02, edge_y / 0.10), 0.0, 1.0)
 				img.set_pixel(x, y, Color(0.68, 0.66, 0.60, a))
 				continue
-			## Slightly darker cream bar with chrome edge
 			var c := Color(0.86, 0.82, 0.72).lightened((1.0 - v) * 0.10).darkened(v * 0.06)
 			c.a = 1.0
 			img.set_pixel(x, y, c)
 	img.resize(size, int(size * 0.32), Image.INTERPOLATE_LANCZOS)
-	img.save_png(path)
-
-
-static func _write_striker(path: String, size: int) -> void:
-	var src_n := 256
-	var img := Image.create(src_n, src_n, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
-	for y in src_n:
-		for x in src_n:
-			var u := float(x) / float(src_n)
-			var v := float(y) / float(src_n)
-			## Typebar stem + slug head
-			var in_stem := absf(u - 0.5) < 0.06 and v > 0.35
-			var in_head := (u - 0.5) * (u - 0.5) / 0.12 + (v - 0.28) * (v - 0.28) / 0.10 < 1.0
-			if not in_stem and not in_head:
-				continue
-			var metal := Color(0.45, 0.38, 0.28).lightened((1.0 - v) * 0.25)
-			metal.a = 1.0
-			img.set_pixel(x, y, metal)
-	img.resize(size, size, Image.INTERPOLATE_LANCZOS)
 	img.save_png(path)
 
 

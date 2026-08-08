@@ -28,15 +28,12 @@ var _shift: bool = false
 var _shift_lock: bool = false
 var _paper_loaded: bool = true
 var _paper_release: bool = false
-var _paper_offset: float = 0.0
-var _platen_rot: float = 0.0
 var _tab_stops: Array[int] = [8, 16, 24, 32, 40, 48]
 var _margin_override: bool = false
 var _bell_rung: bool = false
 var _click: AudioStreamPlayer
 var _bell: AudioStreamPlayer
 var _carriage_x: float = 0.0
-var _paper_scroll: Vector2 = Vector2.ZERO
 var _pending: Dictionary = {}
 var _pending_queue: Array = []
 var _notes: String = ""
@@ -61,6 +58,7 @@ var _paper_sheet: Control
 var _breath: Node
 var _aero: Node
 var _sfx: Node
+var _feed: RefCounted ## scripts/paper_feed.gd — original line-advance adapter
 var _blow_btn: Button
 var _aero_hud: Label
 var _curve_overlay: Control
@@ -69,7 +67,6 @@ var _curve_toggle: CheckButton
 var _blow_mode: OptionButton
 var _paper_base_pos: Vector2 = Vector2.ZERO
 var _paper_grabbed: bool = false
-var _paper_grab_last: Vector2 = Vector2.ZERO
 var _feed_hold_dir: float = 0.0
 var _feed_chord_keys: Dictionary = {} ## keycode -> pressed
 var _feed_sfx_cooldown: float = 0.0
@@ -79,7 +76,7 @@ var _feed_pull_btn: Button
 var _paper_drag_layer: Control
 var _paper_drag_active: bool = false
 var _paper_drag_last_global: Vector2 = Vector2.ZERO
-var _pull_armed: bool = false ## after FEED — next click-drag pulls paper
+var _pull_armed: bool = false ## unused — grab always manual
 var _pull_hint_label: Label
 var _views: Node
 var _view_label: Label
@@ -95,6 +92,7 @@ func _ready() -> void:
 	add_child(_breath)
 	_aero = preload("res://scripts/paper_aero.gd").new()
 	add_child(_aero)
+	_feed = preload("res://scripts/paper_feed.gd").new()
 	_views = preload("res://scripts/view_director.gd").new()
 	add_child(_views)
 	_setup_audio()
@@ -119,7 +117,8 @@ func _process(delta: float) -> void:
 		typebar_fx.modulate.a = move_toward(typebar_fx.modulate.a, 0.0, delta * 6.0)
 		if typebar_fx.modulate.a <= 0.01:
 			typebar_fx.visible = false
-	platen.rotation_degrees = _platen_rot
+	if _feed:
+		platen.rotation_degrees = float(_feed.platen_deg)
 	_update_held_feed(delta)
 	if _feed_sfx_cooldown > 0.0:
 		_feed_sfx_cooldown = maxf(0.0, _feed_sfx_cooldown - delta)
@@ -130,31 +129,36 @@ func _process(delta: float) -> void:
 		_aero.clamp_stiff_mul = TwSettings.clamp_stiffness
 		_breath.enabled = TwSettings.mic_breath
 		_breath.sensitivity = TwSettings.mic_sensitivity
-		# Exposed length grows slightly as paper feeds up
-		_aero.set_exposed_length(0.12 + clampf(_paper_offset / 500.0, 0.0, 0.08))
+		var off := float(_feed.offset_px) if _feed else 0.0
+		_aero.set_exposed_length(0.12 + clampf(off / 500.0, 0.0, 0.08))
 		_aero.step(delta, float(_breath.vp), float(_breath.level))
 		_apply_paper_deform(delta)
 		if _aero_hud:
 			_aero_hud.text = str(_aero.debug_text()) + ("  · mic OK" if _breath.mic_ok else "  · hold BLOW")
-	## Paper stays put while typing — RichTextLabel scrolls lines; no sheet translation.
+	## Paper stays put while typing — RichTextLabel scrolls lines; platen only on Return/manual.
 
 
 func _apply_paper_deform(_delta: float) -> void:
-	if _paper_sheet == null or _aero == null:
+	if _paper_sheet == null:
 		return
-	## Keep sheet correct size — never scale. Only subtle tip tilt + manual grab tug.
-	var ang: float = float(_aero.angle)
-	var tip_px: float = clampf(_aero.tip_pixels(), -28.0, 28.0)
-	var g: RefCounted = _aero.grab
+	## Fixed size always. Feed offset + light aero tug only — no wild scale/scroll.
+	var tug := Vector2.ZERO
+	var ang := 0.0
+	if _aero:
+		var tip_px: float = clampf(_aero.tip_pixels(), -28.0, 28.0)
+		var g: RefCounted = _aero.grab
+		ang = clampf(float(_aero.angle) * 0.25, -0.08, 0.08)
+		tug.x = tip_px * 0.15
+		if g and bool(g.active):
+			tug.x += clampf(float(g.local_defl_m) * 400.0, -18.0, 18.0)
+			tug.y += clampf(float(g.force_feed) * 3.0, -10.0, 10.0)
 	_paper_sheet.pivot_offset = Vector2(_paper_sheet.size.x * 0.5, _paper_sheet.size.y)
 	_paper_sheet.scale = Vector2.ONE
-	var tug := Vector2.ZERO
-	if g and bool(g.active):
-		tug.x = clampf(float(g.local_defl_m) * 400.0, -18.0, 18.0)
-		tug.y = clampf(float(g.force_feed) * 3.0, -10.0, 10.0)
-	## Feed offset is vertical only from platen rolls — not typing scroll
-	_paper_sheet.position = Vector2(tug.x + tip_px * 0.15, -_paper_offset + tug.y)
-	_paper_sheet.rotation = clampf(ang * 0.25, -0.08, 0.08)
+	if _feed:
+		_paper_sheet.position = _feed.sheet_position(tug)
+	else:
+		_paper_sheet.position = tug
+	_paper_sheet.rotation = ang
 	if paper_bg:
 		paper_bg.scale = Vector2.ONE
 		paper_bg.position = Vector2.ZERO
@@ -420,59 +424,78 @@ func _clear_pull_arm_visual() -> void:
 
 
 func _feed_paper(dir: float = 2.5, then_arm_pull: bool = false) -> void:
-	## Button / chord feed — automatic platen roll. Grab stays manual.
+	## Discrete FEED button — one platen step. Grab stays manual.
 	_paper_loaded = true
 	_pull_armed = false
 	_clear_pull_arm_visual()
-	_roll_platen(dir, true)
-	_animate_feed_bump(dir)
+	if _feed:
+		_feed.paper_loaded = true
+		_feed.feed_step(dir)
+		_play_feed_sfx()
+		_animate_feed_bump(signf(dir))
 	status.text = "Paper fed · grab sheet by hand to pull/adjust"
 
 
 func _animate_feed_bump(dir: float) -> void:
-	if _paper_sheet == null:
+	if _paper_sheet == null or _feed == null:
 		return
 	var tw := create_tween()
-	var y0 := -_paper_offset
-	var bump := 5.0 if dir >= 0.0 else -5.0
-	tw.tween_property(_paper_sheet, "position:y", y0 + bump, 0.07)
-	tw.tween_property(_paper_sheet, "position:y", -_paper_offset, 0.12)
+	var y0 := -float(_feed.offset_px)
+	var bump := 4.0 if dir >= 0.0 else -4.0
+	tw.tween_property(_paper_sheet, "position:y", y0 + bump, 0.06)
+	tw.tween_property(_paper_sheet, "position:y", y0, 0.10)
 
 
 func _target_paper_scroll() -> Vector2:
-	## Sheet no longer tracks the carriage; text scrolls in the label.
+	## Broken auto-scroll path removed — text scrolls in the label only.
 	return Vector2.ZERO
 
 
 func _rebuild_assets() -> void:
 	status.text = "Baking HQ paper/key sprites…"
 	await get_tree().process_frame
-	_assets = HQAssets.ensure_assets(TwSettings.hq_assets)
+	var use_dropin := TwSettings.key_sprite_style == "dropin"
+	_assets = HQAssets.ensure_assets(TwSettings.hq_assets, use_dropin)
 	_key_tex = HQAssets.load_tex(str(_assets.get("key", "")))
 	_key_press_tex = HQAssets.load_tex(str(_assets.get("key_pressed", "")))
 	_space_tex = HQAssets.load_tex(str(_assets.get("space", "")))
 	_striker_tex = HQAssets.load_tex(str(_assets.get("striker", "")))
-	if _views and _striker_tex:
+	if _views:
 		_views.set_striker_texture(_striker_tex)
 	_load_paper_texture()
-	status.text = "HQ %dx paper · cream/chrome keys · asset SFX" % [int(_assets.get("paper_px", 0))]
+	var skin := "drop-in" if use_dropin else "procedural"
+	status.text = "HQ %dx paper · %s keys · quiet until audio drop-in" % [
+		int(_assets.get("paper_px", 0)),
+		skin,
+	]
 
 
 func _load_paper_texture() -> void:
+	var override_path := str(_assets.get("paper_override", ""))
 	var papers: Dictionary = _assets.get("papers", {})
-	var path := str(papers.get(TwSettings.paper_type, ""))
-	_paper_tex = HQAssets.load_tex(path)
+	## Prefer selected paper TYPE (textured or procedural), then optional paper.png override.
+	var typed := str(papers.get(TwSettings.paper_type, ""))
+	if not typed.is_empty():
+		_paper_tex = HQAssets.load_tex(typed)
+	elif not override_path.is_empty():
+		_paper_tex = HQAssets.load_tex(override_path)
+	else:
+		_paper_tex = null
 	if paper_bg == null:
 		return
 	if _paper_tex:
 		paper_bg.texture = _paper_tex
 	if TwSettings.use_custom_paper_color:
 		paper_bg.modulate = TwSettings.paper_color
+	elif HQAssets.is_textured_paper(TwSettings.paper_type):
+		paper_bg.modulate = Color.WHITE
 	else:
 		paper_bg.modulate = Color.WHITE
 
 
 func _apply_settings() -> void:
+	if _feed:
+		_feed.configure_from_font(TwSettings.font_size, TwSettings.line_height_mul())
 	_load_paper_texture()
 	if paper_text:
 		paper_text.add_theme_font_size_override("normal_font_size", TwSettings.font_size)
@@ -482,10 +505,15 @@ func _apply_settings() -> void:
 		paper_text.add_theme_constant_override("line_separation", int(8 * TwSettings.line_height_mul()))
 	if _sfx:
 		_sfx.set_enabled(TwSettings.sound_enabled)
+		_sfx.erase_enabled = TwSettings.erase_sound_enabled
 		_sfx.surround_max = TwSettings.surround_max
 		_sfx.reverb_amount = TwSettings.reverb_amount
 		_sfx.mic_reverb_monitor = TwSettings.mic_reverb_monitor
-		_sfx.click_volume_db = lerpf(-8.0, 0.0, TwSettings.click_feel)
+		_sfx.ambient_enabled = TwSettings.ambient_room
+		_sfx.ambient_volume_db = lerpf(-40.0, -18.0, TwSettings.ambient_volume)
+		_sfx.click_volume_db = lerpf(-18.0, -1.0, TwSettings.sound_volume) + lerpf(-2.0, 1.0, TwSettings.click_feel - 0.85)
+		if _sfx.has_method("reload_streams"):
+			_sfx.reload_streams(TwSettings.use_asset_sounds)
 		_sfx.apply_mix()
 	if _haptic:
 		_haptic.intensity = TwSettings.click_feel
@@ -519,7 +547,7 @@ func _wire_machine_controls() -> void:
 			platen.gui_input.connect(_on_paper_input)
 	_build_feed_buttons()
 	if feed_hint:
-		feed_hint.text = "Return = auto feed · grab paper to pull by hand · FEED↑/↓ · knobs"
+		feed_hint.text = "Return = one line · grab paper to pull · FEED↑/↓ · knobs"
 
 
 func _on_paper_input(event: InputEvent) -> void:
@@ -570,18 +598,25 @@ func _paper_local_grab_coords(global_pos: Vector2) -> Vector2:
 
 
 func _apply_grab_drag(rel: Vector2) -> void:
-	## Manual grab only — like rolling/pulling paper by hand.
-	if _aero == null:
-		_roll_platen(rel.y * 0.14, absf(rel.y) > 2.0)
+	## Manual grab only — roll platen by hand; never rescale the sheet.
+	if _feed:
+		var roll_y := rel.y
+		if _aero:
+			roll_y = _aero.apply_grab_drag(rel, false)
+		_feed.grab_roll(roll_y)
+		if absf(roll_y) > 2.5:
+			_play_feed_sfx()
+		_apply_paper_deform(0.0)
 		return
-	var roll_y: float = _aero.apply_grab_drag(rel, false)
-	_roll_platen(roll_y * 0.14, absf(roll_y) > 2.5)
+	_roll_platen(rel.y * 0.14, absf(rel.y) > 2.0)
 
 
 func _begin_paper_drag(global_pos: Vector2) -> void:
 	_paper_drag_active = true
 	_paper_grabbed = true
 	_paper_loaded = true
+	if _feed:
+		_feed.paper_loaded = true
 	_paper_drag_last_global = global_pos
 	_pull_armed = false
 	_clear_pull_arm_visual()
@@ -591,7 +626,7 @@ func _begin_paper_drag(global_pos: Vector2) -> void:
 	var where := "tip" if coords.x > 0.65 else ("mid" if coords.x > 0.35 else "near platen")
 	status.text = "Manual grab (%s) — drag to pull/adjust paper" % where
 	if feed_hint:
-		feed_hint.text = "Manual pull · release to stop · Return key feeds automatically"
+		feed_hint.text = "Manual pull · release to stop · Return advances one line"
 	_haptic.call("roller_pulse")
 
 
@@ -604,7 +639,7 @@ func _end_paper_drag() -> void:
 		_feed_pull_btn.set_pressed_no_signal(false)
 	status.text = "Paper released"
 	if feed_hint:
-		feed_hint.text = "Return = auto feed · grab paper to pull by hand · FEED↑/↓"
+		feed_hint.text = "Return = one line · grab paper to pull · FEED↑/↓"
 
 
 func _input(event: InputEvent) -> void:
@@ -675,39 +710,44 @@ func _clear_feed_hold_if(dir: float) -> void:
 
 func _update_held_feed(delta: float) -> void:
 	var dir := _feed_hold_dir
-	# Arrow keys while held
 	if Input.is_key_pressed(KEY_DOWN) or Input.is_key_pressed(KEY_KP_2):
 		dir = 1.0
 	elif Input.is_key_pressed(KEY_UP) or Input.is_key_pressed(KEY_KP_8):
 		dir = -1.0
-	# Chord feeds: both shifts, or 1+=, or Z+/
 	if _chord_active():
 		dir = 1.0
 	if absf(dir) > 0.001:
-		_roll_platen(dir * delta * 14.0, false)
+		if _feed:
+			_feed.feed_hold(dir, delta)
+			_play_feed_sfx()
+			_apply_paper_deform(0.0)
+		else:
+			_roll_platen(dir * delta * 14.0, false)
 
 
 func _roll_platen(dir: float, play_sound: bool = true) -> void:
+	## Legacy entry — routes through paper_feed (no wild sheet scroll).
 	if absf(dir) < 0.0001:
 		return
-	if not _paper_loaded and dir > 0:
-		_paper_loaded = true
-		if feed_hint:
-			feed_hint.text = "Paper feeding…"
-	_platen_rot = fmod(_platen_rot + dir * 12.0, 360.0)
-	_paper_offset = clampf(_paper_offset + dir * 6.0, -40.0, 220.0)
-	if _paper_sheet and not _paper_drag_active:
-		_paper_sheet.position.y = -_paper_offset
+	_paper_loaded = true
+	if _feed:
+		_feed.paper_loaded = true
+		_feed.feed_step(dir)
+		_apply_paper_deform(0.0)
 	if play_sound or _feed_sfx_cooldown <= 0.0:
-		_haptic.call("roller_pulse")
-		if _sfx and TwSettings.sound_enabled:
-			_sfx.play_platen()
-		_feed_sfx_cooldown = 0.07
-	status.text = "Platen %s · offset %.0f" % [
-		"↑" if dir < 0 else "↓",
-		_paper_offset,
-	]
+		_play_feed_sfx()
+	var off := float(_feed.offset_px) if _feed else 0.0
+	status.text = "Platen %s · offset %.0f" % ["↑" if dir < 0 else "↓", off]
 	_update_notes()
+
+
+func _play_feed_sfx() -> void:
+	if _feed_sfx_cooldown > 0.0:
+		return
+	_haptic.call("roller_pulse")
+	if _sfx and TwSettings.sound_enabled:
+		_sfx.play_platen()
+	_feed_sfx_cooldown = 0.07
 
 
 func _build_keyboard() -> void:
@@ -1101,7 +1141,7 @@ func _backspace() -> void:
 		if _col < s.length():
 			_lines[_line] = s.substr(0, _col) + s.substr(_col + 1)
 	_haptic.call("spring_pulse")
-	if _sfx and TwSettings.sound_enabled:
+	if _sfx and TwSettings.sound_enabled and TwSettings.erase_sound_enabled:
 		_sfx.play_erase()
 	_refresh_paper()
 	_update_carriage()
@@ -1116,9 +1156,9 @@ func _carriage_return() -> void:
 	if _sfx and TwSettings.sound_enabled:
 		_sfx.play_return()
 	_animate_carriage_home()
-	## Real typewriter: return advances the platen automatically
-	_animate_feed_bump(1.2)
-	status.text = "Carriage return — paper advanced"
+	## Real typewriter: return advances one line via paper_feed (not whole-sheet scroll)
+	_animate_feed_bump(1.0)
+	status.text = "Carriage return — one line advanced"
 	_refresh_paper()
 
 
@@ -1126,8 +1166,14 @@ func _advance_line(n: int) -> void:
 	_line += n
 	while _lines.size() <= _line:
 		_lines.append("")
-	## Automatic vertical feed with each new line
-	_roll_platen(n * 1.35, true)
+	## Automatic vertical feed with each new line — one line-step only
+	if _feed:
+		_feed.configure_from_font(TwSettings.font_size, TwSettings.line_height_mul())
+		_feed.advance_line(n, TwSettings.line_height_mul())
+		_play_feed_sfx()
+		_apply_paper_deform(0.0)
+	else:
+		_roll_platen(float(n) * 1.35, true)
 
 
 func _ensure_line() -> void:

@@ -1,5 +1,5 @@
 extends MarginContainer
-## Settings: paper type/color, fonts, spacing, HQ 4K/2K, haptics.
+## Settings: paper, fonts, HQ sprites, drop-in SFX (silent until assets present).
 
 signal request_rebuild_assets
 
@@ -8,9 +8,15 @@ var _font_style: OptionButton
 var _spacing: OptionButton
 var _font_size: SpinBox
 var _hq: CheckButton
+var _key_style: OptionButton
 var _haptics: CheckButton
 var _fx: CheckButton
 var _sound: CheckButton
+var _asset_sfx: CheckButton
+var _erase_sfx: CheckButton
+var _ambient: CheckButton
+var _vol: HSlider
+var _click_s: HSlider
 var _custom_paper: CheckButton
 var _paper_picker: ColorPickerButton
 var _font_picker: ColorPickerButton
@@ -40,10 +46,10 @@ func _build() -> void:
 	root.add_theme_constant_override("separation", 10)
 	scroll.add_child(root)
 
-	root.add_child(_title("Settings — Paper, Fonts, HQ"))
-	root.add_child(_hint("Referenced from Underwood / Remington / Olivetti manuals. Paper textures bake at 4K; key sprites at 2K when HQ is on."))
+	root.add_child(_title("Settings — Paper, Fonts, Sound, Sprites"))
+	root.add_child(_hint("Drop new sounds in assets/audio/ and textures in assets/images/. Machine is quiet and procedural until then."))
 
-	root.add_child(_section("HQ graphics"))
+	root.add_child(_section("HQ graphics & key sprites"))
 	_hq = CheckButton.new()
 	_hq.text = "HQ mode — 4K paper · 2K key sprites"
 	_hq.toggled.connect(func(on: bool) -> void:
@@ -53,17 +59,32 @@ func _build() -> void:
 		_status.text = "Rebaking assets at %s…" % ("4K/2K" if on else "2K/1K")
 	)
 	root.add_child(_hq)
+	_key_style = OptionButton.new()
+	_key_style.add_item("Drop-in textures (assets/images)")
+	_key_style.set_item_metadata(0, "dropin")
+	_key_style.add_item("Procedural cream/chrome")
+	_key_style.set_item_metadata(1, "procedural")
+	_key_style.item_selected.connect(func(i: int) -> void:
+		TwSettings.key_sprite_style = str(_key_style.get_item_metadata(i))
+		TwSettings.notify()
+		request_rebuild_assets.emit()
+		_status.text = "Key sprites: %s" % TwSettings.key_sprite_style
+	)
+	root.add_child(_key_style)
 
 	root.add_child(_section("Paper type"))
+	root.add_child(_hint("Textured types: Recycled / Kraft / Beige / Underwood desk. Color tints are procedural."))
 	_paper_option = OptionButton.new()
-	for id in ["white", "tinted_yellow", "vintage", "green", "blue", "red", "yellow", "black"]:
-		_paper_option.add_item(id.replace("_", " ").capitalize())
+	for id in HQAssets.paper_type_ids():
+		_paper_option.add_item(HQAssets.paper_type_label(str(id)))
 		_paper_option.set_item_metadata(_paper_option.item_count - 1, id)
 	_paper_option.item_selected.connect(func(i: int) -> void:
 		TwSettings.paper_type = str(_paper_option.get_item_metadata(i))
 		TwSettings.use_custom_paper_color = false
 		_custom_paper.button_pressed = false
 		TwSettings.notify()
+		request_rebuild_assets.emit()
+		_status.text = "Paper type: %s" % HQAssets.paper_type_label(TwSettings.paper_type)
 	)
 	root.add_child(_paper_option)
 
@@ -247,6 +268,69 @@ func _build() -> void:
 	)
 	clamp_row.add_child(clamp_s)
 
+	root.add_child(_section("Sound — drop-in oggs (silent until present)"))
+	_sound = CheckButton.new()
+	_sound.text = "Sound on (keys, return, bell)"
+	_sound.toggled.connect(func(on: bool) -> void:
+		TwSettings.sound_enabled = on
+		TwSettings.notify()
+	)
+	root.add_child(_sound)
+	_asset_sfx = CheckButton.new()
+	_asset_sfx.text = "Load assets/audio/{key,erase,return,bell,feed}.ogg — missing = silent"
+	_asset_sfx.toggled.connect(func(on: bool) -> void:
+		TwSettings.use_asset_sounds = on
+		TwSettings.notify()
+	)
+	root.add_child(_asset_sfx)
+	_erase_sfx = CheckButton.new()
+	_erase_sfx.text = "Erase / backspace sound"
+	_erase_sfx.toggled.connect(func(on: bool) -> void:
+		TwSettings.erase_sound_enabled = on
+		TwSettings.notify()
+	)
+	root.add_child(_erase_sfx)
+	_ambient = CheckButton.new()
+	_ambient.text = "Ambient room (disabled — no room bed in this build)"
+	_ambient.disabled = true
+	_ambient.button_pressed = false
+	TwSettings.ambient_room = false
+	root.add_child(_ambient)
+
+	var vol_row := HBoxContainer.new()
+	root.add_child(vol_row)
+	var vol_l := Label.new()
+	vol_l.text = "Volume"
+	vol_row.add_child(vol_l)
+	_vol = HSlider.new()
+	_vol.min_value = 0.0
+	_vol.max_value = 1.0
+	_vol.step = 0.01
+	_vol.value = TwSettings.sound_volume
+	_vol.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_vol.value_changed.connect(func(v: float) -> void:
+		TwSettings.sound_volume = v
+		TwSettings.notify()
+	)
+	vol_row.add_child(_vol)
+
+	var click_row := HBoxContainer.new()
+	root.add_child(click_row)
+	var click_l := Label.new()
+	click_l.text = "Click / spring feel"
+	click_row.add_child(click_l)
+	_click_s = HSlider.new()
+	_click_s.min_value = 0.3
+	_click_s.max_value = 1.5
+	_click_s.step = 0.05
+	_click_s.value = TwSettings.click_feel
+	_click_s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_click_s.value_changed.connect(func(v: float) -> void:
+		TwSettings.click_feel = v
+		TwSettings.notify()
+	)
+	click_row.add_child(_click_s)
+
 	root.add_child(_section("Feel"))
 	_haptics = CheckButton.new()
 	_haptics.text = "Spring vibration on each letter (peak → soft settle)"
@@ -262,13 +346,6 @@ func _build() -> void:
 		TwSettings.notify()
 	)
 	root.add_child(_fx)
-	_sound = CheckButton.new()
-	_sound.text = "Clean key click + return + bell (no ambient)"
-	_sound.toggled.connect(func(on: bool) -> void:
-		TwSettings.sound_enabled = on
-		TwSettings.notify()
-	)
-	root.add_child(_sound)
 
 	var surround := CheckButton.new()
 	surround.text = "Extra room reverb (soft)"
@@ -303,22 +380,6 @@ func _build() -> void:
 		TwSettings.notify()
 	)
 	rev_row.add_child(rev)
-	var click_row := HBoxContainer.new()
-	root.add_child(click_row)
-	var click_l := Label.new()
-	click_l.text = "Click / spring feel"
-	click_row.add_child(click_l)
-	var click_s := HSlider.new()
-	click_s.min_value = 0.3
-	click_s.max_value = 1.5
-	click_s.step = 0.05
-	click_s.value = TwSettings.click_feel
-	click_s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	click_s.value_changed.connect(func(v: float) -> void:
-		TwSettings.click_feel = v
-		TwSettings.notify()
-	)
-	click_row.add_child(click_s)
 
 	var save := Button.new()
 	save.text = "Save settings"
@@ -337,6 +398,10 @@ func _build() -> void:
 
 func _load_into_form() -> void:
 	_hq.button_pressed = TwSettings.hq_assets
+	for i in _key_style.item_count:
+		if str(_key_style.get_item_metadata(i)) == TwSettings.key_sprite_style:
+			_key_style.select(i)
+			break
 	for i in _paper_option.item_count:
 		if str(_paper_option.get_item_metadata(i)) == TwSettings.paper_type:
 			_paper_option.select(i)
@@ -356,6 +421,11 @@ func _load_into_form() -> void:
 	_haptics.button_pressed = TwSettings.haptics_enabled
 	_fx.button_pressed = TwSettings.key_fx_enabled
 	_sound.button_pressed = TwSettings.sound_enabled
+	_asset_sfx.button_pressed = TwSettings.use_asset_sounds
+	_erase_sfx.button_pressed = TwSettings.erase_sound_enabled
+	_ambient.button_pressed = TwSettings.ambient_room
+	_vol.value = TwSettings.sound_volume
+	_click_s.value = TwSettings.click_feel
 
 
 func _title(t: String) -> Label:
