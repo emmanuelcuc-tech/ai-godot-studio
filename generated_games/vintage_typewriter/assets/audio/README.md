@@ -1,13 +1,13 @@
 # Audio (drop-in)
 
-Place new typewriter sounds here. The machine is **silent** until these files exist.
+Canonical names loaded by `typewriter_sfx.gd`:
 
 | File | Use |
 |------|-----|
-| `key.ogg` | Key strike |
+| `key.ogg` | Key strike (alias: `key_strike.ogg`) |
 | `erase.ogg` | Backspace / erase |
-| `return.ogg` | Carriage return (falls back to `feed.ogg` if missing) |
+| `return.ogg` | Carriage return (alias: `enter_bell.ogg`; falls back to `feed.ogg`) |
 | `bell.ogg` | Margin / return bell |
-| `feed.ogg` | Platen / paper feed |
+| `feed.ogg` | Platen / paper feed (alias: `page_feed.ogg`) |
 
-`typewriter_sfx.gd` loads these when present; otherwise plays nothing.
+Missing files → silent. No procedural bed.
