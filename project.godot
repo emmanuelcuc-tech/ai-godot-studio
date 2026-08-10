@@ -31,10 +31,7 @@ AIOrchestrator="*res://scripts/ai/ai_orchestrator.gd"
 
 window/size/viewport_width=1280
 window/size/viewport_height=800
-window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-window/size/min_viewport_width=960
-window/size/min_viewport_height=640
 
 [rendering]
 

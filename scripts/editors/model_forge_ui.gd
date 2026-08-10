@@ -24,16 +24,25 @@ func _ready() -> void:
 
 
 func _build() -> void:
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
 	var root := VBoxContainer.new()
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_theme_constant_override("separation", 8)
-	add_child(root)
+	scroll.add_child(root)
 	var title := Label.new()
 	title.text = "Model Forge — Studio + Blender + Unity"
 	title.add_theme_font_size_override("font_size", 20)
 	root.add_child(title)
 	var hint := Label.new()
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hint.add_theme_color_override("font_color", Color(0.56, 0.64, 0.72))
 	hint.text = "Describe the model, then add photos (front, optional side + back) for a closer replica. Photos wrap onto head/torso/limbs and drive Blender UVs. Studio still builds Skeleton3D + idle/walk/attack, plus .glb/.fbx if Blender is set."
 	root.add_child(hint)
@@ -41,17 +50,22 @@ func _build() -> void:
 	ml.text = "What is the model?"
 	root.add_child(ml)
 	_model = TextEdit.new()
-	_model.custom_minimum_size.y = 72
+	_model.custom_minimum_size.y = 48
+	_model.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_model.placeholder_text = "Example: cartoon knight with a round helmet and a short cape"
+	_model.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	root.add_child(_model)
 	var matl := Label.new()
 	matl.text = "Texture or material to use"
 	root.add_child(matl)
 	_material = TextEdit.new()
-	_material.custom_minimum_size.y = 56
+	_material.custom_minimum_size.y = 40
+	_material.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_material.placeholder_text = "Example: scratched steel armor, red cloth cape, leather brown straps  — or #c45a2a wood"
+	_material.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	root.add_child(_material)
 	var trow := HBoxContainer.new()
+	trow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(trow)
 	_texture = LineEdit.new()
 	_texture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -61,7 +75,8 @@ func _build() -> void:
 	browse.text = "Browse texture"
 	browse.pressed.connect(_on_browse_tex)
 	trow.add_child(browse)
-	var prow := HBoxContainer.new()
+	var prow := HFlowContainer.new()
+	prow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(prow)
 	var add_photos := Button.new()
 	add_photos.text = "Add photos (front / side / back)"
@@ -76,10 +91,12 @@ func _build() -> void:
 	prow.add_child(clear_photos)
 	_photo_list = Label.new()
 	_photo_list.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_photo_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_photo_list.add_theme_color_override("font_color", Color(0.72, 0.82, 0.68))
 	_photo_list.text = "No photos yet — add a front shot (and side/back if you have them) for a better replica."
 	root.add_child(_photo_list)
-	var brow := HBoxContainer.new()
+	var brow := HFlowContainer.new()
+	brow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(brow)
 	var make := Button.new()
 	make.text = "Forge model (Blender + Godot + Unity kit)"
@@ -96,13 +113,16 @@ func _build() -> void:
 	_status = Label.new()
 	_status.text = "Create or open a game first, then forge a model into that project."
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_child(_status)
 	_log = RichTextLabel.new()
+	_log.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_log.bbcode_enabled = true
 	_log.fit_content = false
 	_log.scroll_active = true
-	_log.custom_minimum_size.y = 140
+	_log.custom_minimum_size.y = 72
+	_log.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(_log)
 	_tex_dialog = FileDialog.new()
 	_tex_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE

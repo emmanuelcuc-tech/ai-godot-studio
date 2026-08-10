@@ -47,13 +47,13 @@ const ArtEditIntentScript = preload("res://scripts/art_edit_intent.gd")
 @onready var style_minimal: CheckBox = %StyleMinimal
 @onready var style_detailed: CheckBox = %StyleDetailed
 @onready var art_edit_label: Label = %ArtEditLabel
-@onready var art_slot_row: HBoxContainer = %ArtSlotRow
+@onready var art_slot_row: HFlowContainer = %ArtSlotRow
 @onready var slot_wall: CheckBox = %SlotWall
 @onready var slot_floor: CheckBox = %SlotFloor
 @onready var slot_room: CheckBox = %SlotRoom
 @onready var slot_character: CheckBox = %SlotCharacter
 @onready var slot_weapon: CheckBox = %SlotWeapon
-@onready var art_edit_kind_row: HBoxContainer = %ArtEditKindRow
+@onready var art_edit_kind_row: HFlowContainer = %ArtEditKindRow
 @onready var edit_as_texture: CheckBox = %EditAsTexture
 @onready var edit_as_sprite: CheckBox = %EditAsSprite
 @onready var edit_as_model: CheckBox = %EditAsModel
@@ -76,6 +76,12 @@ var _style_user_set: bool = false
 
 
 func _ready() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var win := get_window()
+	if win:
+		win.min_size = Vector2i(880, 560)
 	brand.text = "AI GODOT STUDIO"
 	tabs.set_tab_title(0, "Create")
 	tabs.set_tab_title(1, "Edit Game")

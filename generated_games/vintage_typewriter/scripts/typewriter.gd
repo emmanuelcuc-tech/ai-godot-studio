@@ -1,6 +1,6 @@
 extends Control
-## Photo-based Royal Quiet De Luxe model + TypingSimulator UX.
-## Machine body = royal_machine.png; keys/typebars/paper are overlays.
+## Royal Quiet De Luxe from three refs: full_machine, keys_closeup, striker.
+## Invisible key hotspots; press shrinks a photo crop. Paper width = top rail.
 
 enum ViewMode { FOLLOW, FULL, ALL_PAPER, KEYS, BOTTOM_CLOSE, TOP_PAPER }
 
@@ -8,6 +8,9 @@ const COLS := 42
 const MARGIN_BELL_COL := 35
 const PAPER_MARGIN := Vector2(16, 18)
 const SAMPLE_DRAFT := "The quick brown fox jumps over the lazy dog.\n1948 Royal Quiet De Luxe.\nStart Typing uses this draft."
+const PATH_FULL := "res://assets/images/full_machine.png"
+const PATH_KEYS := "res://assets/images/keys_closeup.png"
+const PATH_STRIKER := "res://assets/images/striker.png"
 const RoyalKeyScript := preload("res://scripts/royal_key.gd")
 const TypebarBasketScript := preload("res://scripts/typebar_basket.gd")
 const TwSettingsScript := preload("res://scripts/tw_settings.gd")
@@ -32,8 +35,13 @@ var _bell_armed := true
 var _key_map: Dictionary = {}
 var _typebars: Control
 var _paper_base_pos := Vector2.ZERO
+var _paper_feed_offset := 0.0
+var _paper_dragging := false
+var _paper_drag_last_y := 0.0
 var _caret_blink := 0.0
 var _paper_font: Font
+var _keys_tex: Texture2D
+var _full_tex: Texture2D
 
 @onready var status_label: Label = %StatusLabel
 @onready var speed_slider: HSlider = %SpeedSlider
@@ -62,6 +70,8 @@ var _paper_font: Font
 
 func _ready() -> void:
 	settings.load_cfg()
+	if str(settings.sound_pack).begins_with("freesound"):
+		settings.sound_pack = "buckling"
 	sfx.set("pack_name", settings.sound_pack)
 	sfx.call("load_pack", settings.sound_pack)
 	_setup_paper_font()
@@ -69,6 +79,7 @@ func _ready() -> void:
 	_apply_paper_texture()
 	_layout_photo_slots()
 	_paper_base_pos = paper_panel.position
+	_wire_paper_drag()
 	_ensure_typebars()
 	await _build_keyboard()
 	_wire_controls()
@@ -161,18 +172,24 @@ func _setup_paper_font() -> void:
 		caret_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-func _load_royal_photo() -> void:
-	var path := "res://assets/images/royal_machine.png"
-	var abs_path := ProjectSettings.globalize_path(path)
-	var tex: Texture2D = null
+func _load_tex(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):
-		tex = load(path) as Texture2D
-	elif FileAccess.file_exists(abs_path):
+		return load(path) as Texture2D
+	var abs_path := ProjectSettings.globalize_path(path)
+	if FileAccess.file_exists(abs_path):
 		var img := Image.load_from_file(abs_path)
 		if img:
-			tex = ImageTexture.create_from_image(img)
-	if tex:
-		royal_photo.texture = tex
+			return ImageTexture.create_from_image(img)
+	return null
+
+
+func _load_royal_photo() -> void:
+	_full_tex = _load_tex(PATH_FULL)
+	if _full_tex == null:
+		_full_tex = _load_tex("res://assets/images/royal_machine.png")
+	_keys_tex = _load_tex(PATH_KEYS)
+	if _full_tex:
+		royal_photo.texture = _full_tex
 		royal_photo.visible = true
 
 
@@ -180,13 +197,47 @@ func _layout_photo_slots() -> void:
 	var ms := machine.size
 	if ms.x < 10.0:
 		ms = Vector2(720, 720)
+	# Paper width = Quiet De Luxe / platen top rail; tall for feed.
 	var paper_uv: Rect2 = PhotoLayoutScript.paper_uv()
-	paper_panel.position = Vector2(paper_uv.position.x * ms.x, paper_uv.position.y * ms.y)
+	paper_panel.position = Vector2(paper_uv.position.x * ms.x, paper_uv.position.y * ms.y + _paper_feed_offset)
 	paper_panel.size = Vector2(paper_uv.size.x * ms.x, paper_uv.size.y * ms.y)
 	if _typebars:
 		var tb: Rect2 = PhotoLayoutScript.typebar_uv()
 		_typebars.position = Vector2(tb.position.x * ms.x, tb.position.y * ms.y)
 		_typebars.size = Vector2(tb.size.x * ms.x, tb.size.y * ms.y)
+
+
+func _wire_paper_drag() -> void:
+	paper_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	if not paper_panel.gui_input.is_connected(_on_paper_gui_input):
+		paper_panel.gui_input.connect(_on_paper_gui_input)
+
+
+func _on_paper_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT:
+			_paper_dragging = mb.pressed
+			_paper_drag_last_y = mb.position.y
+			if mb.pressed:
+				_paper_base_pos = paper_panel.position - Vector2(0.0, _paper_feed_offset)
+			accept_event()
+	elif event is InputEventMouseMotion and _paper_dragging:
+		var mm := event as InputEventMouseMotion
+		var dy := mm.position.y - _paper_drag_last_y
+		_paper_drag_last_y = mm.position.y
+		_paper_feed_offset = clampf(_paper_feed_offset + dy, -220.0, 160.0)
+		_apply_paper_feed_pos(false)
+		accept_event()
+
+
+func _apply_paper_feed_pos(animate: bool) -> void:
+	var target := _paper_base_pos + Vector2(-float(_col) * 2.2, float(_row) * 1.1 + _paper_feed_offset)
+	if animate:
+		var tw := create_tween()
+		tw.tween_property(paper_panel, "position", target, 0.08).set_trans(Tween.TRANS_SINE)
+	else:
+		paper_panel.position = target
 
 
 func _ensure_typebars() -> void:
@@ -269,10 +320,12 @@ func _sync_settings_ui() -> void:
 	var sel := 0
 	for i in packs.size():
 		var label: String = packs[i]
-		if label == "freesound_typewriter":
-			pack_opt.add_item("Freesound typewriter clicks")
+		var nice := label
+		if label.begins_with("km_"):
+			nice = "Keymulate: " + label.substr(3)
 		else:
-			pack_opt.add_item("TS: " + label)
+			nice = "TypingSim: " + label
+		pack_opt.add_item(nice)
 		pack_opt.set_item_metadata(i, label)
 		if label == settings.sound_pack:
 			sel = i
@@ -285,8 +338,8 @@ func _sync_settings_ui() -> void:
 
 func _on_pack_selected(idx: int) -> void:
 	var pack := str(pack_opt.get_item_metadata(idx))
-	if pack.is_empty():
-		pack = "freesound_typewriter"
+	if pack.is_empty() or pack.begins_with("freesound"):
+		pack = "buckling"
 	settings.sound_pack = pack
 	sfx.call("load_pack", pack)
 	settings.save_cfg()
@@ -342,6 +395,8 @@ func _build_keyboard() -> void:
 	for c in grid.get_children():
 		c.queue_free()
 	await get_tree().process_frame
+	if _keys_tex == null:
+		_keys_tex = _load_tex(PATH_KEYS)
 	var specs: Array = PhotoLayoutScript.rows()
 	var ms := machine.size
 	if ms.x < 10.0:
@@ -354,16 +409,22 @@ func _build_keyboard() -> void:
 		var nw: float = float(spec[4])
 		var nh: float = float(spec[5])
 		var circular: bool = bool(spec[6]) if spec.size() > 6 else true
+		var kx: float = float(spec[7]) if spec.size() > 7 else nx
+		var ky: float = float(spec[8]) if spec.size() > 8 else ny
+		var kw: float = float(spec[9]) if spec.size() > 9 else nw
+		var kh: float = float(spec[10]) if spec.size() > 10 else nh
 		var btn: Button = RoyalKeyScript.new()
 		var px := nx * ms.x
 		var py := ny * ms.y
 		var sz := Vector2(nw * ms.x, nh * ms.y)
-		sz.x = maxf(sz.x, 26.0)
-		sz.y = maxf(sz.y, 26.0)
-		btn.call("setup", id, label, sz, circular)
+		sz.x = maxf(sz.x, 22.0)
+		sz.y = maxf(sz.y, 22.0)
+		var atlas_uv := Rect2(kx - kw * 0.5, ky - kh * 0.5, kw, kh)
+		btn.call("setup", id, label, sz, circular, _keys_tex, atlas_uv)
 		btn.position = Vector2(px - sz.x * 0.5, py - sz.y * 0.5)
 		btn.set_meta("uv", Vector2(nx, ny))
 		btn.set_meta("uv_size", Vector2(nw, nh))
+		btn.set_meta("atlas_uv", atlas_uv)
 		match id:
 			"backspace":
 				btn.connect("key_struck", func(_a: String) -> void: _backspace())
@@ -373,7 +434,7 @@ func _build_keyboard() -> void:
 				btn.connect("key_struck", func(_a: String) -> void: _type_char(" "))
 			"\n":
 				btn.connect("key_struck", func(_a: String) -> void: _type_char("\n"))
-			"shift":
+			"shift", "shift_r":
 				btn.toggle_mode = true
 				btn.connect("key_struck", func(_a: String) -> void:
 					_shift_on = not _shift_on
@@ -633,15 +694,8 @@ func _update_paper_motion(animate: bool) -> void:
 
 
 func _update_carriage_slide(animate: bool) -> void:
-	## Carriage drifts left as column advances (classic typewriter feel).
-	var slide := -float(_col) * 2.2
-	var drop := float(_row) * 1.1
-	var target := _paper_base_pos + Vector2(slide, drop)
-	if animate:
-		var tw := create_tween()
-		tw.tween_property(paper_panel, "position", target, 0.08).set_trans(Tween.TRANS_SINE)
-	else:
-		paper_panel.position = target
+	## Carriage drifts left as column advances; vertical includes paper feed drag.
+	_apply_paper_feed_pos(animate)
 
 
 func _do_strike_fx(with_ink: bool, ch: String = "") -> void:
@@ -657,7 +711,6 @@ func _do_strike_fx(with_ink: bool, ch: String = "") -> void:
 		blot.set_script(load("res://scripts/ink_blot.gd"))
 		ink_layer.add_child(blot)
 		blot.call("setup", pos - ink_layer.position, settings.ink_color, 2.8 + float(settings.font_size) * 0.06)
-	# Skip cinema zoom during auto-type (too jumpy) and when already following paper
 	if not _typing_active:
 		_play_strike_cinema()
 
@@ -704,6 +757,8 @@ func _apply_view_transform(animate: bool) -> void:
 	var target_scale := Vector2.ONE
 	paper_panel.visible = true
 	keyboard_panel.visible = true
+	if _full_tex:
+		royal_photo.texture = _full_tex
 	match _view:
 		ViewMode.FOLLOW:
 			target_scale = Vector2(1.12, 1.12)
@@ -713,8 +768,10 @@ func _apply_view_transform(animate: bool) -> void:
 			target_pos = Vector2(120, -20)
 			target_scale = Vector2(1.35, 1.35)
 		ViewMode.KEYS:
-			target_pos = Vector2(100, -220)
-			target_scale = Vector2(1.25, 1.25)
+			# Zoom onto keyboard deck of full_machine (hotspots stay aligned).
+			# keys_closeup.png supplies press-shrink atlas crops, not the backdrop.
+			target_pos = Vector2(60, -300)
+			target_scale = Vector2(1.6, 1.6)
 		ViewMode.BOTTOM_CLOSE:
 			target_pos = Vector2(40, -320)
 			target_scale = Vector2(1.45, 1.45)

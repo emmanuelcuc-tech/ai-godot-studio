@@ -68,6 +68,8 @@ theme_override_constants/margin_bottom = 28
 
 [node name="RootVBox" type="VBoxContainer" parent="Margin"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 12
 
 [node name="Header" type="HBoxContainer" parent="Margin/RootVBox"]
@@ -86,9 +88,11 @@ text = "AI GODOT STUDIO"
 
 [node name="Tagline" type="Label" parent="Margin/RootVBox/Header/BrandBlock"]
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
 theme_override_font_sizes/font_size = 14
 text = "Describe a game. Create builds Godot 4 + C++ (GDExtension) with a playable GDScript fallback. Library, Scripts, Animation, Controls, and Effects edit the active game."
+autowrap_mode = 3
 
 [node name="StatusBox" type="VBoxContainer" parent="Margin/RootVBox/Header"]
 layout_mode = 2
@@ -96,11 +100,13 @@ alignment = 1
 
 [node name="Status" type="Label" parent="Margin/RootVBox/Header/StatusBox"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.64, 0.28, 1)
 theme_override_font_sizes/font_size = 14
 text = "Idle"
 horizontal_alignment = 2
+autowrap_mode = 3
 
 [node name="Providers" type="Label" parent="Margin/RootVBox/Header/StatusBox"]
 unique_name_in_owner = true
@@ -113,10 +119,13 @@ horizontal_alignment = 2
 [node name="Tabs" type="TabContainer" parent="Margin/RootVBox"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="Create" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 10
@@ -124,6 +133,8 @@ theme_override_constants/margin_bottom = 10
 
 [node name="CreateSplit" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 14
 
 [node name="LeftPanel" type="PanelContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit"]
@@ -132,16 +143,24 @@ size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.05
 theme_override_styles/panel = SubResource("panel")
 
-[node name="LeftVBox" type="VBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel"]
+[node name="LeftScroll" type="ScrollContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="LeftVBox" type="VBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 10
 
-[node name="AskLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="AskLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Search / describe your game"
 
-[node name="SessionLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="SessionLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.64, 0.28, 1)
@@ -149,226 +168,231 @@ theme_override_font_sizes/font_size = 13
 text = "No active game"
 autowrap_mode = 3
 
-[node name="AskHint" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="AskHint" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.56, 0.64, 0.72, 1)
 theme_override_font_sizes/font_size = 13
 text = "Paste a description or GameProject JSON. Check Textures / Sprites / Models (default on). Create writes starter art and copies useful files from F:/asset. After testing, open Edit Game to add more. Load JSON only for game specs — User-role / npm site files are skipped."
 autowrap_mode = 3
 
-[node name="GenreRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="GenreRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 layout_mode = 2
 
-[node name="GenreCaption" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/GenreRow"]
+[node name="GenreCaption" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/GenreRow"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.78, 0.85, 1)
 text = "Genre"
 
-[node name="GenreOption" type="OptionButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/GenreRow"]
+[node name="GenreOption" type="OptionButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/GenreRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="UseCpp" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="UseCpp" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 button_pressed = true
 text = "Create with C++ (GDExtension) — default on"
 
-[node name="ArtKindRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="ArtKindRow" type="HFlowContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 4
 
-[node name="ArtKindLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtKindRow"]
+[node name="ArtKindLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtKindRow"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.78, 0.85, 1)
 text = "Use art"
 
-[node name="ArtTextures" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtKindRow"]
+[node name="ArtTextures" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtKindRow"]
 unique_name_in_owner = true
 layout_mode = 2
 button_pressed = true
 text = "Textures"
 
-[node name="ArtSprites" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtKindRow"]
+[node name="ArtSprites" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtKindRow"]
 unique_name_in_owner = true
 layout_mode = 2
 button_pressed = true
 text = "Sprites"
 
-[node name="ArtModels" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtKindRow"]
+[node name="ArtModels" type="CheckButton" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtKindRow"]
 unique_name_in_owner = true
 layout_mode = 2
 button_pressed = true
 text = "Models"
 
-[node name="StyleLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="StyleLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.78, 0.85, 1)
 text = "Graphic style"
 
-[node name="StyleRow1" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="StyleRow1" type="HFlowContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 4
 
-[node name="StyleRealistic" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow1"]
+[node name="StyleRealistic" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/StyleRow1"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Realistic"
 
-[node name="StyleCartoon" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow1"]
+[node name="StyleCartoon" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/StyleRow1"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Cartoon"
 
-[node name="StylePixel" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow1"]
+[node name="StylePixel" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/StyleRow1"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Pixel"
 
-[node name="Style2D" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow1"]
+[node name="Style2D" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/StyleRow1"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "2D"
 
-[node name="StyleRow2" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="StyleRow2" type="HFlowContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 4
 
-[node name="Style3D" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow2"]
+[node name="Style3D" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/StyleRow2"]
 unique_name_in_owner = true
 layout_mode = 2
 button_pressed = true
 text = "3D"
 
-[node name="StyleMinimal" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow2"]
+[node name="StyleMinimal" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/StyleRow2"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Minimal"
 
-[node name="StyleDetailed" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/StyleRow2"]
+[node name="StyleDetailed" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/StyleRow2"]
 unique_name_in_owner = true
 layout_mode = 2
 button_pressed = true
 text = "Detailed"
 
-[node name="ArtEditLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="ArtEditLabel" type="Label" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.78, 0.85, 1)
 text = "Edit art slots (after test)"
 
-[node name="ArtSlotRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="ArtSlotRow" type="HFlowContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 4
 
-[node name="SlotWall" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtSlotRow"]
+[node name="SlotWall" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtSlotRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Wall"
 
-[node name="SlotFloor" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtSlotRow"]
+[node name="SlotFloor" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtSlotRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Floor"
 
-[node name="SlotRoom" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtSlotRow"]
+[node name="SlotRoom" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtSlotRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Room"
 
-[node name="SlotCharacter" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtSlotRow"]
+[node name="SlotCharacter" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtSlotRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Character"
 
-[node name="SlotWeapon" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtSlotRow"]
+[node name="SlotWeapon" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtSlotRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Weapon"
 
-[node name="ArtEditKindRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="ArtEditKindRow" type="HFlowContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 4
 
-[node name="EditAsTexture" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtEditKindRow"]
+[node name="EditAsTexture" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtEditKindRow"]
 unique_name_in_owner = true
 layout_mode = 2
 button_pressed = true
 text = "Texture"
 
-[node name="EditAsSprite" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtEditKindRow"]
+[node name="EditAsSprite" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtEditKindRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Sprite"
 
-[node name="EditAsModel" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ArtEditKindRow"]
+[node name="EditAsModel" type="CheckBox" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ArtEditKindRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Model"
 
-[node name="MakeArtEditBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="MakeArtEditBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Make this edit"
 
-[node name="JsonRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="JsonRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 layout_mode = 2
 
-[node name="LoadJsonBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/JsonRow"]
+[node name="LoadJsonBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/JsonRow"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Load JSON"
 
-[node name="Prompt" type="TextEdit" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="Prompt" type="TextEdit" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 160)
+custom_minimum_size = Vector2(0, 88)
 layout_mode = 2
 size_flags_vertical = 3
 placeholder_text = "Describe a game, or paste GameProject JSON (title + description)…"
 wrap_mode = 1
 
-[node name="BtnRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="BtnRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="CreateBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/BtnRow"]
+[node name="CreateBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/BtnRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Create Game"
 
-[node name="RunBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/BtnRow"]
+[node name="RunBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/BtnRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Run Game"
 
-[node name="NewGameBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/BtnRow"]
+[node name="NewGameBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/BtnRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "New Game"
 
-[node name="ActionRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox"]
+[node name="ActionRow" type="HBoxContainer" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="SaveBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ActionRow"]
+[node name="SaveBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ActionRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Save Game"
 
-[node name="OpenBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ActionRow"]
+[node name="OpenBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ActionRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Open in Godot"
 
-[node name="FolderBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftVBox/ActionRow"]
+[node name="FolderBtn" type="Button" parent="Margin/RootVBox/Tabs/Create/CreateSplit/LeftPanel/LeftScroll/LeftVBox/ActionRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -473,6 +497,8 @@ script = ExtResource("4")
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 10
@@ -502,6 +528,8 @@ script = ExtResource("6")
 [node name="Settings" type="MarginContainer" parent="Margin/RootVBox/Tabs"]
 visible = false
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 10
@@ -509,11 +537,15 @@ theme_override_constants/margin_bottom = 10
 
 [node name="SettingsPanel" type="PanelContainer" parent="Margin/RootVBox/Tabs/Settings"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_styles/panel = SubResource("panel")
 
 [node name="SettingsScroll" type="ScrollContainer" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel"]
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
+horizontal_scroll_mode = 0
 
 [node name="SettingsVBox" type="VBoxContainer" parent="Margin/RootVBox/Tabs/Settings/SettingsPanel/SettingsScroll"]
 layout_mode = 2
