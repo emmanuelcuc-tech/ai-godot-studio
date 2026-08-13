@@ -66,6 +66,14 @@ var _more_list: ItemList
 var _more_items: Array = []
 var _more_section: String = ""
 
+## Live enemy anim preview — replaces the static photo as soon as a clip is picked.
+var _live_frames: Array = []
+var _live_fps: float = 8.0
+var _live_loop: bool = true
+var _live_t: float = 0.0
+var _live_i: int = 0
+var _live_active: bool = false
+
 
 func _ready() -> void:
 	add_theme_constant_override("margin_left", 8)
@@ -315,10 +323,19 @@ func _build() -> void:
 	_floor_opt.item_selected.connect(func(_i): _preview_from(_floor_opt, _world_preview))
 	_wall_opt.item_selected.connect(func(_i): _preview_from(_wall_opt, _world_preview))
 	_sky_opt.item_selected.connect(func(_i): _preview_from(_sky_opt, _world_preview))
-	_enemy_tex.item_selected.connect(func(_i): _preview_from(_enemy_tex, _enemy_preview))
+	_enemy_tex.item_selected.connect(func(_i):
+		_stop_live_anim_preview()
+		_preview_from(_enemy_tex, _enemy_preview)
+	)
 	_wep_tex.item_selected.connect(func(_i): _preview_from(_wep_tex, _wep_preview))
 	_wep_spr.item_selected.connect(func(_i): _preview_from(_wep_spr, _wep_preview))
 	_enemy_anim.item_selected.connect(_on_enemy_anim_selected)
+	_enemy_fps.value_changed.connect(func(v: float):
+		_live_fps = v
+	)
+	_enemy_loop.toggled.connect(func(pressed: bool):
+		_live_loop = pressed
+	)
 
 
 func _section_box(title_text: String, preview: TextureRect, rows: Array, add_cb: Callable, change_cb: Callable, gen_cb: Callable, dl_cb: Callable, imp_cb: Callable, more_cb: Callable) -> Control:
@@ -328,7 +345,8 @@ func _section_box(title_text: String, preview: TextureRect, rows: Array, add_cb:
 	head.text = title_text
 	head.add_theme_font_size_override("font_size", 15)
 	box.add_child(head)
-	preview.custom_minimum_size = Vector2(0, 72)
+	# Enemy preview is taller so live clip playback is easier to see.
+	preview.custom_minimum_size = Vector2(0, 96 if preview == _enemy_preview else 72)
 	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	box.add_child(preview)
@@ -416,7 +434,6 @@ func _reload_all_options() -> void:
 	_fill_opt(_wep_spr, path, ["weapon", "sprites"], "image", str(assigns.get("weapon_sprite", assigns.get("weapon", ""))))
 	_fill_opt(_wep_mat, path, ["materials"], "material", str(assigns.get("weapon_material", "")))
 	_fill_opt(_mat_opt, path, ["materials"], "material", str(assigns.get("wall_material", "")))
-	_reload_enemy_anims(path, str(assigns.get("enemy_anim", "idle")))
 	_reload_phys_list()
 	var phys: Dictionary = ConfigScript.load_physics(path)
 	_phys_char.set_pressed_no_signal(bool(phys.get("character_collision", true)))
@@ -435,6 +452,8 @@ func _reload_all_options() -> void:
 	_preview_from(_wep_tex, _wep_preview)
 	if _wep_preview.texture == null:
 		_preview_from(_wep_spr, _wep_preview)
+	# Anim clip last so live playback replaces the enemy photo immediately.
+	_reload_enemy_anims(path, str(assigns.get("enemy_anim", "idle")))
 
 
 func _fill_opt(opt: OptionButton, project_path: String, cats: Array, kind: String, selected_res: String, name_hints: Array = []) -> void:
@@ -609,17 +628,136 @@ func _reload_enemy_anims(project_path: String, selected: String) -> void:
 func _on_enemy_anim_selected(_idx: int) -> void:
 	var path: String = AIOrchestrator.get_project_path()
 	if path.is_empty() or _enemy_anim.item_count == 0:
+		_stop_live_anim_preview()
 		return
 	var clip: String = _enemy_anim.get_item_text(_enemy_anim.selected)
 	var data: Dictionary = ConfigScript.load_anim(path)
 	var anims: Variant = data.get("animations", [])
-	if typeof(anims) != TYPE_ARRAY:
+	var row: Dictionary = {}
+	if typeof(anims) == TYPE_ARRAY:
+		for a in anims:
+			if typeof(a) == TYPE_DICTIONARY and str(a.get("name", "")) == clip:
+				row = a
+				break
+	if not row.is_empty():
+		_enemy_fps.set_value_no_signal(float(row.get("fps", 8.0)))
+		_enemy_loop.set_pressed_no_signal(bool(row.get("loop", true)))
+	var fps: float = float(_enemy_fps.value)
+	var loop: bool = _enemy_loop.button_pressed
+	var frames: Array = _resolve_clip_frame_textures(path, clip, row)
+	# Replace the enemy photo right away and play the clip live in the preview.
+	_start_live_anim_preview(frames, fps, loop)
+	if frames.size() > 1:
+		_status.text = "Live preview: %s (%d frames @ %.1f fps)" % [clip, frames.size(), fps]
+	elif frames.size() == 1:
+		_status.text = "Preview: %s (1 frame — add sprite frames in Animation tab for a multi-frame clip)" % clip
+	else:
+		_status.text = "No frames for %s yet — pick a texture or add frames in Animation." % clip
+
+
+func _process(delta: float) -> void:
+	if not _live_active or _live_frames.is_empty() or _enemy_preview == null:
 		return
-	for a in anims:
-		if typeof(a) == TYPE_DICTIONARY and str(a.get("name", "")) == clip:
-			_enemy_fps.value = float(a.get("fps", 8.0))
-			_enemy_loop.button_pressed = bool(a.get("loop", true))
-			return
+	if _live_frames.size() == 1:
+		_enemy_preview.texture = _live_frames[0]
+		return
+	_live_t += delta
+	var frame_dur: float = 1.0 / maxf(_live_fps, 0.01)
+	while _live_t >= frame_dur:
+		_live_t -= frame_dur
+		_live_i += 1
+		if _live_i >= _live_frames.size():
+			if _live_loop:
+				_live_i = 0
+			else:
+				_live_i = _live_frames.size() - 1
+				_live_active = false
+				break
+		_enemy_preview.texture = _live_frames[_live_i]
+
+
+func _start_live_anim_preview(frames: Array, fps: float, loop: bool) -> void:
+	_live_frames = frames
+	_live_fps = fps
+	_live_loop = loop
+	_live_t = 0.0
+	_live_i = 0
+	_live_active = not frames.is_empty()
+	if _enemy_preview == null:
+		return
+	if frames.is_empty():
+		# Keep whatever photo/texture is already shown.
+		return
+	_enemy_preview.texture = frames[0]
+
+
+func _stop_live_anim_preview() -> void:
+	_live_active = false
+	_live_frames = []
+	_live_t = 0.0
+	_live_i = 0
+
+
+func _resolve_clip_frame_textures(project_path: String, clip: String, row: Dictionary) -> Array:
+	var out: Array = []
+	var seen: Dictionary = {}
+	var listed: Variant = row.get("frames", []) if not row.is_empty() else []
+	if typeof(listed) == TYPE_ARRAY:
+		for p in listed:
+			var tex: Texture2D = _load_preview_texture(project_path, str(p))
+			if tex == null:
+				continue
+			var key: String = str(p)
+			if seen.has(key):
+				continue
+			seen[key] = true
+			out.append(tex)
+	if out.is_empty():
+		# Fall back to images whose filenames mention the clip (enemy / sprites / character).
+		var clip_l: String = clip.to_lower()
+		for cat in ["enemy", "sprites", "character"]:
+			for item in LayoutScript.list_category(project_path, cat):
+				if typeof(item) != TYPE_DICTIONARY:
+					continue
+				if str(item.get("kind", "")) != "image":
+					continue
+				var fname: String = str(item.get("name", item.get("res", ""))).get_file().to_lower()
+				if not fname.contains(clip_l):
+					continue
+				var abs_path: String = str(item.get("abs", ""))
+				var tex2: Texture2D = _load_preview_texture(project_path, abs_path)
+				if tex2 == null:
+					continue
+				if seen.has(abs_path):
+					continue
+				seen[abs_path] = true
+				out.append(tex2)
+	if out.is_empty():
+		# Last resort: current enemy texture as a single-frame stand-in so the photo still updates.
+		var item: Dictionary = _selected_item(_enemy_tex)
+		var abs_tex: String = str(item.get("abs", ""))
+		var fallback: Texture2D = _load_preview_texture(project_path, abs_tex)
+		if fallback != null:
+			out.append(fallback)
+	return out
+
+
+func _load_preview_texture(project_path: String, path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	var abs_path: String = path
+	if path.begins_with("res://"):
+		abs_path = project_path.path_join(path.substr(6))
+	elif path.begins_with("user://"):
+		abs_path = ProjectSettings.globalize_path(path)
+	if not FileAccess.file_exists(abs_path):
+		return null
+	if not LayoutScript.IMAGE_EXTS.has(abs_path.get_extension().to_lower()):
+		return null
+	var img: Image = Image.new()
+	if img.load(abs_path) != OK:
+		return null
+	return ImageTexture.create_from_image(img)
 
 
 func _selected_item(opt: OptionButton) -> Dictionary:

@@ -14,9 +14,17 @@ var _loop: CheckButton
 var _notes: TextEdit
 var _frames: ItemList
 var _frame_path: LineEdit
+var _preview: TextureRect
+var _preview_caption: Label
 var _status: Label
 var _data: Dictionary = {}
 var _anims: Array = []
+var _live_frames: Array = []
+var _live_fps: float = 8.0
+var _live_loop: bool = true
+var _live_t: float = 0.0
+var _live_i: int = 0
+var _live_active: bool = false
 
 
 func _ready() -> void:
@@ -112,10 +120,16 @@ func _build() -> void:
 	_fps.max_value = 60.0
 	_fps.step = 0.5
 	_fps.value = 8.0
+	_fps.value_changed.connect(func(v: float):
+		_live_fps = v
+	)
 	fps_row.add_child(_fps)
 	_loop = CheckButton.new()
 	_loop.text = "Loop"
 	_loop.button_pressed = true
+	_loop.toggled.connect(func(pressed: bool):
+		_live_loop = pressed
+	)
 	fps_row.add_child(_loop)
 	var notes_l: Label = Label.new()
 	notes_l.text = "Preview notes / AnimationPlayer hints"
@@ -124,6 +138,15 @@ func _build() -> void:
 	_notes.custom_minimum_size = Vector2(0, 70)
 	_notes.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	right.add_child(_notes)
+	_preview_caption = Label.new()
+	_preview_caption.text = "Live preview (updates when you pick a clip)"
+	right.add_child(_preview_caption)
+	_preview = TextureRect.new()
+	_preview.custom_minimum_size = Vector2(0, 140)
+	_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.add_child(_preview)
 	var fr_l: Label = Label.new()
 	fr_l.text = "Sprite frames (res:// paths)"
 	right.add_child(fr_l)
@@ -178,17 +201,93 @@ func _on_mode(pressed: bool) -> void:
 
 func _on_select(idx: int) -> void:
 	if idx < 0 or idx >= _anims.size():
+		_stop_live_preview()
 		return
 	var a: Dictionary = _anims[idx]
 	_name_edit.text = str(a.get("name", ""))
-	_fps.value = float(a.get("fps", 8.0))
-	_loop.button_pressed = bool(a.get("loop", true))
+	_fps.set_value_no_signal(float(a.get("fps", 8.0)))
+	_loop.set_pressed_no_signal(bool(a.get("loop", true)))
 	_notes.text = str(a.get("notes", ""))
 	_frames.clear()
 	var fr: Variant = a.get("frames", [])
 	if typeof(fr) == TYPE_ARRAY:
 		for p in fr:
 			_frames.add_item(str(p))
+	# Replace the preview photo immediately and play the clip live.
+	_play_selected_live()
+
+
+func _process(delta: float) -> void:
+	if not _live_active or _live_frames.is_empty() or _preview == null:
+		return
+	if _live_frames.size() == 1:
+		_preview.texture = _live_frames[0]
+		return
+	_live_t += delta
+	var frame_dur: float = 1.0 / maxf(_live_fps, 0.01)
+	while _live_t >= frame_dur:
+		_live_t -= frame_dur
+		_live_i += 1
+		if _live_i >= _live_frames.size():
+			if _live_loop:
+				_live_i = 0
+			else:
+				_live_i = _live_frames.size() - 1
+				_live_active = false
+				break
+		_preview.texture = _live_frames[_live_i]
+
+
+func _play_selected_live() -> void:
+	var path: String = AIOrchestrator.get_project_path()
+	var texes: Array = []
+	for i in _frames.item_count:
+		var tex: Texture2D = _load_frame_texture(path, _frames.get_item_text(i))
+		if tex != null:
+			texes.append(tex)
+	_live_frames = texes
+	_live_fps = float(_fps.value)
+	_live_loop = _loop.button_pressed
+	_live_t = 0.0
+	_live_i = 0
+	_live_active = not texes.is_empty()
+	if _preview == null:
+		return
+	if texes.is_empty():
+		_preview.texture = null
+		_preview_caption.text = "Live preview — no frames on this clip yet"
+		return
+	_preview.texture = texes[0]
+	_preview_caption.text = "Live preview: %s (%d frames @ %.1f fps)" % [
+		_name_edit.text.strip_edges(), texes.size(), _live_fps,
+	]
+
+
+func _stop_live_preview() -> void:
+	_live_active = false
+	_live_frames = []
+	_live_t = 0.0
+	_live_i = 0
+	if _preview:
+		_preview.texture = null
+
+
+func _load_frame_texture(project_path: String, path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	var abs_path: String = path
+	if path.begins_with("res://"):
+		abs_path = project_path.path_join(path.substr(6))
+	elif path.begins_with("user://"):
+		abs_path = ProjectSettings.globalize_path(path)
+	if not FileAccess.file_exists(abs_path):
+		return null
+	if not LayoutScript.IMAGE_EXTS.has(abs_path.get_extension().to_lower()):
+		return null
+	var img: Image = Image.new()
+	if img.load(abs_path) != OK:
+		return null
+	return ImageTexture.create_from_image(img)
 
 
 func _on_add() -> void:
@@ -212,6 +311,7 @@ func _on_add_frame() -> void:
 		return
 	_frames.add_item(p)
 	_frame_path.clear()
+	_play_selected_live()
 
 
 func _on_remove_frame() -> void:
@@ -219,6 +319,7 @@ func _on_remove_frame() -> void:
 	if idxs.is_empty():
 		return
 	_frames.remove_item(idxs[0])
+	_play_selected_live()
 
 
 func _on_scan_frames() -> void:
@@ -242,6 +343,7 @@ func _on_scan_frames() -> void:
 		if not exists:
 			_frames.add_item(res_p)
 	_status.text = "Scanned character/ + sprites/ into frame list."
+	_play_selected_live()
 
 
 func _on_apply() -> void:
@@ -261,7 +363,8 @@ func _on_apply() -> void:
 	}
 	_persist()
 	_reload_list()
-	_status.text = "Wrote studio_anim.json + scripts/anim_config.gd. Run Game to preview."
+	_status.text = "Wrote studio_anim.json + scripts/anim_config.gd. Live preview is playing this clip."
+	_play_selected_live()
 
 
 func _persist() -> void:
