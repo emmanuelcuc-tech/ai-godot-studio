@@ -7,6 +7,7 @@ const ImageClientScript = preload("res://scripts/ai/image_asset_client.gd")
 const GraphicStyleScript = preload("res://scripts/graphic_style.gd")
 const ProceduralArtScript = preload("res://scripts/ai/procedural_art.gd")
 const LocalLibScript = preload("res://scripts/editors/local_asset_library.gd")
+const PosePreviewScript = preload("res://scripts/editors/pose_preview.gd")
 
 signal applied(message: String)
 
@@ -40,7 +41,7 @@ var _wall_mat: OptionButton
 var _sky_mat: OptionButton
 var _phys_world: CheckButton
 
-var _enemy_preview: TextureRect
+var _enemy_preview: Control
 var _enemy_tex: OptionButton
 var _enemy_mdl: OptionButton
 var _enemy_mat: OptionButton
@@ -65,14 +66,6 @@ var _more_dialog: AcceptDialog
 var _more_list: ItemList
 var _more_items: Array = []
 var _more_section: String = ""
-
-## Live enemy anim preview — replaces the static photo as soon as a clip is picked.
-var _live_frames: Array = []
-var _live_fps: float = 8.0
-var _live_loop: bool = true
-var _live_t: float = 0.0
-var _live_i: int = 0
-var _live_active: bool = false
 
 
 func _ready() -> void:
@@ -185,7 +178,9 @@ func _build() -> void:
 		_phys_world,
 	], func(): _on_section_add("world"), func(): _on_section_change("world"), func(): _generate_section("world"), func(): _download_section("world"), func(): _import_section("world"), func(): _open_add_more("world")))
 
-	_enemy_preview = TextureRect.new()
+	_enemy_preview = PosePreviewScript.new()
+	if _enemy_preview.has_signal("pose_changed"):
+		_enemy_preview.pose_changed.connect(_on_enemy_pose_pulled)
 	_enemy_tex = OptionButton.new()
 	_enemy_mdl = OptionButton.new()
 	_enemy_mat = OptionButton.new()
@@ -201,7 +196,7 @@ func _build() -> void:
 	_phys_enemy = CheckButton.new()
 	_phys_enemy.text = "Physics collision (CharacterBody)"
 	_phys_enemy.button_pressed = true
-	col.add_child(_section_box("4. Enemy — textures / models / animation", _enemy_preview, [
+	col.add_child(_section_box("4. Enemy — textures / models / animation (drag ↕ pull pose)", _enemy_preview, [
 		_labeled_row("Texture", _enemy_tex),
 		_labeled_row("Model", _enemy_mdl),
 		_labeled_row("Material", _enemy_mat),
@@ -331,24 +326,27 @@ func _build() -> void:
 	_wep_spr.item_selected.connect(func(_i): _preview_from(_wep_spr, _wep_preview))
 	_enemy_anim.item_selected.connect(_on_enemy_anim_selected)
 	_enemy_fps.value_changed.connect(func(v: float):
-		_live_fps = v
+		if _enemy_preview and _enemy_preview.has_method("set_frames"):
+			_enemy_preview.fps = v
 	)
 	_enemy_loop.toggled.connect(func(pressed: bool):
-		_live_loop = pressed
+		if _enemy_preview:
+			_enemy_preview.loop_anim = pressed
 	)
 
 
-func _section_box(title_text: String, preview: TextureRect, rows: Array, add_cb: Callable, change_cb: Callable, gen_cb: Callable, dl_cb: Callable, imp_cb: Callable, more_cb: Callable) -> Control:
+func _section_box(title_text: String, preview: Control, rows: Array, add_cb: Callable, change_cb: Callable, gen_cb: Callable, dl_cb: Callable, imp_cb: Callable, more_cb: Callable) -> Control:
 	var box: VBoxContainer = VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	var head: Label = Label.new()
 	head.text = title_text
 	head.add_theme_font_size_override("font_size", 15)
 	box.add_child(head)
-	# Enemy preview is taller so live clip playback is easier to see.
-	preview.custom_minimum_size = Vector2(0, 96 if preview == _enemy_preview else 72)
-	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# Enemy pose preview is taller for pull / scrub interaction.
+	preview.custom_minimum_size = Vector2(0, 140 if preview == _enemy_preview else 72)
+	if preview is TextureRect:
+		(preview as TextureRect).expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		(preview as TextureRect).stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	box.add_child(preview)
 	for row in rows:
 		if row is Control:
@@ -645,57 +643,42 @@ func _on_enemy_anim_selected(_idx: int) -> void:
 	var fps: float = float(_enemy_fps.value)
 	var loop: bool = _enemy_loop.button_pressed
 	var frames: Array = _resolve_clip_frame_textures(path, clip, row)
-	# Replace the enemy photo right away and play the clip live in the preview.
-	_start_live_anim_preview(frames, fps, loop)
+	var pull: Variant = row.get("pose_pull", []) if not row.is_empty() else []
+	_start_live_anim_preview(frames, fps, loop, pull if typeof(pull) == TYPE_ARRAY else [])
 	if frames.size() > 1:
-		_status.text = "Live preview: %s (%d frames @ %.1f fps)" % [clip, frames.size(), fps]
+		_status.text = "Live pose: %s — pull ↕ on image to warp, drag ↔ to scrub (%d frames)" % [clip, frames.size()]
 	elif frames.size() == 1:
-		_status.text = "Preview: %s (1 frame — add sprite frames in Animation tab for a multi-frame clip)" % clip
+		_status.text = "Pose preview: %s — click + pull up/down on the image to manipulate" % clip
 	else:
 		_status.text = "No frames for %s yet — pick a texture or add frames in Animation." % clip
 
 
-func _process(delta: float) -> void:
-	if not _live_active or _live_frames.is_empty() or _enemy_preview == null:
-		return
-	if _live_frames.size() == 1:
-		_enemy_preview.texture = _live_frames[0]
-		return
-	_live_t += delta
-	var frame_dur: float = 1.0 / maxf(_live_fps, 0.01)
-	while _live_t >= frame_dur:
-		_live_t -= frame_dur
-		_live_i += 1
-		if _live_i >= _live_frames.size():
-			if _live_loop:
-				_live_i = 0
-			else:
-				_live_i = _live_frames.size() - 1
-				_live_active = false
-				break
-		_enemy_preview.texture = _live_frames[_live_i]
-
-
-func _start_live_anim_preview(frames: Array, fps: float, loop: bool) -> void:
-	_live_frames = frames
-	_live_fps = fps
-	_live_loop = loop
-	_live_t = 0.0
-	_live_i = 0
-	_live_active = not frames.is_empty()
+func _start_live_anim_preview(frames: Array, fps: float, loop: bool, pull: Array = []) -> void:
 	if _enemy_preview == null:
 		return
-	if frames.is_empty():
-		# Keep whatever photo/texture is already shown.
-		return
-	_enemy_preview.texture = frames[0]
+	if _enemy_preview.has_method("set_frames"):
+		_enemy_preview.set_frames(frames, fps, loop, true)
+		_enemy_preview.set_pull_points(pull)
+	elif frames.size() > 0:
+		_enemy_preview.texture = frames[0]
 
 
 func _stop_live_anim_preview() -> void:
-	_live_active = false
-	_live_frames = []
-	_live_t = 0.0
-	_live_i = 0
+	if _enemy_preview and _enemy_preview.has_method("set_frames"):
+		_enemy_preview.set_frames([], 8.0, true, false)
+		_enemy_preview.set_pull_points([])
+
+
+func _on_enemy_pose_pulled(points: Array) -> void:
+	var path: String = AIOrchestrator.get_project_path()
+	if path.is_empty() or _enemy_anim.item_count == 0:
+		return
+	var clip: String = _enemy_anim.get_item_text(_enemy_anim.selected)
+	ConfigScript.upsert_anim_clip(path, clip, float(_enemy_fps.value), _enemy_loop.button_pressed, true)
+	ConfigScript.set_anim_pose_pull(path, clip, points)
+	_status.text = "Pose pulled live on %s (%d handle%s) — saved to studio_anim.json" % [
+		clip, points.size(), "" if points.size() == 1 else "s",
+	]
 
 
 func _resolve_clip_frame_textures(project_path: String, clip: String, row: Dictionary) -> Array:
@@ -768,9 +751,11 @@ func _selected_item(opt: OptionButton) -> Dictionary:
 	return row if typeof(row) == TYPE_DICTIONARY else {}
 
 
-func _preview_from(opt: OptionButton, preview: TextureRect) -> void:
+func _preview_from(opt: OptionButton, preview: Control) -> void:
 	var item: Dictionary = _selected_item(opt)
 	var abs_path: String = str(item.get("abs", ""))
+	if preview.has_method("set_frames"):
+		preview.set_frames([], 8.0, true, false)
 	preview.texture = null
 	if abs_path.is_empty() or not FileAccess.file_exists(abs_path):
 		return
@@ -778,7 +763,11 @@ func _preview_from(opt: OptionButton, preview: TextureRect) -> void:
 		return
 	var img: Image = Image.new()
 	if img.load(abs_path) == OK:
-		preview.texture = ImageTexture.create_from_image(img)
+		var tex: ImageTexture = ImageTexture.create_from_image(img)
+		if preview.has_method("set_frames"):
+			preview.set_frames([tex], 8.0, true, false)
+		else:
+			preview.texture = tex
 
 
 func _kinds() -> Dictionary:

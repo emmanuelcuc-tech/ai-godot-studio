@@ -63,11 +63,11 @@ static func default_anim() -> Dictionary:
 	return {
 		"mode_enabled": false,
 		"animations": [
-			{"name": "idle", "fps": 8.0, "loop": true, "frames": [], "notes": "Idle / stand"},
-			{"name": "walk", "fps": 10.0, "loop": true, "frames": [], "notes": "Locomotion / walk-bob fallback"},
-			{"name": "attack", "fps": 12.0, "loop": false, "frames": [], "notes": "Fire / melee swing"},
-			{"name": "hit", "fps": 12.0, "loop": false, "frames": [], "notes": "Enemy hurt flash / hit react"},
-			{"name": "death", "fps": 8.0, "loop": false, "frames": [], "notes": "Enemy death"},
+			{"name": "idle", "fps": 8.0, "loop": true, "frames": [], "notes": "Idle / stand", "pose_pull": []},
+			{"name": "walk", "fps": 10.0, "loop": true, "frames": [], "notes": "Locomotion / walk-bob fallback", "pose_pull": []},
+			{"name": "attack", "fps": 12.0, "loop": false, "frames": [], "notes": "Fire / melee swing", "pose_pull": []},
+			{"name": "hit", "fps": 12.0, "loop": false, "frames": [], "notes": "Enemy hurt flash / hit react", "pose_pull": []},
+			{"name": "death", "fps": 8.0, "loop": false, "frames": [], "notes": "Enemy death", "pose_pull": []},
 		],
 	}
 
@@ -340,14 +340,38 @@ static func upsert_anim_clip(project_path: String, clip_name: String, fps: float
 		row["loop"] = loop
 		if not row.has("frames"):
 			row["frames"] = []
+		if not row.has("pose_pull"):
+			row["pose_pull"] = []
 		list[i] = row
 		found = true
 		break
 	if not found:
-		list.append({"name": clip_name, "fps": fps, "loop": loop, "frames": [], "notes": "Studio enemy clip"})
+		list.append({"name": clip_name, "fps": fps, "loop": loop, "frames": [], "notes": "Studio enemy clip", "pose_pull": []})
 	data["animations"] = list
 	if enable_mode:
 		data["mode_enabled"] = true
+	save_anim(project_path, data)
+
+
+static func set_anim_pose_pull(project_path: String, clip_name: String, points: Array) -> void:
+	var data: Dictionary = load_anim(project_path)
+	var anims: Variant = data.get("animations", [])
+	var list: Array = anims if typeof(anims) == TYPE_ARRAY else []
+	var found: bool = false
+	for i in list.size():
+		if typeof(list[i]) != TYPE_DICTIONARY:
+			continue
+		if str(list[i].get("name", "")) != clip_name:
+			continue
+		var row: Dictionary = list[i]
+		row["pose_pull"] = points
+		list[i] = row
+		found = true
+		break
+	if not found:
+		list.append({"name": clip_name, "fps": 8.0, "loop": true, "frames": [], "notes": "Studio pose", "pose_pull": points})
+	data["animations"] = list
+	data["mode_enabled"] = true
 	save_anim(project_path, data)
 
 

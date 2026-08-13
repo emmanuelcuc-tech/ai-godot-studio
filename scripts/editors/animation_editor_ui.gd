@@ -3,6 +3,7 @@ extends MarginContainer
 
 const ConfigScript = preload("res://scripts/editors/studio_game_config.gd")
 const LayoutScript = preload("res://scripts/editors/game_asset_layout.gd")
+const PosePreviewScript = preload("res://scripts/editors/pose_preview.gd")
 
 var _empty: Label
 var _root: HSplitContainer
@@ -14,17 +15,13 @@ var _loop: CheckButton
 var _notes: TextEdit
 var _frames: ItemList
 var _frame_path: LineEdit
-var _preview: TextureRect
+var _preview: Control
 var _preview_caption: Label
 var _status: Label
 var _data: Dictionary = {}
 var _anims: Array = []
-var _live_frames: Array = []
 var _live_fps: float = 8.0
 var _live_loop: bool = true
-var _live_t: float = 0.0
-var _live_i: int = 0
-var _live_active: bool = false
 
 
 func _ready() -> void:
@@ -122,6 +119,8 @@ func _build() -> void:
 	_fps.value = 8.0
 	_fps.value_changed.connect(func(v: float):
 		_live_fps = v
+		if _preview:
+			_preview.fps = v
 	)
 	fps_row.add_child(_fps)
 	_loop = CheckButton.new()
@@ -129,6 +128,8 @@ func _build() -> void:
 	_loop.button_pressed = true
 	_loop.toggled.connect(func(pressed: bool):
 		_live_loop = pressed
+		if _preview:
+			_preview.loop_anim = pressed
 	)
 	fps_row.add_child(_loop)
 	var notes_l: Label = Label.new()
@@ -139,14 +140,35 @@ func _build() -> void:
 	_notes.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	right.add_child(_notes)
 	_preview_caption = Label.new()
-	_preview_caption.text = "Live preview (updates when you pick a clip)"
+	_preview_caption.text = "Live pose preview — click + pull ↕ to warp · drag ↔ to scrub poses"
+	_preview_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(_preview_caption)
-	_preview = TextureRect.new()
-	_preview.custom_minimum_size = Vector2(0, 140)
-	_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_preview = PosePreviewScript.new()
+	_preview.custom_minimum_size = Vector2(0, 180)
 	_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	if _preview.has_signal("pose_changed"):
+		_preview.pose_changed.connect(_on_pose_pulled)
 	right.add_child(_preview)
+	var pose_row: HBoxContainer = HBoxContainer.new()
+	right.add_child(pose_row)
+	var reset_pose: Button = Button.new()
+	reset_pose.text = "Reset pose pulls"
+	reset_pose.pressed.connect(func() -> void:
+		if _preview and _preview.has_method("reset_pose"):
+			_preview.reset_pose()
+		_status.text = "Pose pulls cleared."
+	)
+	pose_row.add_child(reset_pose)
+	var play_pose: Button = Button.new()
+	play_pose.text = "Play / Pause"
+	play_pose.pressed.connect(func() -> void:
+		if _preview == null:
+			return
+		_preview.set_playing(not bool(_preview.playing))
+		_status.text = "Preview %s" % ("playing" if _preview.playing else "paused — drag to manipulate")
+	)
+	pose_row.add_child(play_pose)
 	var fr_l: Label = Label.new()
 	fr_l.text = "Sprite frames (res:// paths)"
 	right.add_child(fr_l)
@@ -217,27 +239,6 @@ func _on_select(idx: int) -> void:
 	_play_selected_live()
 
 
-func _process(delta: float) -> void:
-	if not _live_active or _live_frames.is_empty() or _preview == null:
-		return
-	if _live_frames.size() == 1:
-		_preview.texture = _live_frames[0]
-		return
-	_live_t += delta
-	var frame_dur: float = 1.0 / maxf(_live_fps, 0.01)
-	while _live_t >= frame_dur:
-		_live_t -= frame_dur
-		_live_i += 1
-		if _live_i >= _live_frames.size():
-			if _live_loop:
-				_live_i = 0
-			else:
-				_live_i = _live_frames.size() - 1
-				_live_active = false
-				break
-		_preview.texture = _live_frames[_live_i]
-
-
 func _play_selected_live() -> void:
 	var path: String = AIOrchestrator.get_project_path()
 	var texes: Array = []
@@ -245,30 +246,44 @@ func _play_selected_live() -> void:
 		var tex: Texture2D = _load_frame_texture(path, _frames.get_item_text(i))
 		if tex != null:
 			texes.append(tex)
-	_live_frames = texes
 	_live_fps = float(_fps.value)
 	_live_loop = _loop.button_pressed
-	_live_t = 0.0
-	_live_i = 0
-	_live_active = not texes.is_empty()
 	if _preview == null:
 		return
+	var pull: Variant = []
+	var idxs: PackedInt32Array = _list.get_selected_items()
+	if idxs.size() > 0 and idxs[0] < _anims.size() and typeof(_anims[idxs[0]]) == TYPE_DICTIONARY:
+		pull = _anims[idxs[0]].get("pose_pull", [])
+	_preview.set_frames(texes, _live_fps, _live_loop, true)
+	if typeof(pull) == TYPE_ARRAY:
+		_preview.set_pull_points(pull)
 	if texes.is_empty():
-		_preview.texture = null
-		_preview_caption.text = "Live preview — no frames on this clip yet"
+		_preview_caption.text = "Live pose preview — no frames on this clip yet"
 		return
-	_preview.texture = texes[0]
-	_preview_caption.text = "Live preview: %s (%d frames @ %.1f fps)" % [
-		_name_edit.text.strip_edges(), texes.size(), _live_fps,
+	_preview_caption.text = "Live pose: %s (%d frames) — pull ↕ to warp, drag ↔ to scrub" % [
+		_name_edit.text.strip_edges(), texes.size(),
+	]
+
+
+func _on_pose_pulled(points: Array) -> void:
+	var idxs: PackedInt32Array = _list.get_selected_items()
+	if idxs.is_empty() or idxs[0] >= _anims.size():
+		return
+	if typeof(_anims[idxs[0]]) != TYPE_DICTIONARY:
+		return
+	var row: Dictionary = _anims[idxs[0]]
+	row["pose_pull"] = points
+	_anims[idxs[0]] = row
+	_status.text = "Pose updated live (%d pull point%s) — Apply to save into game." % [
+		points.size(), "" if points.size() == 1 else "s",
 	]
 
 
 func _stop_live_preview() -> void:
-	_live_active = false
-	_live_frames = []
-	_live_t = 0.0
-	_live_i = 0
-	if _preview:
+	if _preview and _preview.has_method("set_frames"):
+		_preview.set_frames([], 8.0, true, false)
+		_preview.set_pull_points([])
+	elif _preview:
 		_preview.texture = null
 
 
@@ -291,7 +306,7 @@ func _load_frame_texture(project_path: String, path: String) -> Texture2D:
 
 
 func _on_add() -> void:
-	_anims.append({"name": "new_clip", "fps": 8.0, "loop": true, "frames": [], "notes": ""})
+	_anims.append({"name": "new_clip", "fps": 8.0, "loop": true, "frames": [], "notes": "", "pose_pull": []})
 	_reload_list()
 	_list.select(_list.item_count - 1)
 	_on_select(_list.item_count - 1)
@@ -354,16 +369,20 @@ func _on_apply() -> void:
 	var frames: Array = []
 	for i in _frames.item_count:
 		frames.append(_frames.get_item_text(i))
+	var pull: Array = []
+	if _preview and _preview.has_method("get_pull_points"):
+		pull = _preview.get_pull_points()
 	_anims[idxs[0]] = {
 		"name": _name_edit.text.strip_edges() if not _name_edit.text.strip_edges().is_empty() else "clip",
 		"fps": _fps.value,
 		"loop": _loop.button_pressed,
 		"frames": frames,
 		"notes": _notes.text.strip_edges(),
+		"pose_pull": pull,
 	}
 	_persist()
 	_reload_list()
-	_status.text = "Wrote studio_anim.json + scripts/anim_config.gd. Live preview is playing this clip."
+	_status.text = "Wrote studio_anim.json (incl. pose pulls) + scripts/anim_config.gd. Live preview is playing this clip."
 	_play_selected_live()
 
 
