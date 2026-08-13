@@ -7,6 +7,7 @@ const ImageClientScript = preload("res://scripts/ai/image_asset_client.gd")
 const GraphicStyleScript = preload("res://scripts/graphic_style.gd")
 const ProceduralArtScript = preload("res://scripts/ai/procedural_art.gd")
 const LocalLibScript = preload("res://scripts/editors/local_asset_library.gd")
+const PosePreviewScript = preload("res://scripts/editors/pose_preview.gd")
 
 signal applied(message: String)
 
@@ -40,7 +41,7 @@ var _wall_mat: OptionButton
 var _sky_mat: OptionButton
 var _phys_world: CheckButton
 
-var _enemy_preview: TextureRect
+var _enemy_preview: Control
 var _enemy_tex: OptionButton
 var _enemy_mdl: OptionButton
 var _enemy_mat: OptionButton
@@ -177,7 +178,9 @@ func _build() -> void:
 		_phys_world,
 	], func(): _on_section_add("world"), func(): _on_section_change("world"), func(): _generate_section("world"), func(): _download_section("world"), func(): _import_section("world"), func(): _open_add_more("world")))
 
-	_enemy_preview = TextureRect.new()
+	_enemy_preview = PosePreviewScript.new()
+	if _enemy_preview.has_signal("pose_changed"):
+		_enemy_preview.pose_changed.connect(_on_enemy_pose_pulled)
 	_enemy_tex = OptionButton.new()
 	_enemy_mdl = OptionButton.new()
 	_enemy_mat = OptionButton.new()
@@ -193,7 +196,7 @@ func _build() -> void:
 	_phys_enemy = CheckButton.new()
 	_phys_enemy.text = "Physics collision (CharacterBody)"
 	_phys_enemy.button_pressed = true
-	col.add_child(_section_box("4. Enemy — textures / models / animation", _enemy_preview, [
+	col.add_child(_section_box("4. Enemy — textures / models / animation (drag ↕ pull pose)", _enemy_preview, [
 		_labeled_row("Texture", _enemy_tex),
 		_labeled_row("Model", _enemy_mdl),
 		_labeled_row("Material", _enemy_mat),
@@ -315,22 +318,35 @@ func _build() -> void:
 	_floor_opt.item_selected.connect(func(_i): _preview_from(_floor_opt, _world_preview))
 	_wall_opt.item_selected.connect(func(_i): _preview_from(_wall_opt, _world_preview))
 	_sky_opt.item_selected.connect(func(_i): _preview_from(_sky_opt, _world_preview))
-	_enemy_tex.item_selected.connect(func(_i): _preview_from(_enemy_tex, _enemy_preview))
+	_enemy_tex.item_selected.connect(func(_i):
+		_stop_live_anim_preview()
+		_preview_from(_enemy_tex, _enemy_preview)
+	)
 	_wep_tex.item_selected.connect(func(_i): _preview_from(_wep_tex, _wep_preview))
 	_wep_spr.item_selected.connect(func(_i): _preview_from(_wep_spr, _wep_preview))
 	_enemy_anim.item_selected.connect(_on_enemy_anim_selected)
+	_enemy_fps.value_changed.connect(func(v: float):
+		if _enemy_preview and _enemy_preview.has_method("set_frames"):
+			_enemy_preview.fps = v
+	)
+	_enemy_loop.toggled.connect(func(pressed: bool):
+		if _enemy_preview:
+			_enemy_preview.loop_anim = pressed
+	)
 
 
-func _section_box(title_text: String, preview: TextureRect, rows: Array, add_cb: Callable, change_cb: Callable, gen_cb: Callable, dl_cb: Callable, imp_cb: Callable, more_cb: Callable) -> Control:
+func _section_box(title_text: String, preview: Control, rows: Array, add_cb: Callable, change_cb: Callable, gen_cb: Callable, dl_cb: Callable, imp_cb: Callable, more_cb: Callable) -> Control:
 	var box: VBoxContainer = VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	var head: Label = Label.new()
 	head.text = title_text
 	head.add_theme_font_size_override("font_size", 15)
 	box.add_child(head)
-	preview.custom_minimum_size = Vector2(0, 72)
-	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# Enemy pose preview is taller for pull / scrub interaction.
+	preview.custom_minimum_size = Vector2(0, 140 if preview == _enemy_preview else 72)
+	if preview is TextureRect:
+		(preview as TextureRect).expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		(preview as TextureRect).stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	box.add_child(preview)
 	for row in rows:
 		if row is Control:
@@ -391,6 +407,11 @@ func _anim_row() -> HBoxContainer:
 	row.add_child(lab)
 	row.add_child(_enemy_fps)
 	row.add_child(_enemy_loop)
+	var save_orig: Button = Button.new()
+	save_orig.text = "Save over original"
+	save_orig.tooltip_text = "Bake pulled pose into the original enemy frame PNGs (overwrites files)."
+	save_orig.pressed.connect(_on_enemy_save_over_original)
+	row.add_child(save_orig)
 	return row
 
 
@@ -416,7 +437,6 @@ func _reload_all_options() -> void:
 	_fill_opt(_wep_spr, path, ["weapon", "sprites"], "image", str(assigns.get("weapon_sprite", assigns.get("weapon", ""))))
 	_fill_opt(_wep_mat, path, ["materials"], "material", str(assigns.get("weapon_material", "")))
 	_fill_opt(_mat_opt, path, ["materials"], "material", str(assigns.get("wall_material", "")))
-	_reload_enemy_anims(path, str(assigns.get("enemy_anim", "idle")))
 	_reload_phys_list()
 	var phys: Dictionary = ConfigScript.load_physics(path)
 	_phys_char.set_pressed_no_signal(bool(phys.get("character_collision", true)))
@@ -435,6 +455,8 @@ func _reload_all_options() -> void:
 	_preview_from(_wep_tex, _wep_preview)
 	if _wep_preview.texture == null:
 		_preview_from(_wep_spr, _wep_preview)
+	# Anim clip last so live playback replaces the enemy photo immediately.
+	_reload_enemy_anims(path, str(assigns.get("enemy_anim", "idle")))
 
 
 func _fill_opt(opt: OptionButton, project_path: String, cats: Array, kind: String, selected_res: String, name_hints: Array = []) -> void:
@@ -609,17 +631,157 @@ func _reload_enemy_anims(project_path: String, selected: String) -> void:
 func _on_enemy_anim_selected(_idx: int) -> void:
 	var path: String = AIOrchestrator.get_project_path()
 	if path.is_empty() or _enemy_anim.item_count == 0:
+		_stop_live_anim_preview()
 		return
 	var clip: String = _enemy_anim.get_item_text(_enemy_anim.selected)
 	var data: Dictionary = ConfigScript.load_anim(path)
 	var anims: Variant = data.get("animations", [])
-	if typeof(anims) != TYPE_ARRAY:
+	var row: Dictionary = {}
+	if typeof(anims) == TYPE_ARRAY:
+		for a in anims:
+			if typeof(a) == TYPE_DICTIONARY and str(a.get("name", "")) == clip:
+				row = a
+				break
+	if not row.is_empty():
+		_enemy_fps.set_value_no_signal(float(row.get("fps", 8.0)))
+		_enemy_loop.set_pressed_no_signal(bool(row.get("loop", true)))
+	var fps: float = float(_enemy_fps.value)
+	var loop: bool = _enemy_loop.button_pressed
+	var pack: Dictionary = _resolve_clip_frames_pack(path, clip, row)
+	var frames: Array = pack.get("frames", [])
+	var paths: Array = pack.get("paths", [])
+	var pull: Variant = row.get("pose_pull", []) if not row.is_empty() else []
+	_start_live_anim_preview(frames, fps, loop, pull if typeof(pull) == TYPE_ARRAY else [], paths)
+	if frames.size() > 1:
+		_status.text = "Live pose: %s — pull ↕ · scrub ↔ · Save over original (%d frames)" % [clip, frames.size()]
+	elif frames.size() == 1:
+		_status.text = "Pose preview: %s — pull up/down, then Save over original" % clip
+	else:
+		_status.text = "No frames for %s yet — pick a texture or add frames in Animation." % clip
+
+
+func _start_live_anim_preview(frames: Array, fps: float, loop: bool, pull: Array = [], paths: Array = []) -> void:
+	if _enemy_preview == null:
 		return
-	for a in anims:
-		if typeof(a) == TYPE_DICTIONARY and str(a.get("name", "")) == clip:
-			_enemy_fps.value = float(a.get("fps", 8.0))
-			_enemy_loop.button_pressed = bool(a.get("loop", true))
-			return
+	if _enemy_preview.has_method("set_frames"):
+		_enemy_preview.set_frames(frames, fps, loop, true, paths)
+		_enemy_preview.set_pull_points(pull)
+	elif frames.size() > 0:
+		_enemy_preview.texture = frames[0]
+
+
+func _stop_live_anim_preview() -> void:
+	if _enemy_preview and _enemy_preview.has_method("set_frames"):
+		_enemy_preview.set_frames([], 8.0, true, false)
+		_enemy_preview.set_pull_points([])
+
+
+func _on_enemy_pose_pulled(points: Array) -> void:
+	var path: String = AIOrchestrator.get_project_path()
+	if path.is_empty() or _enemy_anim.item_count == 0:
+		return
+	var clip: String = _enemy_anim.get_item_text(_enemy_anim.selected)
+	ConfigScript.upsert_anim_clip(path, clip, float(_enemy_fps.value), _enemy_loop.button_pressed, true)
+	ConfigScript.set_anim_pose_pull(path, clip, points)
+	_status.text = "Pose pulled on %s (%d handle%s) — Save over original to bake into PNGs" % [
+		clip, points.size(), "" if points.size() == 1 else "s",
+	]
+
+
+func _on_enemy_save_over_original() -> void:
+	if _enemy_preview == null or not _enemy_preview.has_method("save_over_original"):
+		return
+	var result: Dictionary = _enemy_preview.save_over_original(true)
+	if not bool(result.get("ok", false)):
+		_status.text = str(result.get("error", "Save over original failed"))
+		return
+	var path: String = AIOrchestrator.get_project_path()
+	var clip: String = _enemy_anim.get_item_text(_enemy_anim.selected) if _enemy_anim.item_count > 0 else ""
+	if not path.is_empty() and not clip.is_empty():
+		ConfigScript.set_anim_pose_pull(path, clip, [])
+	var n: int = int(result.get("count", 0))
+	_status.text = "Saved over %d original frame file%s for %s." % [n, "" if n == 1 else "s", clip]
+
+
+func _resolve_clip_frame_textures(project_path: String, clip: String, row: Dictionary) -> Array:
+	return _resolve_clip_frames_pack(project_path, clip, row).get("frames", [])
+
+
+func _resolve_clip_frames_pack(project_path: String, clip: String, row: Dictionary) -> Dictionary:
+	var out: Array = []
+	var paths: Array = []
+	var seen: Dictionary = {}
+	var listed: Variant = row.get("frames", []) if not row.is_empty() else []
+	if typeof(listed) == TYPE_ARRAY:
+		for p in listed:
+			var abs_p: String = _abs_from_res(project_path, str(p))
+			var tex: Texture2D = _load_preview_texture(project_path, str(p))
+			if tex == null:
+				continue
+			var key: String = str(p)
+			if seen.has(key):
+				continue
+			seen[key] = true
+			out.append(tex)
+			paths.append(abs_p)
+	if out.is_empty():
+		var clip_l: String = clip.to_lower()
+		for cat in ["enemy", "sprites", "character"]:
+			for item in LayoutScript.list_category(project_path, cat):
+				if typeof(item) != TYPE_DICTIONARY:
+					continue
+				if str(item.get("kind", "")) != "image":
+					continue
+				var fname: String = str(item.get("name", item.get("res", ""))).get_file().to_lower()
+				if not fname.contains(clip_l):
+					continue
+				var abs_path: String = str(item.get("abs", ""))
+				var tex2: Texture2D = _load_preview_texture(project_path, abs_path)
+				if tex2 == null:
+					continue
+				if seen.has(abs_path):
+					continue
+				seen[abs_path] = true
+				out.append(tex2)
+				paths.append(abs_path)
+	if out.is_empty():
+		var item: Dictionary = _selected_item(_enemy_tex)
+		var abs_tex: String = str(item.get("abs", ""))
+		var fallback: Texture2D = _load_preview_texture(project_path, abs_tex)
+		if fallback != null:
+			out.append(fallback)
+			paths.append(abs_tex)
+	return {"frames": out, "paths": paths}
+
+
+func _abs_from_res(project_path: String, path: String) -> String:
+	if path.is_empty():
+		return ""
+	if path.begins_with("res://"):
+		return project_path.path_join(path.substr(6))
+	if path.begins_with("user://"):
+		return ProjectSettings.globalize_path(path)
+	if path.is_absolute_path():
+		return path
+	return project_path.path_join(path)
+
+
+func _load_preview_texture(project_path: String, path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	var abs_path: String = path
+	if path.begins_with("res://"):
+		abs_path = project_path.path_join(path.substr(6))
+	elif path.begins_with("user://"):
+		abs_path = ProjectSettings.globalize_path(path)
+	if not FileAccess.file_exists(abs_path):
+		return null
+	if not LayoutScript.IMAGE_EXTS.has(abs_path.get_extension().to_lower()):
+		return null
+	var img: Image = Image.new()
+	if img.load(abs_path) != OK:
+		return null
+	return ImageTexture.create_from_image(img)
 
 
 func _selected_item(opt: OptionButton) -> Dictionary:
@@ -630,9 +792,11 @@ func _selected_item(opt: OptionButton) -> Dictionary:
 	return row if typeof(row) == TYPE_DICTIONARY else {}
 
 
-func _preview_from(opt: OptionButton, preview: TextureRect) -> void:
+func _preview_from(opt: OptionButton, preview: Control) -> void:
 	var item: Dictionary = _selected_item(opt)
 	var abs_path: String = str(item.get("abs", ""))
+	if preview.has_method("set_frames"):
+		preview.set_frames([], 8.0, true, false, [])
 	preview.texture = null
 	if abs_path.is_empty() or not FileAccess.file_exists(abs_path):
 		return
@@ -640,7 +804,11 @@ func _preview_from(opt: OptionButton, preview: TextureRect) -> void:
 		return
 	var img: Image = Image.new()
 	if img.load(abs_path) == OK:
-		preview.texture = ImageTexture.create_from_image(img)
+		var tex: ImageTexture = ImageTexture.create_from_image(img)
+		if preview.has_method("set_frames"):
+			preview.set_frames([tex], 8.0, true, false, [abs_path])
+		else:
+			preview.texture = tex
 
 
 func _kinds() -> Dictionary:
