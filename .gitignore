@@ -5,6 +5,14 @@ export_presets.cfg
 *.translation
 generated_games/**
 !generated_games/.gitkeep
+!generated_games/audio_stem_studio/
+!generated_games/audio_stem_studio/**
+generated_games/audio_stem_studio/.godot/
+generated_games/audio_stem_studio/build/
+generated_games/audio_stem_studio/.cache/
+generated_games/audio_stem_studio/user_data/
+generated_games/audio_stem_studio/tools/daw_drivers/
+generated_games/audio_stem_studio/**/*.exe
 learned_refs/**
 !learned_refs/.gitkeep
 _stdout.txt
