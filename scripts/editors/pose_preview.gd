@@ -17,6 +17,8 @@ const MAX_PULL := 72.0
 const SCRUB_PX := 14.0
 
 var frames: Array = []
+## Absolute disk paths aligned with `frames` (empty string if unknown).
+var frame_paths: PackedStringArray = PackedStringArray()
 var fps: float = 8.0
 var loop_anim: bool = true
 var playing: bool = false
@@ -41,7 +43,7 @@ var _grab_point_idx: int = -1
 var _last_mouse: Vector2 = Vector2.ZERO
 var _scrub_accum: float = 0.0
 var _was_playing: bool = false
-var _hint: String = "Drag ↕ pull pose · ↔ scrub frames · right-click reset"
+var _hint: String = "Drag ↕ pull pose · ↔ scrub · right-click reset · Save over original"
 
 
 func _ready() -> void:
@@ -51,11 +53,17 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func set_frames(new_frames: Array, new_fps: float = 8.0, new_loop: bool = true, autoplay: bool = true) -> void:
+func set_frames(new_frames: Array, new_fps: float = 8.0, new_loop: bool = true, autoplay: bool = true, paths: Array = []) -> void:
 	frames = []
+	frame_paths = PackedStringArray()
 	for f in new_frames:
 		if f is Texture2D:
 			frames.append(f)
+	for i in frames.size():
+		var p := ""
+		if i < paths.size():
+			p = str(paths[i])
+		frame_paths.append(p)
 	fps = new_fps
 	loop_anim = new_loop
 	frame_index = 0
@@ -95,6 +103,93 @@ func reset_pose() -> void:
 
 func set_playing(on: bool) -> void:
 	playing = on and frames.size() > 1
+
+
+## Bake the current pose warp into the original image file(s) on disk.
+## all_frames=true writes every clip frame; false writes only the current pose.
+func save_over_original(all_frames: bool = true) -> Dictionary:
+	if frames.is_empty():
+		return {"ok": false, "error": "No frames to save", "saved": PackedStringArray()}
+	if pull_points.is_empty():
+		return {"ok": false, "error": "Nothing to bake — pull the image first", "saved": PackedStringArray()}
+	var rect: Rect2 = _image_rect()
+	if rect.size.x <= 1.0 or rect.size.y <= 1.0:
+		# Fallback scale if control not laid out yet.
+		rect = Rect2(Vector2.ZERO, Vector2(256, 256))
+	var saved: PackedStringArray = PackedStringArray()
+	var indices: Array = []
+	if all_frames:
+		for i in frames.size():
+			indices.append(i)
+	else:
+		indices.append(frame_index)
+	for i in indices:
+		if i < 0 or i >= frames.size():
+			continue
+		var tex: Texture2D = frames[i]
+		if tex == null:
+			continue
+		var abs_path: String = frame_paths[i] if i < frame_paths.size() else ""
+		if abs_path.is_empty() or not FileAccess.file_exists(abs_path):
+			continue
+		var baked: Image = bake_warped_image(tex, rect.size)
+		if baked == null:
+			continue
+		var err: Error = baked.save_png(abs_path)
+		if err != OK:
+			continue
+		saved.append(abs_path)
+		# Reload texture from the overwritten original.
+		var reloaded := Image.new()
+		if reloaded.load(abs_path) == OK:
+			frames[i] = ImageTexture.create_from_image(reloaded)
+	if saved.is_empty():
+		return {"ok": false, "error": "No writable original paths (need project frame files)", "saved": saved}
+	# Pulls are now baked into the originals — clear handles.
+	pull_points.clear()
+	if frame_index >= 0 and frame_index < frames.size():
+		_texture = frames[frame_index]
+	queue_redraw()
+	pose_changed.emit(get_pull_points())
+	return {"ok": true, "saved": saved, "count": saved.size()}
+
+
+func bake_warped_image(tex: Texture2D, display_size: Vector2 = Vector2.ZERO) -> Image:
+	if tex == null:
+		return null
+	var src: Image = tex.get_image()
+	if src == null:
+		return null
+	if src.get_format() != Image.FORMAT_RGBA8:
+		src.convert(Image.FORMAT_RGBA8)
+	var w: int = src.get_width()
+	var h: int = src.get_height()
+	if w <= 0 or h <= 0:
+		return null
+	var disp: Vector2 = display_size
+	if disp.x <= 1.0 or disp.y <= 1.0:
+		disp = Vector2(float(w), float(h))
+	var sx: float = float(w) / disp.x
+	var sy: float = float(h) / disp.y
+	var out := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	out.fill(Color(0, 0, 0, 0))
+	for i in STRIPS:
+		var v_mid: float = (float(i) + 0.5) / float(STRIPS)
+		var offset: Vector2 = _sample_pull(v_mid)
+		var ox: int = int(round(offset.x * sx))
+		var oy: int = int(round(offset.y * sy))
+		var y0: int = int(float(i) * float(h) / float(STRIPS))
+		var y1: int = int(float(i + 1) * float(h) / float(STRIPS))
+		for y in range(y0, y1):
+			var dy: int = y + oy
+			if dy < 0 or dy >= h:
+				continue
+			for x in range(w):
+				var dx: int = x + ox
+				if dx < 0 or dx >= w:
+					continue
+				out.set_pixel(dx, dy, src.get_pixel(x, y))
+	return out
 
 
 func _process(delta: float) -> void:

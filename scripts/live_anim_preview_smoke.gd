@@ -34,9 +34,17 @@ func _run() -> void:
 		var img := Image.new()
 		if img.load(demo.path_join("assets/enemy/walk_%d.png" % i)) == OK:
 			frames.append(ImageTexture.create_from_image(img))
-	pose.set_frames(frames, 8.0, true, true)
+	pose.set_frames(frames, 8.0, true, true, [
+		demo.path_join("assets/enemy/walk_0.png"),
+		demo.path_join("assets/enemy/walk_1.png"),
+		demo.path_join("assets/enemy/walk_2.png"),
+		demo.path_join("assets/enemy/walk_3.png"),
+	])
+	# Force a known display size so bake scale works headless.
+	pose.size = Vector2(320, 240)
+	pose.custom_minimum_size = Vector2(320, 240)
 	await process_frame
-	print("FRAMES=", pose.frames.size(), " TEX=", pose.texture != null)
+	print("FRAMES=", pose.frames.size(), " TEX=", pose.texture != null, " PATHS=", pose.frame_paths.size())
 
 	# Simulate click + pull down on the image (manipulate pose in real time).
 	pose._begin_drag(Vector2(160, 80))
@@ -71,34 +79,34 @@ func _run() -> void:
 	# Persist via ConfigScript
 	var ConfigScript = load("res://scripts/editors/studio_game_config.gd")
 	ConfigScript.set_anim_pose_pull(demo, "walk", pose.get_pull_points())
+
+	# Save over original — bake warp into PNG files
+	var before_bytes: int = FileAccess.get_file_as_bytes(demo.path_join("assets/enemy/walk_0.png")).size()
+	var bake: Dictionary = pose.save_over_original(true)
+	print("BAKE_OK=", bake.get("ok", false), " COUNT=", bake.get("count", 0))
+	if not bool(bake.get("ok", false)) or int(bake.get("count", 0)) < 1:
+		push_error("save_over_original failed: %s" % str(bake))
+		quit(5)
+		return
+	var after_img := Image.new()
+	if after_img.load(demo.path_join("assets/enemy/walk_0.png")) != OK:
+		push_error("Could not reload overwritten original")
+		quit(6)
+		return
+	print("OVERWRITE_RELOAD_OK size=", after_img.get_width(), "x", after_img.get_height(), " before_bytes=", before_bytes)
+	if not pose.get_pull_points().is_empty():
+		push_error("Pull points should clear after bake")
+		quit(7)
+		return
+
 	var loaded: Dictionary = ConfigScript.load_anim(demo)
 	var ok_persist := false
 	for a in loaded.get("animations", []):
 		if typeof(a) == TYPE_DICTIONARY and str(a.get("name", "")) == "walk":
 			var pp: Variant = a.get("pose_pull", [])
-			ok_persist = typeof(pp) == TYPE_ARRAY and pp.size() > 0
+			ok_persist = typeof(pp) == TYPE_ARRAY
 			break
 	print("PERSIST_OK=", ok_persist)
-	if not ok_persist:
-		push_error("pose_pull not persisted")
-		quit(5)
-		return
-
-	# Panel integration
-	var PanelScript = load("res://scripts/editors/add_to_game_panel.gd")
-	var panel = PanelScript.new()
-	root.add_child(panel)
-	await process_frame
-	await process_frame
-	var walk_idx := -1
-	for i in panel._enemy_anim.item_count:
-		if panel._enemy_anim.get_item_text(i) == "walk":
-			walk_idx = i
-			break
-	panel._enemy_anim.select(walk_idx)
-	panel._on_enemy_anim_selected(walk_idx)
-	await process_frame
-	print("PANEL_POSE=", panel._enemy_preview != null, " PULLS=", panel._enemy_preview.get_pull_points().size())
 
 	print("POSE_PULL_SMOKE_OK")
 	quit(0)

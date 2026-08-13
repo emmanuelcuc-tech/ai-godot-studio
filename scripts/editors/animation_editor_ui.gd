@@ -169,6 +169,11 @@ func _build() -> void:
 		_status.text = "Preview %s" % ("playing" if _preview.playing else "paused — drag to manipulate")
 	)
 	pose_row.add_child(play_pose)
+	var save_orig: Button = Button.new()
+	save_orig.text = "Save over original"
+	save_orig.tooltip_text = "Bake the pulled pose into the original frame PNG files on disk (overwrites them)."
+	save_orig.pressed.connect(_on_save_over_original)
+	pose_row.add_child(save_orig)
 	var fr_l: Label = Label.new()
 	fr_l.text = "Sprite frames (res:// paths)"
 	right.add_child(fr_l)
@@ -242,10 +247,14 @@ func _on_select(idx: int) -> void:
 func _play_selected_live() -> void:
 	var path: String = AIOrchestrator.get_project_path()
 	var texes: Array = []
+	var paths: Array = []
 	for i in _frames.item_count:
-		var tex: Texture2D = _load_frame_texture(path, _frames.get_item_text(i))
+		var rel: String = _frames.get_item_text(i)
+		var abs_path: String = _resolve_abs(path, rel)
+		var tex: Texture2D = _load_frame_texture(path, rel)
 		if tex != null:
 			texes.append(tex)
+			paths.append(abs_path)
 	_live_fps = float(_fps.value)
 	_live_loop = _loop.button_pressed
 	if _preview == null:
@@ -254,15 +263,38 @@ func _play_selected_live() -> void:
 	var idxs: PackedInt32Array = _list.get_selected_items()
 	if idxs.size() > 0 and idxs[0] < _anims.size() and typeof(_anims[idxs[0]]) == TYPE_DICTIONARY:
 		pull = _anims[idxs[0]].get("pose_pull", [])
-	_preview.set_frames(texes, _live_fps, _live_loop, true)
+	_preview.set_frames(texes, _live_fps, _live_loop, true, paths)
 	if typeof(pull) == TYPE_ARRAY:
 		_preview.set_pull_points(pull)
 	if texes.is_empty():
 		_preview_caption.text = "Live pose preview — no frames on this clip yet"
 		return
-	_preview_caption.text = "Live pose: %s (%d frames) — pull ↕ to warp, drag ↔ to scrub" % [
+	_preview_caption.text = "Live pose: %s (%d frames) — pull ↕ · scrub ↔ · Save over original" % [
 		_name_edit.text.strip_edges(), texes.size(),
 	]
+
+
+func _on_save_over_original() -> void:
+	if _preview == null or not _preview.has_method("save_over_original"):
+		return
+	var result: Dictionary = _preview.save_over_original(true)
+	if not bool(result.get("ok", false)):
+		_status.text = str(result.get("error", "Save over original failed"))
+		return
+	# Clear pose_pull in the clip — it's baked into the PNGs now.
+	var idxs: PackedInt32Array = _list.get_selected_items()
+	if idxs.size() > 0 and idxs[0] < _anims.size() and typeof(_anims[idxs[0]]) == TYPE_DICTIONARY:
+		var row: Dictionary = _anims[idxs[0]]
+		row["pose_pull"] = []
+		_anims[idxs[0]] = row
+		_persist()
+	var saved: Variant = result.get("saved", PackedStringArray())
+	var n: int = int(result.get("count", 0))
+	_status.text = "Saved over %d original frame file%s." % [n, "" if n == 1 else "s"]
+	if typeof(saved) == TYPE_PACKED_STRING_ARRAY:
+		for p in saved:
+			_status.text += "\n• %s" % str(p).get_file()
+	_play_selected_live()
 
 
 func _on_pose_pulled(points: Array) -> void:
@@ -274,7 +306,7 @@ func _on_pose_pulled(points: Array) -> void:
 	var row: Dictionary = _anims[idxs[0]]
 	row["pose_pull"] = points
 	_anims[idxs[0]] = row
-	_status.text = "Pose updated live (%d pull point%s) — Apply to save into game." % [
+	_status.text = "Pose updated live (%d pull%s) — Save over original to bake into PNGs." % [
 		points.size(), "" if points.size() == 1 else "s",
 	]
 
@@ -287,14 +319,22 @@ func _stop_live_preview() -> void:
 		_preview.texture = null
 
 
+func _resolve_abs(project_path: String, path: String) -> String:
+	if path.is_empty():
+		return ""
+	if path.begins_with("res://"):
+		return project_path.path_join(path.substr(6))
+	if path.begins_with("user://"):
+		return ProjectSettings.globalize_path(path)
+	if path.is_absolute_path():
+		return path
+	return project_path.path_join(path)
+
+
 func _load_frame_texture(project_path: String, path: String) -> Texture2D:
 	if path.is_empty():
 		return null
-	var abs_path: String = path
-	if path.begins_with("res://"):
-		abs_path = project_path.path_join(path.substr(6))
-	elif path.begins_with("user://"):
-		abs_path = ProjectSettings.globalize_path(path)
+	var abs_path: String = _resolve_abs(project_path, path)
 	if not FileAccess.file_exists(abs_path):
 		return null
 	if not LayoutScript.IMAGE_EXTS.has(abs_path.get_extension().to_lower()):
