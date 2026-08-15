@@ -11,5 +11,7 @@
 	<string>Aim a cannon and fire a chrome ball through five spaced glass panes. Real kinetic energy, shard destruction, and slow-motion flight.</string>
 	<key>Author</key>
 	<string>AI Godot Studio / Codea</string>
+	<key>Name</key>
+	<string>ChromeCannonGlass</string>
 </dict>
 </plist>
