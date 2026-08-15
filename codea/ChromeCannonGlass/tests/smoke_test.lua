@@ -1,0 +1,64 @@
+-- Headless smoke test for Chrome Cannon Glass math helpers.
+-- Run: lua5.4 codea/ChromeCannonGlass/tests/smoke_test.lua
+
+package.path = package.path .. ";./codea/ChromeCannonGlass/?.lua;../?.lua"
+
+local here = (arg and arg[0] and arg[0]:match("(.*/)") or "./")
+dofile(here .. "../Glass.lua")
+
+local fails = 0
+local function check(name, cond, detail)
+    if cond then
+        print("OK  " .. name)
+    else
+        fails = fails + 1
+        print("FAIL " .. name .. (detail and (" — " .. detail) or ""))
+    end
+end
+
+-- Kinetic energy
+check("KE of rest is 0", Glass.kineticEnergy(2, 0) == 0)
+check("KE formula 1/2 m v^2", math.abs(Glass.kineticEnergy(2, 10) - 100) < 1e-9)
+check("speed from velocity", math.abs(Glass.speedFromVelocity(3, 4) - 5) < 1e-9)
+check("circle mass positive", Glass.circleMass(2.2, 16) > 1000)
+
+-- Energy loss after shatter
+local m = 10
+local v0 = 100
+local ke0 = Glass.kineticEnergy(m, v0)
+local v1 = Glass.speedAfterEnergyLoss(m, v0, ke0 * 0.5)
+check("speed drops after energy loss", v1 < v0 and v1 > 0)
+check("half KE => speed / sqrt(2)", math.abs(v1 - v0 / math.sqrt(2)) < 1e-6)
+
+-- Shatter threshold
+check("shatter when KE high", Glass.shouldShatter(200000, 180000, 1) == true)
+check("no shatter when KE low", Glass.shouldShatter(1000, 180000, 1) == false)
+
+-- Five panes spaced apart
+local xs = Glass.panePositions(5, 200, 115)
+check("five panes", #xs == 5)
+check("first pane x", xs[1] == 200)
+check("spacing", xs[2] - xs[1] == 115 and xs[5] - xs[4] == 115)
+check("last pane far from first", xs[5] - xs[1] == 460)
+
+-- Shard velocities
+local shards = Glass.shardVelocities(14, 800, 50, 50000, 0.08)
+check("shard count", #shards == 14)
+check("shards have outward motion", shards[1].vx ~= 0 or shards[1].vy ~= 0)
+
+-- Slow-mo corridor
+check("ready = full speed", Glass.slowMoFactor(100, 200, 600, false, 0, 5) == 1)
+check("in corridor = slow", Glass.slowMoFactor(300, 200, 600, true, 0, 5) < 0.35)
+check("past corridor = full", Glass.slowMoFactor(800, 200, 600, true, 5, 5) == 1)
+
+-- Cannon muzzle / velocity
+local mx, my = Glass.cannonMuzzle(0, 0, 0, 78)
+check("muzzle along +x", math.abs(mx - 78) < 1e-9 and math.abs(my) < 1e-9)
+local vx, vy = Glass.muzzleVelocity(0, 980)
+check("muzzle vel right", math.abs(vx - 980) < 1e-9 and math.abs(vy) < 1e-9)
+
+if fails > 0 then
+    print("\n" .. fails .. " failure(s)")
+    os.exit(1)
+end
+print("\nAll smoke checks passed.")
