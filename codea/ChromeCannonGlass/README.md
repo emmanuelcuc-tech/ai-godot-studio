@@ -2,20 +2,22 @@
 
 Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spaced glass panes** with real **kinetic energy**, **shard destruction**, and **slow-motion** flight.
 
-## Install on iPad (Codea)
+## Download & load (easiest)
 
-1. Open **Codea** on your iPad.
-2. Tap **+** → **New Project** → name it `ChromeCannonGlass`.
-3. Clear the default `Main` buffer.
-4. Copy from this folder:
-   - `Main.lua` → buffer **Main**
-   - `Glass.lua` → add a new buffer named **Glass** (sidebar **+**) and paste
-5. Project **Info** / `Info.plist` buffer order: **Main**, then **Glass**.
-6. Tap **Play**. Use landscape.
+1. Download **[`codea/dist/ChromeCannonGlass.codea.zip`](../dist/ChromeCannonGlass.codea.zip)** (also on the PR / release artifacts).
+2. On your iPad, unzip so you get a folder named **`ChromeCannonGlass.codea`**.
+3. Open the **Files** app → **On My iPad** → **Codea**.
+4. Copy **`ChromeCannonGlass.codea`** into that Codea folder (Share → Save to Files, or drag).
+5. Open **Codea** — the project shows on the home screen.
+6. Tap it → **Play** (landscape).
 
-### Files app / Working Copy
+> The `.codea` folder name matters — Codea treats folders ending in `.codea` as projects.
 
-Copy the whole `ChromeCannonGlass` folder into Codea’s Documents if you sync projects that way.
+## Manual paste (alternate)
+
+1. Open **Codea** → **+** → **New Project** → `ChromeCannonGlass`.
+2. Paste `Main.lua` → **Main**, `Glass.lua` → new buffer **Glass**.
+3. Buffer order: **Main**, then **Glass** → Play.
 
 ## Controls (iPad)
 
@@ -42,7 +44,10 @@ Copy the whole `ChromeCannonGlass` folder into Codea’s Documents if you sync p
 
 ## Files
 
-- `Main.lua` — cannon, aim, fire, slow-mo, drawing, HUD
-- `Glass.lua` — kinetic energy, pane layout, shard velocities, slow-mo factor
-- `Info.plist` — Codea project metadata / buffer order
-- `tests/smoke_test.lua` — headless math checks (`lua5.4 tests/smoke_test.lua`)
+| Path | Purpose |
+|------|---------|
+| `codea/dist/ChromeCannonGlass.codea.zip` | **Download this** → unzip → drop into Codea |
+| `codea/dist/ChromeCannonGlass.codea/` | Unzipped project package |
+| `Main.lua` / `Glass.lua` | Source buffers |
+| `Info.plist` | Buffer order + metadata |
+| `tests/smoke_test.lua` | Headless math checks |

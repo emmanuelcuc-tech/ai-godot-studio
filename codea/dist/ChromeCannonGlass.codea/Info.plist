@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Buffer Order</key>
+	<array>
+		<string>Main</string>
+		<string>Glass</string>
+	</array>
+	<key>Description</key>
+	<string>Aim a cannon and fire a chrome ball through five spaced glass panes. Real kinetic energy, shard destruction, and slow-motion flight.</string>
+	<key>Author</key>
+	<string>AI Godot Studio / Codea</string>
+</dict>
+</plist>
