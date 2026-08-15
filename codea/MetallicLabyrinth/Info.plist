@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Buffer Order</key>
+	<array>
+		<string>Main</string>
+		<string>Levels</string>
+	</array>
+	<key>Description</key>
+	<string>Tilt the iPad to roll a metallic ball through a labyrinth. Reach the green goal — traps sit right beside it.</string>
+	<key>Author</key>
+	<string>AI Godot Studio / Codea</string>
+</dict>
+</plist>
