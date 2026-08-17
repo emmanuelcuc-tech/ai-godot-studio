@@ -32,7 +32,11 @@ EOF
   echo "wrote $path"
 }
 
-# Shell launcher on Desktop (double-click even if .desktop is untrusted).
+# Saved desktop mixer snapshot (also copied to ~/Desktop).
+if [[ -f "$ROOT/saves/audio_studio_1.0.1_desktop.cfg" ]]; then
+  cp -f "$ROOT/saves/audio_studio_1.0.1_desktop.cfg" "$DESKTOP/Audio Studio 1.0.1 desktop.cfg"
+  echo "wrote $DESKTOP/Audio Studio 1.0.1 desktop.cfg"
+fi
 cat > "$DESKTOP/Launch Audio Studio.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail

@@ -384,6 +384,8 @@ func _save() -> void:
 	cfg.set_value("meta", "high_performance", 1 if high_performance else 0)
 	cfg.set_value("meta", "page", page)
 	cfg.set_value("meta", "version", MixerBus.VERSION)
+	cfg.set_value("meta", "release", MixerBus.RELEASE)
+	cfg.set_value("meta", "neon_step_sec", MixerBus.NEON_STEP_SEC)
 	cfg.save(SAVE_PATH)
 
 
