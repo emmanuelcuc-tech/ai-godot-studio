@@ -1,4 +1,4 @@
-# Chrome Cannon Glass (Codea / iPad)
+# Chrome Cannon Glass (Codea / iPad) — **1.0.0 final**
 
 Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spaced glass panes** with real **kinetic energy**, **shard destruction**, and **slow-motion** flight.
 
@@ -31,16 +31,16 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 | **FIRE** button | Shoot chrome ball |
 | **Tab** or **Space** (hardware keyboard) | Shoot |
 | **RESET** button or **R** | Reload panes + ball |
+| **RESTART** button or **F** | Save high performance, then restart PLAY (final 1.0.0) |
 | **SETTINGS** tab | Opens audio settings |
 | **INPUT AUDIO** tab (or **I**) | Mic / input gain — twist INPUT knob or fader |
 | **OUTPUT AUDIO** tab (or **O**) | Speaker / output — twist OUTPUT and FX knobs |
 | **SET ALL 80%** | All faders including Master → unity (0.8) |
-| **Tab** | Shoot on PLAY · back to PLAY from MIXER |
-| **RESET** button or **R** | Reload panes + ball |
 | **Describe to song or audio** | Tap the field next to Record melody / Hum instrument, type a prompt |
 | **RECORD MELODY** | Mic-capture ~3.6s of notes, then play them back |
 | **HUM INSTRUMENT** | Hold a hummed tone to make a playback instrument |
-| Sidebar **HighPerformance** | On = GPU/RAM pool + heavier physics (saved) |
+| Sidebar **Save Settings** or **H** | Save in high performance mode |
+| Sidebar **Save & Restart** | Save final 1.0.0, then restart PLAY |
 | **Yell into mic** | Red MIC lamp flashes / stays lit; IN column height = volume |
 | **FIRE / playback** | OUT column height = speaker volume |
 
@@ -58,7 +58,7 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 - **GPU/RAM pool** — 2× leather atlas, bloom ping-pong, glow, and scratch textures (tens of MB of VRAM)
 - Tweaking **any mixer fader** always **resets** the screen glass
 - **Save / Load** (sidebar + auto-save on mixer tweak / exit) — **Save** always stores **high performance mode**
-- Touch-friendly FIRE / RESET for iPad (no keyboard required)
+- Touch-friendly **FIRE** / **RESET** / **RESTART** (save & restart final 1.0.0)
 
 FL Studio scripts (repaired `import general` vs `flpianoroll`): `flstudio/ChromeCannonGlass/`
 

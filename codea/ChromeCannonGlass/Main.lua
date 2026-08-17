@@ -11,11 +11,13 @@
 --   SETTINGS tab → Input Audio / Output Audio
 --   Describe to song or audio · Record melody · Hum instrument
 --   MIXER tab for FL-style Master + all channel volumes
---   Save Settings stores everything in high performance mode
+--   Save & Restart (Final) stores high performance and boots PLAY 1.0.0
 --   Tweaking any mixer fader resets the screen glass
 --   Yell into mic or crank Master/OUT + fire to break the screen glass
 
 DISPLAYED_NAME = "Chrome Cannon Glass"
+APP_VERSION = "1.0.0"
+APP_RELEASE = "final"
 
 -- Tunables
 BALL_RADIUS = 16
@@ -130,8 +132,11 @@ function setup()
     end)
     parameter.action("Save Settings", function()
         saveInHighPerformanceMode()
-        message = "Saved in high performance mode"
+        message = "Saved in high performance mode · " .. Mixer.finalLabel()
         messageTimer = 1.6
+    end)
+    parameter.action("Save & Restart", function()
+        saveRestartFinal()
     end)
     parameter.action("Load Settings", function()
         loadAllSettings()
@@ -155,6 +160,9 @@ function setup()
     applyPerformanceMode(HighPerformance)
     GpuMegabytes = string.format("%.1f", GpuRam.megabytes(WIDTH, HEIGHT))
     parameter.watch("GpuMegabytes")
+    saveAllSettings()
+    message = "Final " .. Mixer.finalLabel() .. " — saved"
+    messageTimer = 2.4
 end
 
 function startMic()
@@ -179,6 +187,32 @@ end
 function saveInHighPerformanceMode()
     applyPerformanceMode(true)
     saveAllSettings()
+end
+
+function saveRestartFinal()
+    saveInHighPerformanceMode()
+    restartFromSave()
+end
+
+function restartFromSave()
+    if editingPrompt then
+        stopDescribeEdit()
+    end
+    captureMode = nil
+    captureSamples = {}
+    melodyQueue = nil
+    melodyIndex = 1
+    mixerDrag = nil
+    knobDrag = nil
+    aiming = false
+    loadAllSettings()
+    syncGainsFromMixer()
+    applyPerformanceMode(true)
+    uiPage, settingsTab = Mixer.restartPage()
+    resetScreenGlass()
+    resetScene()
+    message = "Final " .. Mixer.finalLabel() .. " — saved & restarted"
+    messageTimer = 2.4
 end
 
 function applyPerformanceMode(high)
@@ -206,6 +240,8 @@ function saveAllSettings()
         saveProjectData("neonSpeed", Mixer.NEON_SPEED or 0.2)
         saveProjectData("highPerformance", HighPerformance and 1 or 0)
         saveProjectData("songPrompt", songPrompt or "")
+        saveProjectData("version", Mixer.VERSION)
+        saveProjectData("release", Mixer.RELEASE)
     end)
 end
 
@@ -744,6 +780,10 @@ function touched(touch)
             resetScene()
             return
         end
+        if hitButton(touch, restartBtn()) then
+            saveRestartFinal()
+            return
+        end
         -- Aim if touching left half / near cannon
         if touch.x < WIDTH * 0.45 or dist(touch.x, touch.y, cannonPos.x, cannonPos.y) < 160 then
             aiming = true
@@ -800,8 +840,10 @@ function keyboard(key)
         if uiPage == "play" then fireCannon() end
     elseif key == "h" or key == "H" then
         saveInHighPerformanceMode()
-        message = "Saved in high performance mode"
+        message = "Saved in high performance mode · " .. Mixer.finalLabel()
         messageTimer = 1.6
+    elseif key == "f" or key == "F" then
+        saveRestartFinal()
     elseif key == "r" or key == "R" then
         resetScene()
     elseif key == "w" or key == "W" then
@@ -825,6 +867,10 @@ end
 
 function resetBtn()
     return { x = WIDTH - 290, y = 28, w = 120, h = 52 }
+end
+
+function restartBtn()
+    return { x = WIDTH - 430, y = 28, w = 120, h = 52 }
 end
 
 function playTabBtn()
@@ -1299,7 +1345,7 @@ end
 function drawHUD()
     textAlign(LEFT)
     textMode(CORNER)
-    neonText("Chrome Cannon Glass", 22, HEIGHT - 34, 24)
+    neonText("Chrome Cannon Glass  ·  " .. Mixer.finalLabel(), 22, HEIGHT - 34, 24)
     neonText(string.format(
         "Aim · FIRE/Tab · panes %d/%d · KE %.0f · IN %.2f OUT %.2f · %s · GPU %.0fMB",
         brokenCount, PANE_COUNT, lastKe, inputLevel, outputLevel,
@@ -1318,11 +1364,14 @@ function drawHUD()
 end
 
 function drawButtons()
-    local f, r = fireBtn(), resetBtn()
+    local f, r, rs = fireBtn(), resetBtn(), restartBtn()
     fill(12, 8, 8, 220)
-    rect(r.x, r.y, r.w, r.h, 10)
+    rect(rs.x, rs.y, rs.w, rs.h, 10)
     textAlign(CENTER)
     textMode(CENTER)
+    neonText("RESTART", rs.x + rs.w * 0.5, rs.y + rs.h * 0.5, 16)
+    fill(12, 8, 8, 220)
+    rect(r.x, r.y, r.w, r.h, 10)
     neonText("RESET", r.x + r.w * 0.5, r.y + r.h * 0.5, 18)
     if state == "ready" then
         fill(40, 8, 12, 230)

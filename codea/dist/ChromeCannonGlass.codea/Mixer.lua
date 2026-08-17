@@ -8,6 +8,16 @@ Mixer.CHANNELS = { "input", "output", "fire", "hit", "glass" }
 Mixer.STRIPS = { "input", "output", "fire", "hit", "glass", "master" }
 Mixer.PAGES = { "play", "settings", "mixer" }
 Mixer.SETTINGS_TABS = { "input", "output" }
+Mixer.VERSION = "1.0.0"
+Mixer.RELEASE = "final"
+
+function Mixer.finalLabel()
+    return Mixer.VERSION .. " " .. Mixer.RELEASE
+end
+
+function Mixer.restartPage()
+    return "play", "input"
+end
 
 function Mixer.isPage(id)
     for _, p in ipairs(Mixer.PAGES) do

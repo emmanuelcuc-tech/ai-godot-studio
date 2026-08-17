@@ -9,8 +9,10 @@
 		<string>Mixer</string>
 		<string>GpuRam</string>
 	</array>
+	<key>Version</key>
+	<string>1.0.0 final</string>
 	<key>Description</key>
-	<string>Chrome cannon with slow neon color, GPU/RAM texture pool, SETTINGS tabs for Input Audio and Output Audio, and screen glass that shatters when input/output is too loud.</string>
+	<string>Chrome Cannon Glass 1.0.0 final — chrome cannon, Input/Output settings, describe-to-song, high-performance GPU save &amp; restart.</string>
 	<key>Author</key>
 	<string>AI Godot Studio / Codea</string>
 	<key>Name</key>

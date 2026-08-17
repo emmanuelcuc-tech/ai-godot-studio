@@ -176,6 +176,11 @@ local hum = Mixer.humInstrument({ { amp = 0.6, freq = 220 }, { amp = 0.5, freq =
 check("hum instrument has pitch", hum.midi ~= nil and hum.peak >= 0.5)
 check("describe placeholder", Mixer.DESCRIBE_PLACEHOLDER == "Describe to song or audio")
 check("describe clip", Mixer.clipDescribe("abc", 2) == "ab")
+check("final version is 1.0.0", Mixer.VERSION == "1.0.0")
+check("release is final", Mixer.RELEASE == "final")
+check("final label", Mixer.finalLabel() == "1.0.0 final")
+local rp, rt = Mixer.restartPage()
+check("restart returns to play / input", rp == "play" and rt == "input")
 
 if fails > 0 then
     print("\n" .. fails .. " failure(s)")
