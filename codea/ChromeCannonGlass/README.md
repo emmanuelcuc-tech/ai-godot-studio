@@ -37,7 +37,8 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 | **SET ALL 80%** | All faders including Master → unity (0.8) |
 | **Tab** | Shoot on PLAY · back to PLAY from MIXER |
 | **RESET** button or **R** | Reload panes + ball |
-| Sidebar **LoudnessBreak** | How loud is “too loud” |
+| Sidebar **Save Settings** or **H** | Save everything **in high performance mode** |
+| Sidebar **HighPerformance** | On = GPU/RAM pool + heavier physics (saved) |
 | **Yell into mic** | Red MIC lamp flashes / stays lit; IN column height = volume |
 | **FIRE / playback** | OUT column height = speaker volume |
 
@@ -54,7 +55,7 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 - **Neon tube type** cycling bright blue → pink → red (**slow**, ~31s per cycle; sidebar **NeonSpeed**)
 - **GPU/RAM pool** — 2× leather atlas, bloom ping-pong, glow, and scratch textures (tens of MB of VRAM)
 - Tweaking **any mixer fader** always **resets** the screen glass
-- **Save / Load** (sidebar + auto-save on mixer tweak / exit)
+- **Save / Load** (sidebar + auto-save on mixer tweak / exit) — **Save** always stores **high performance mode**
 - Touch-friendly FIRE / RESET for iPad (no keyboard required)
 
 FL Studio scripts (repaired `import general` vs `flpianoroll`): `flstudio/ChromeCannonGlass/`

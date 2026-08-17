@@ -13,4 +13,5 @@ Tabs: PLAY · SETTINGS · MIXER.
 SETTINGS has two tabs: INPUT AUDIO (mic) and OUTPUT AUDIO (speaker).
 Twist knobs on those tabs to set mic and speaker volume.
 Sidebar NeonSpeed slows/speeds the tube color. GpuMegabytes shows the texture pool.
-Sidebar Save / Load stores mixer volumes. Tweaking any fader resets screen glass.
+Sidebar Save Settings (or H) stores mixer + neon in high performance mode.
+HighPerformance stays on after save/load. Tweaking any fader resets screen glass.

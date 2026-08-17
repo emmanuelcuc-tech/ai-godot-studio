@@ -3,15 +3,59 @@
 -- RAM / video-memory working set (leather atlas, bloom ping-pong, glow).
 
 GpuRam = {}
-GpuRam.LEATHER_MAX = 2048
-GpuRam.BLOOM_SIZE = 1024
-GpuRam.SCRATCH_COUNT = 4
-GpuRam.GRAIN_COUNT = 10000
-GpuRam.CHROME_STEPS = 24
+GpuRam.PROFILES = {
+    high = {
+        leatherMax = 2048,
+        bloomSize = 1024,
+        scratchCount = 4,
+        grainCount = 10000,
+        chromeSteps = 24,
+        physicsVel = 20,
+        physicsPos = 16,
+        bloomPasses = true,
+    },
+    normal = {
+        leatherMax = 1024,
+        bloomSize = 512,
+        scratchCount = 1,
+        grainCount = 2500,
+        chromeSteps = 8,
+        physicsVel = 14,
+        physicsPos = 10,
+        bloomPasses = false,
+    },
+}
 GpuRam.ready = false
 GpuRam.bytes = 0
 GpuRam.width = 0
 GpuRam.height = 0
+GpuRam.profile = "high"
+
+function GpuRam.isHigh(flag)
+    if flag == false or flag == 0 or flag == "0" or flag == "false" or flag == "normal" then
+        return false
+    end
+    return true
+end
+
+function GpuRam.applyProfile(name)
+    if name ~= "normal" then
+        name = "high"
+    end
+    local p = GpuRam.PROFILES[name]
+    GpuRam.profile = name
+    GpuRam.LEATHER_MAX = p.leatherMax
+    GpuRam.BLOOM_SIZE = p.bloomSize
+    GpuRam.SCRATCH_COUNT = p.scratchCount
+    GpuRam.GRAIN_COUNT = p.grainCount
+    GpuRam.CHROME_STEPS = p.chromeSteps
+    GpuRam.bloomPasses = p.bloomPasses
+    GpuRam.physicsVel = p.physicsVel
+    GpuRam.physicsPos = p.physicsPos
+    return name
+end
+
+GpuRam.applyProfile("high")
 
 function GpuRam.leatherSize(w, h)
     w = math.max(64, math.floor(w or 1024))
@@ -180,6 +224,7 @@ function GpuRam.boot(w, h)
     end
     GpuRam.bake()
     GpuRam.bytes = GpuRam.bytesEstimate(w, h)
+    GpuRam.bootedProfile = GpuRam.profile
     GpuRam.ready = true
     return GpuRam.bytes
 end
@@ -190,7 +235,8 @@ function GpuRam.ensure(w, h)
     if w < 64 or h < 64 then
         return
     end
-    if (not GpuRam.ready) or GpuRam.width ~= w or GpuRam.height ~= h then
+    if (not GpuRam.ready) or GpuRam.width ~= w or GpuRam.height ~= h
+        or GpuRam.bootedProfile ~= GpuRam.profile then
         GpuRam.boot(w, h)
     end
 end
@@ -201,17 +247,19 @@ function GpuRam.drawCached()
     end
     spriteMode(CORNER)
     sprite(GpuRam.leather, 0, 0, WIDTH, HEIGHT)
-    pcall(function()
-        if GpuRam.bloomA then
-            tint(255, 255, 255, 10)
-            sprite(GpuRam.bloomA, 0, 0, WIDTH, HEIGHT)
-            noTint()
-        end
-        if GpuRam.bloomB then
-            tint(255, 255, 255, 8)
-            sprite(GpuRam.bloomB, WIDTH * 0.08, HEIGHT * 0.06, WIDTH, HEIGHT)
-            noTint()
-        end
-    end)
+    if GpuRam.bloomPasses then
+        pcall(function()
+            if GpuRam.bloomA then
+                tint(255, 255, 255, 10)
+                sprite(GpuRam.bloomA, 0, 0, WIDTH, HEIGHT)
+                noTint()
+            end
+            if GpuRam.bloomB then
+                tint(255, 255, 255, 8)
+                sprite(GpuRam.bloomB, WIDTH * 0.08, HEIGHT * 0.06, WIDTH, HEIGHT)
+                noTint()
+            end
+        end)
+    end
     return true
 end

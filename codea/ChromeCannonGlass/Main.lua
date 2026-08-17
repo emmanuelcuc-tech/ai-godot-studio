@@ -10,6 +10,7 @@
 --   Tap RESET (or R) after the shot to reload panes + ball
 --   SETTINGS tab → Input Audio / Output Audio
 --   MIXER tab for FL-style Master + all channel volumes
+--   Save Settings stores everything in high performance mode
 --   Tweaking any mixer fader resets the screen glass
 --   Yell into mic or crank Master/OUT + fire to break the screen glass
 
@@ -80,6 +81,7 @@ mixerDrag = nil
 mixerLayoutCache = nil
 knobDrag = nil
 knobLastAng = 0
+HighPerformance = true
 
 function setup()
     supportedOrientations(LANDSCAPE_ANY)
@@ -88,6 +90,7 @@ function setup()
     parameter.number("MuzzleSpeed", 400, 1600, MUZZLE_SPEED)
     parameter.number("LoudnessBreak", 0.15, 1.2, LoudnessBreak)
     parameter.number("NeonSpeed", 0.05, 0.6, Mixer.NEON_SPEED)
+    parameter.boolean("HighPerformance", true)
     parameter.action("Fire Cannon", function()
         fireCannon()
     end)
@@ -115,15 +118,16 @@ function setup()
         messageTimer = 1.8
     end)
     parameter.action("Save Settings", function()
-        saveAllSettings()
-        message = "Settings saved"
-        messageTimer = 1.4
+        saveInHighPerformanceMode()
+        message = "Saved in high performance mode"
+        messageTimer = 1.6
     end)
     parameter.action("Load Settings", function()
         loadAllSettings()
         syncGainsFromMixer()
-        message = "Settings loaded"
-        messageTimer = 1.4
+        applyPerformanceMode(HighPerformance)
+        message = HighPerformance and "Loaded high performance settings" or "Settings loaded"
+        messageTimer = 1.6
     end)
 
     mixVols = Mixer.defaults()
@@ -132,13 +136,12 @@ function setup()
     syncGainsFromMixer()
 
     physics.continuous = true
-    physics.iterations(14, 10)
     physics.pause()
 
     startMic()
     layoutScene()
     resetScene()
-    GpuRam.boot(WIDTH, HEIGHT)
+    applyPerformanceMode(HighPerformance)
     GpuMegabytes = string.format("%.1f", GpuRam.megabytes(WIDTH, HEIGHT))
     parameter.watch("GpuMegabytes")
 end
@@ -154,12 +157,29 @@ function startMic()
 end
 
 function cleanup()
-    saveAllSettings()
+    saveInHighPerformanceMode()
     if mic and mic.stop then
         pcall(function()
             mic.stop()
         end)
     end
+end
+
+function saveInHighPerformanceMode()
+    applyPerformanceMode(true)
+    saveAllSettings()
+end
+
+function applyPerformanceMode(high)
+    HighPerformance = GpuRam.isHigh(high)
+    GpuRam.applyProfile(HighPerformance and "high" or "normal")
+    if physics and physics.iterations then
+        physics.iterations(GpuRam.physicsVel or 20, GpuRam.physicsPos or 16)
+    end
+    if WIDTH and HEIGHT and WIDTH >= 64 then
+        GpuRam.boot(WIDTH, HEIGHT)
+    end
+    GpuMegabytes = string.format("%.1f", GpuRam.megabytes(WIDTH or 1024, HEIGHT or 768))
 end
 
 function saveAllSettings()
@@ -173,6 +193,7 @@ function saveAllSettings()
         saveProjectData("uiPage", uiPage or "play")
         saveProjectData("settingsTab", settingsTab or "input")
         saveProjectData("neonSpeed", Mixer.NEON_SPEED or 0.2)
+        saveProjectData("highPerformance", HighPerformance and 1 or 0)
     end)
 end
 
@@ -196,6 +217,12 @@ function loadAllSettings()
         if ns then
             Mixer.NEON_SPEED = math.max(0.05, math.min(0.6, tonumber(ns) or 0.2))
             NeonSpeed = Mixer.NEON_SPEED
+        end
+        local hp = readProjectData("highPerformance")
+        if hp ~= nil then
+            HighPerformance = GpuRam.isHigh(hp)
+        else
+            HighPerformance = true
         end
     end)
 end
@@ -395,6 +422,13 @@ end
 function draw()
     if NeonSpeed then
         Mixer.NEON_SPEED = NeonSpeed
+    end
+    if HighPerformance ~= nil then
+        local wantHigh = GpuRam.isHigh(HighPerformance)
+        local isHigh = GpuRam.profile == "high"
+        if wantHigh ~= isHigh then
+            applyPerformanceMode(wantHigh)
+        end
     end
     GpuRam.ensure(WIDTH, HEIGHT)
     GpuMegabytes = string.format("%.1f", (GpuRam.bytes or 0) / (1024 * 1024))
@@ -732,6 +766,10 @@ function keyboard(key)
         uiPage = (uiPage == "mixer") and "play" or "mixer"
     elseif key == " " then
         if uiPage == "play" then fireCannon() end
+    elseif key == "h" or key == "H" then
+        saveInHighPerformanceMode()
+        message = "Saved in high performance mode"
+        messageTimer = 1.6
     elseif key == "r" or key == "R" then
         resetScene()
     elseif key == "w" or key == "W" then
@@ -1021,8 +1059,9 @@ function drawHUD()
     textMode(CORNER)
     neonText("Chrome Cannon Glass", 22, HEIGHT - 34, 24)
     neonText(string.format(
-        "Aim · FIRE/Tab · panes %d/%d · KE %.0f · IN %.2f OUT %.2f · GPU %.0fMB",
+        "Aim · FIRE/Tab · panes %d/%d · KE %.0f · IN %.2f OUT %.2f · %s · GPU %.0fMB",
         brokenCount, PANE_COUNT, lastKe, inputLevel, outputLevel,
+        HighPerformance and "HIGH PERF" or "PERF OFF",
         (GpuRam.bytes or 0) / (1024 * 1024)), 22, HEIGHT - 58, 14)
 
     if messageTimer > 0 and message ~= "" then
