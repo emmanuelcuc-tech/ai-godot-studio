@@ -21,6 +21,8 @@ var status_text: String = "Desktop Audio Studio  ·  " + MixerBus.final_label()
 var _knobs: Dictionary = {}
 var _faders: Dictionary = {}
 var _page_btns: Dictionary = {}
+var _cols: Dictionary = {}
+var _page_group: ButtonGroup
 var _describe: LineEdit
 var _status: Label
 var _mic_lamp: ColorRect
@@ -158,7 +160,8 @@ func _build_ui() -> void:
 	describe_lbl.add_theme_font_size_override("font_size", 13)
 	capture.add_child(describe_lbl)
 	_describe = LineEdit.new()
-	_describe.placeholder_text = MixerBus.DESCRIBE_PLACEHOLDER
+	_describe.placeholder_text = "type a song or audio idea…"
+	_describe.custom_minimum_size = Vector2(260, 32)
 	_describe.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_describe.text_changed.connect(func(t: String) -> void: song_prompt = MixerBus.describe_to_song(t))
 	capture.add_child(_describe)
@@ -174,15 +177,17 @@ func _build_ui() -> void:
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 8)
 	root.add_child(tabs)
+	_page_group = ButtonGroup.new()
+	_page_group.allow_unpress = false
 	for id_label in [["mixer", "MIXER"], ["input", "INPUT AUDIO"], ["output", "OUTPUT AUDIO"]]:
 		var b := Button.new()
 		b.text = id_label[1]
 		b.toggle_mode = true
+		b.button_group = _page_group
 		b.button_pressed = id_label[0] == "mixer"
-		var pid: String = id_label[0]
-		b.pressed.connect(func() -> void: _set_page(pid))
+		b.toggled.connect(_on_page_toggled.bind(String(id_label[0])))
 		tabs.add_child(b)
-		_page_btns[pid] = b
+		_page_btns[String(id_label[0])] = b
 
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -242,6 +247,7 @@ func _build_ui() -> void:
 		fd.value_changed.connect(_on_vol.bind(id))
 		col.add_child(fd)
 		_faders[id] = fd
+		_cols[id] = col
 		mix_row.add_child(col)
 
 	var actions := HBoxContainer.new()
@@ -266,19 +272,27 @@ func _build_ui() -> void:
 	actions.add_child(_hp)
 
 
+func _on_page_toggled(on: bool, pid: String) -> void:
+	if on:
+		_set_page(pid)
+
+
 func _set_page(pid: String) -> void:
 	page = pid
 	for id in _page_btns:
-		(_page_btns[id] as Button).button_pressed = (id == pid)
-	# Input page emphasizes IN; output emphasizes OUT/FX; mixer shows all.
+		(_page_btns[id] as Button).set_pressed_no_signal(id == pid)
 	for id in MixerBus.STRIPS:
 		var show := true
 		if pid == "input":
 			show = id == "input"
 		elif pid == "output":
 			show = id != "input"
-		(_knobs[id] as Control).visible = show
-		(_faders[id] as Control).visible = show
+		if _cols.has(id):
+			(_cols[id] as Control).visible = show
+		if _knobs.has(id):
+			(_knobs[id] as Control).visible = show
+		if _faders.has(id):
+			(_faders[id] as Control).visible = show
 	_refresh_status()
 
 
