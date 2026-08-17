@@ -173,3 +173,81 @@ function Glass.screenBurstVelocity(tileX, tileY, cx, cy, loudness)
     local sp = 220 + loudness * 480
     return (dx / len) * sp, (dy / len) * sp + 80
 end
+
+-- Hammer strike: KE = 1/2 m v^2, quadratic falloff from the hit point.
+function Glass.hammerImpact(mass, speed)
+    return Glass.kineticEnergy(mass or 2.4, speed or 720)
+end
+
+function Glass.hammerFalloff(dist, radius)
+    radius = math.max(1, radius or 90)
+    dist = math.max(0, dist or 0)
+    if dist >= radius then
+        return 0
+    end
+    local t = 1 - dist / radius
+    return t * t
+end
+
+function Glass.tileBreakThreshold(tw, th)
+    local area = math.max(1, (tw or 80) * (th or 80))
+    return 90 + area * 0.035
+end
+
+function Glass.hammerBreaksTile(ke, falloff, tw, th)
+    return (ke or 0) * (falloff or 0) >= Glass.tileBreakThreshold(tw, th)
+end
+
+function Glass.tilesInHammerRadius(tiles, hx, hy, radius)
+    local hits = {}
+    radius = radius or 110
+    hx, hy = hx or 0, hy or 0
+    for _, t in ipairs(tiles or {}) do
+        if not t.broken then
+            local dx = (t.x or 0) - hx
+            local dy = (t.y or 0) - hy
+            local dist = math.sqrt(dx * dx + dy * dy)
+            local f = Glass.hammerFalloff(dist, radius)
+            if f > 0 then
+                hits[#hits + 1] = { tile = t, dist = dist, falloff = f }
+            end
+        end
+    end
+    return hits
+end
+
+function Glass.hammerBurstVelocity(tileX, tileY, hx, hy, ke, shardMass)
+    local dx = (tileX or 0) - (hx or 0)
+    local dy = (tileY or 0) - (hy or 0)
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len < 1 then
+        dx, dy, len = 0.25, 1, 1.03
+    end
+    shardMass = math.max(0.001, shardMass or 0.12)
+    local speed = 140
+    if (ke or 0) > 0 then
+        speed = math.sqrt(2 * ke / shardMass) * 0.28 + 90
+    end
+    speed = math.min(880, speed)
+    return (dx / len) * speed, (dy / len) * speed + 55
+end
+
+function Glass.paneHitByHammer(px, py, pw, ph, hx, hy, radius)
+    pw, ph = pw or 10, ph or 220
+    radius = radius or 110
+    local nx = math.max((px or 0) - pw * 0.5, math.min(hx or 0, (px or 0) + pw * 0.5))
+    local ny = math.max((py or 0) - ph * 0.5, math.min(hy or 0, (py or 0) + ph * 0.5))
+    local dx = (hx or 0) - nx
+    local dy = (hy or 0) - ny
+    return dx * dx + dy * dy <= radius * radius
+end
+
+function Glass.countIntact(tiles)
+    local n = 0
+    for _, t in ipairs(tiles or {}) do
+        if not t.broken then
+            n = n + 1
+        end
+    end
+    return n
+end

@@ -13,6 +13,8 @@
 --   MIXER tab for FL-style Master + all channel volumes
 --   Save & Restart (Final) stores high performance and boots PLAY 1.0.0
 --   Tweaking any mixer fader resets the screen glass
+--   Tap / click the glass for a hammer hit at that spot (real KE shards)
+--   GLASS REPAIR restores panes · GLASS REMOVE cracks all glass at once
 --   Yell into mic or crank Master/OUT + fire to break the screen glass
 
 DISPLAYED_NAME = "Chrome Cannon Glass"
@@ -30,8 +32,11 @@ SHATTER_KE = 180000         -- joules-ish (px units); ball must carry enough KE
 SHARD_COUNT = 14
 GRAVITY_Y = -980
 SLOW_MO_BLEND = 0.12        -- how quickly time scale eases
-SCREEN_COLS, SCREEN_ROWS = 8, 5
+SCREEN_COLS, SCREEN_ROWS = 10, 6
 SCREEN_BREAK_COOLDOWN = 0.5 -- seconds after a tweak before loudness can break again
+HAMMER_MASS = 2.4
+HAMMER_SPEED = 720          -- px/s — hammer KE = 1/2 m v^2
+HAMMER_RADIUS = 118
 
 -- Layout
 cannonPos = vec2(0, 0)
@@ -59,6 +64,9 @@ fireFlash = 0
 -- Main-screen glass (covers the display until audio is too loud)
 screenBroken = false
 screenShards = {}
+screenTiles = {}
+screenCracks = {}
+hammerFlashes = {}
 inputLevel, outputLevel = 0, 0
 outputPeak = 0
 loudestSource = "input"
@@ -111,7 +119,13 @@ function setup()
         resetScene()
     end)
     parameter.action("Reset Screen Glass", function()
-        resetScreenGlass()
+        glassRepair()
+    end)
+    parameter.action("Glass Repair", function()
+        glassRepair()
+    end)
+    parameter.action("Glass Remove", function()
+        glassRemoveAll()
     end)
     parameter.action("Input Audio", function()
         openAudioSettings("input")
@@ -508,6 +522,7 @@ function draw()
     drawPanes()
     drawShards()
     drawScreenShards()
+    drawHammerHits()
     if ball then
         drawMetallicBall(ball.x, ball.y, BALL_RADIUS, ball.angle or 0)
     end
@@ -784,10 +799,20 @@ function touched(touch)
             saveRestartFinal()
             return
         end
-        -- Aim if touching left half / near cannon
-        if touch.x < WIDTH * 0.45 or dist(touch.x, touch.y, cannonPos.x, cannonPos.y) < 160 then
+        if hitButton(touch, glassRepairBtn()) then
+            glassRepair()
+            return
+        end
+        if hitButton(touch, glassRemoveBtn()) then
+            glassRemoveAll()
+            return
+        end
+        -- Aim if grabbing the cannon; otherwise hammer the glass at the click
+        if dist(touch.x, touch.y, cannonPos.x, cannonPos.y) < 100 then
             aiming = true
             aimFromTouch(touch)
+        else
+            hammerHit(touch.x, touch.y)
         end
     elseif touch.state == MOVING then
         if knobDrag then
@@ -846,6 +871,10 @@ function keyboard(key)
         saveRestartFinal()
     elseif key == "r" or key == "R" then
         resetScene()
+    elseif key == "g" or key == "G" then
+        glassRepair()
+    elseif key == "x" or key == "X" then
+        glassRemoveAll()
     elseif key == "w" or key == "W" then
         nudgeAim(math.rad(2))
     elseif key == "s" or key == "S" then
@@ -871,6 +900,14 @@ end
 
 function restartBtn()
     return { x = WIDTH - 430, y = 28, w = 120, h = 52 }
+end
+
+function glassRepairBtn()
+    return { x = 22, y = 28, w = 148, h = 52 }
+end
+
+function glassRemoveBtn()
+    return { x = 180, y = 28, w = 148, h = 52 }
 end
 
 function playTabBtn()
@@ -1380,6 +1417,13 @@ function drawButtons()
     end
     rect(f.x, f.y, f.w, f.h, 10)
     neonText("FIRE", f.x + f.w * 0.5, f.y + f.h * 0.5, 18)
+    local rp, rm = glassRepairBtn(), glassRemoveBtn()
+    fill(10, 18, 14, 230)
+    rect(rp.x, rp.y, rp.w, rp.h, 10)
+    neonText("GLASS REPAIR", rp.x + rp.w * 0.5, rp.y + rp.h * 0.5, 13)
+    fill(28, 10, 12, 230)
+    rect(rm.x, rm.y, rm.w, rm.h, 10)
+    neonText("GLASS REMOVE", rm.x + rm.w * 0.5, rm.y + rm.h * 0.5, 13)
 end
 
 function drawPageTabs()
@@ -1777,15 +1821,26 @@ function updateAudioGlass()
         screenBreakCooldown = screenBreakCooldown - dt
         return
     end
-    if tooLoud and not screenBroken then
+    if tooLoud and Glass.countIntact(screenTiles) > 0 then
         shatterScreenGlass(source, math.max(inputLevel, outputLevel))
     end
 end
 
 function resetScreenGlass()
     clearScreenShards()
-    screenBroken = false
+    initScreenTiles()
+    screenCracks = {}
+    hammerFlashes = {}
     screenBreakCooldown = SCREEN_BREAK_COOLDOWN
+end
+
+function initScreenTiles()
+    screenTiles = Glass.screenTileGrid(SCREEN_COLS, SCREEN_ROWS, WIDTH, HEIGHT)
+    for _, t in ipairs(screenTiles) do
+        t.broken = false
+        t.damage = 0
+    end
+    screenBroken = false
 end
 
 function clearScreenShards()
@@ -1795,36 +1850,164 @@ function clearScreenShards()
     screenShards = {}
 end
 
-function shatterScreenGlass(source, loudness)
-    if screenBroken then return end
-    screenBroken = true
-    clearScreenShards()
-    local tiles = Glass.screenTileGrid(SCREEN_COLS, SCREEN_ROWS, WIDTH, HEIGHT)
+function spawnScreenTileShard(tile, hx, hy, ke)
+    if not tile or not physics or not physics.body then
+        return
+    end
+    local body = physics.body(POLYGON,
+        vec2(-tile.w * 0.5, -tile.h * 0.5), vec2(tile.w * 0.5, -tile.h * 0.5),
+        vec2(tile.w * 0.5, tile.h * 0.5), vec2(-tile.w * 0.5, tile.h * 0.5))
+    body.x = tile.x
+    body.y = tile.y
+    body.type = DYNAMIC
+    body.density = 0.22
+    body.friction = 0.14
+    body.restitution = 0.22
+    body.sleepingAllowed = true
+    body.info = "screenShard"
+    local mass = math.max(0.04, (tile.w * tile.h) * 0.00022)
+    local vx, vy = Glass.hammerBurstVelocity(tile.x, tile.y, hx, hy, ke, mass)
+    body.linearVelocity = vec2(vx * (slowMo or 1), vy * (slowMo or 1))
+    body.angularVelocity = ((tile.col + tile.row) % 2 == 0 and 8 or -8)
+    table.insert(screenShards, { body = body, w = tile.w, h = tile.h, life = 8 })
+end
+
+function hammerHit(hx, hy)
+    local ke = Glass.hammerImpact(HAMMER_MASS, HAMMER_SPEED)
+    table.insert(hammerFlashes, { x = hx, y = hy, life = 0.32, r = HAMMER_RADIUS })
+    for i = 1, 9 do
+        screenCracks[#screenCracks + 1] = {
+            x = hx,
+            y = hy,
+            ang = i * 0.7 + (hx + hy) * 0.002,
+            len = 36 + (i % 4) * 26,
+            life = 2.8,
+        }
+    end
+    if not screenTiles or #screenTiles == 0 then
+        initScreenTiles()
+    end
+    local hits = Glass.tilesInHammerRadius(screenTiles, hx, hy, HAMMER_RADIUS)
+    local broke = 0
+    for _, h in ipairs(hits) do
+        local t = h.tile
+        t.damage = (t.damage or 0) + h.falloff * 0.85
+        if (not t.broken) and (t.damage >= 1 or Glass.hammerBreaksTile(ke, h.falloff, t.w, t.h)) then
+            spawnScreenTileShard(t, hx, hy, ke * h.falloff)
+            t.broken = true
+            broke = broke + 1
+        end
+    end
+    for _, p in ipairs(panes) do
+        if not p.broken and Glass.paneHitByHammer(p.x, p.y, PANE_W, PANE_H, hx, hy, HAMMER_RADIUS) then
+            shatterPane(p, (p.x - hx) * 10, (p.y - hy) * 10, ke)
+        end
+    end
+    screenBroken = Glass.countIntact(screenTiles) == 0
+    playOutputSound(SOUND_HIT, 22100, "hit")
+    outputPeak = math.max(outputPeak, 0.58)
+    message = string.format("Hammer hit · KE %.0f · %d tiles · %d left",
+        ke, broke, Glass.countIntact(screenTiles))
+    messageTimer = 1.3
+end
+
+function glassRepair()
+    for i = #shards, 1, -1 do
+        if shards[i].body then shards[i].body:destroy() end
+        table.remove(shards, i)
+    end
+    rebuildPanes()
+    resetScreenGlass()
+    brokenCount = 0
+    message = "GLASS REPAIR — overlay + panes restored"
+    messageTimer = 1.8
+    playOutputSound(SOUND_HIT, 14000, "glass")
+end
+
+function rebuildPanes()
+    for _, p in ipairs(panes) do
+        if p.body then
+            p.body:destroy()
+            p.body = nil
+        end
+    end
+    panes = {}
+    local firstX = cannonPos.x + 150
+    local xs = Glass.panePositions(PANE_COUNT, firstX, PANE_SPACING)
+    for i, x in ipairs(xs) do
+        local body = physics.body(POLYGON,
+            vec2(-PANE_W * 0.5, -PANE_H * 0.5),
+            vec2(PANE_W * 0.5, -PANE_H * 0.5),
+            vec2(PANE_W * 0.5, PANE_H * 0.5),
+            vec2(-PANE_W * 0.5, PANE_H * 0.5))
+        body.x = x
+        body.y = corridorY
+        body.type = STATIC
+        body.friction = 0.05
+        body.restitution = 0.05
+        body.info = "glass"
+        body.paneIndex = i
+        table.insert(panes, {
+            body = body,
+            x = x,
+            y = corridorY,
+            broken = false,
+            index = i,
+        })
+    end
+end
+
+function glassRemoveAll()
+    if not screenTiles or #screenTiles == 0 then
+        initScreenTiles()
+    end
     local cx, cy = WIDTH * 0.5, HEIGHT * 0.5
-    -- Input cracks from the mic side (left); output from the speaker side (right)
+    local ke = Glass.hammerImpact(HAMMER_MASS, HAMMER_SPEED * 1.35)
+    table.insert(hammerFlashes, { x = cx, y = cy, life = 0.45, r = math.max(WIDTH, HEIGHT) * 0.5 })
+    for _, t in ipairs(screenTiles) do
+        if not t.broken then
+            spawnScreenTileShard(t, cx, cy, ke)
+            t.broken = true
+        end
+    end
+    for _, p in ipairs(panes) do
+        if not p.broken then
+            shatterPane(p, 520, 90, ke)
+        end
+    end
+    screenBroken = true
+    message = "GLASS REMOVE — all glass cracked at once"
+    messageTimer = 2.2
+    playOutputSound(SOUND_EXPLODE, 19221, "glass")
+    outputPeak = math.max(outputPeak, 0.95)
+end
+
+function shatterScreenGlass(source, loudness)
+    if not screenTiles or #screenTiles == 0 then
+        initScreenTiles()
+    end
+    if Glass.countIntact(screenTiles) == 0 then
+        screenBroken = true
+        return
+    end
+    local cx, cy = WIDTH * 0.5, HEIGHT * 0.5
     if source == "input" then
         cx = WIDTH * 0.18
     elseif source == "output" then
         cx = WIDTH * 0.82
+    elseif source == "hammer" then
+        cx, cy = loudness or cx, HEIGHT * 0.55
     end
-    for _, t in ipairs(tiles) do
-        local body = physics.body(POLYGON,
-            vec2(-t.w * 0.5, -t.h * 0.5), vec2(t.w * 0.5, -t.h * 0.5),
-            vec2(t.w * 0.5, t.h * 0.5), vec2(-t.w * 0.5, t.h * 0.5))
-        body.x = t.x
-        body.y = t.y
-        body.type = DYNAMIC
-        body.density = 0.22
-        body.friction = 0.12
-        body.restitution = 0.08
-        body.sleepingAllowed = true
-        body.info = "screenShard"
-        local vx, vy = Glass.screenBurstVelocity(t.x, t.y, cx, cy, loudness)
-        body.linearVelocity = vec2(vx * (slowMo or 1), vy * (slowMo or 1))
-        body.angularVelocity = ((t.col + t.row) % 2 == 0 and 6 or -6) * loudness
-        table.insert(screenShards, { body = body, w = t.w, h = t.h, life = 7 })
+    loudness = math.max(0.2, tonumber(loudness) or 1)
+    local ke = Glass.hammerImpact(HAMMER_MASS, HAMMER_SPEED) * loudness
+    for _, t in ipairs(screenTiles) do
+        if not t.broken then
+            spawnScreenTileShard(t, cx, cy, ke)
+            t.broken = true
+        end
     end
-    message = string.format("SCREEN GLASS SHATTERED — loud %s (%.2f)", source, loudness)
+    screenBroken = true
+    message = string.format("SCREEN GLASS SHATTERED — loud %s (%.2f)", tostring(source), loudness)
     messageTimer = 2.8
     playOutputSound(SOUND_EXPLODE, 19221, "glass")
 end
@@ -1852,33 +2035,87 @@ function drawScreenShards()
 end
 
 function drawScreenGlassOverlay()
-    if screenBroken then return end
-    -- Intact main-screen pane
-    fill(170, 205, 235, 32)
-    rect(0, 0, WIDTH, HEIGHT)
-    -- Specular wash
-    fill(255, 255, 255, 18)
-    rect(WIDTH * 0.08, HEIGHT * 0.12, WIDTH * 0.18, HEIGHT * 0.72)
-    -- Stress cracks as audio approaches the break point
-    local thresh = math.max(0.05, LoudnessBreak or 0.62)
-    local stress = math.min(1, math.max(inputLevel, outputLevel) / thresh)
-    if stress > 0.45 then
-        stroke(220, 235, 250, 40 + 140 * (stress - 0.45))
-        strokeWidth(1.5)
-        local cx, cy = WIDTH * 0.5, HEIGHT * 0.55
-        for i = 1, 7 do
-            local ang = i * 0.9 + stress * 0.4
-            line(cx, cy, cx + math.cos(ang) * WIDTH * 0.35 * stress,
-                cy + math.sin(ang) * HEIGHT * 0.4 * stress)
+    if not screenTiles or #screenTiles == 0 then
+        if WIDTH and WIDTH > 0 then
+            initScreenTiles()
+        else
+            return
         end
-        noStroke()
     end
-    -- Rim
+    local intact = Glass.countIntact(screenTiles)
+    if intact == 0 then
+        screenBroken = true
+        drawScreenCracks()
+        return
+    end
+    for _, t in ipairs(screenTiles) do
+        if not t.broken then
+            local dmg = t.damage or 0
+            fill(170, 205, 235, 26 + math.min(28, dmg * 22))
+            rect(t.x - t.w * 0.5, t.y - t.h * 0.5, t.w - 1, t.h - 1)
+            if dmg > 0.12 then
+                stroke(220, 235, 250, 40 + 160 * math.min(1, dmg))
+                strokeWidth(1.2)
+                for i = 1, 5 do
+                    local ang = i * 1.05 + dmg * 0.6
+                    local L = math.min(t.w, t.h) * 0.48 * math.min(1, dmg + 0.25)
+                    line(t.x, t.y, t.x + math.cos(ang) * L, t.y + math.sin(ang) * L)
+                end
+                noStroke()
+            end
+        end
+    end
+    fill(255, 255, 255, 12)
+    rect(WIDTH * 0.08, HEIGHT * 0.12, WIDTH * 0.18, HEIGHT * 0.72)
+    drawScreenCracks()
     stroke(210, 230, 250, 70)
     strokeWidth(3)
     noFill()
     rect(4, 4, WIDTH - 8, HEIGHT - 8)
     noStroke()
+end
+
+function drawScreenCracks()
+    for i = #screenCracks, 1, -1 do
+        local c = screenCracks[i]
+        c.life = (c.life or 0) - (DeltaTime or 0)
+        if c.life <= 0 then
+            table.remove(screenCracks, i)
+        else
+            local a = math.min(200, 40 + c.life * 70)
+            stroke(230, 245, 255, a)
+            strokeWidth(1.4)
+            line(c.x, c.y, c.x + math.cos(c.ang) * c.len, c.y + math.sin(c.ang) * c.len)
+            noStroke()
+        end
+    end
+end
+
+function drawHammerHits()
+    for i = #hammerFlashes, 1, -1 do
+        local h = hammerFlashes[i]
+        h.life = (h.life or 0) - (DeltaTime or 0)
+        if h.life <= 0 then
+            table.remove(hammerFlashes, i)
+        else
+            local t = h.life / 0.32
+            local hx, hy = h.x, h.y
+            -- Head
+            fill(70, 74, 82, 220 * t)
+            rect(hx - 18, hy + 6, 36, 16)
+            fill(160, 165, 175, 230 * t)
+            rect(hx - 16, hy + 8, 32, 12)
+            -- Handle
+            fill(92, 58, 32, 230 * t)
+            rect(hx - 4, hy - 38, 8, 46)
+            -- Impact ring
+            noFill()
+            stroke(255, 230, 180, 160 * t)
+            strokeWidth(2)
+            ellipse(hx, hy, (h.r or 80) * (1.15 - t * 0.4))
+            noStroke()
+        end
+    end
 end
 
 function drawMeters()
@@ -1887,8 +2124,8 @@ function drawMeters()
     fontSize(12)
     textAlign(LEFT)
     textMode(CORNER)
-    neonText(screenBroken and "screen: shattered — tweak MIXER to reset"
-        or "screen: intact — too loud = break", 22, 58, 12)
+    neonText(screenBroken and "screen: all shattered — GLASS REPAIR or tap leftover shards"
+        or "tap / click glass to hammer  ·  REPAIR restores  ·  REMOVE cracks all", 22, 58, 12)
 end
 
 function drawMicSpeakerLamps()

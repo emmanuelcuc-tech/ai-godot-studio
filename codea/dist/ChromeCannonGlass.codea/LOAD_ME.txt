@@ -11,7 +11,8 @@ This is the final 1.0.0 package. PLAY saves on launch.
 RESTART (or F / sidebar Save & Restart) saves high performance and reboots PLAY.
 RESET reloads panes only.
 
-PLAY tab: drag to aim, FIRE (or Tab) to shoot, RESET to reload.
+PLAY tab: drag the cannon to aim, tap/click glass to hammer, FIRE to shoot, RESET to reload.
+GLASS REPAIR restores panes. GLASS REMOVE cracks all glass at once (real physics shards).
 Black leather background (baked GPU texture). Neon tube type cycles slowly bright blue → pink → red.
 Tabs: PLAY · SETTINGS · MIXER.
 SETTINGS has two tabs: INPUT AUDIO (mic) and OUTPUT AUDIO (speaker).

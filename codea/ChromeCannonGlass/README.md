@@ -27,7 +27,9 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 
 | Input | Action |
 |--------|--------|
-| **Drag** near the cannon (left side) | Aim barrel |
+| **Tap / click glass** | Hammer hit at that spot — shards fly with real KE / gravity |
+| **GLASS REPAIR** (or **G**) | Restore overlay + corridor panes |
+| **GLASS REMOVE** (or **X**) | Instantly crack all remaining glass |
 | **FIRE** button | Shoot chrome ball |
 | **Tab** or **Space** (hardware keyboard) | Shoot |
 | **RESET** button or **R** | Reload panes + ball |
@@ -46,7 +48,8 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 
 ## What you get
 
-- Chrome ball launched from a wheeled cannon with **Box2D** physics
+- **Hammer** the screen glass at any tap/click; keep hitting to shatter more tiles (Box2D shards)
+- **GLASS REPAIR** restores panes · **GLASS REMOVE** cracks every remaining pane at once
 - **KE = ½mv²** decides whether a pane shatters; breaking costs energy
 - **5 glass panes** in a row; each explodes into flying shards
 - **Slow-mo** while the ball travels the glass corridor

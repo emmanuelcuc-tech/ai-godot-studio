@@ -75,6 +75,24 @@ check("first tile centered in cell", math.abs(tiles[1].x - 50) < 1e-6 and math.a
 local bvx, bvy = Glass.screenBurstVelocity(800, 400, 400, 200, 1)
 check("burst flies away from center", bvx > 0 and bvy > 0)
 
+local hke = Glass.hammerImpact(2.4, 720)
+check("hammer KE is 1/2 m v^2", math.abs(hke - 0.5 * 2.4 * 720 * 720) < 1e-6)
+check("falloff 1 at center", Glass.hammerFalloff(0, 100) == 1)
+check("falloff 0 outside radius", Glass.hammerFalloff(100, 100) == 0)
+check("center hit breaks a tile", Glass.hammerBreaksTile(hke, 1, 80, 80) == true)
+check("weak edge does not break", Glass.hammerBreaksTile(50, 0.05, 80, 80) == false)
+local grid = Glass.screenTileGrid(4, 2, 400, 200)
+local near = Glass.tilesInHammerRadius(grid, grid[1].x, grid[1].y, 90)
+check("hammer hits nearby tiles", #near >= 1)
+local far = Glass.tilesInHammerRadius(grid, 10000, 10000, 90)
+check("hammer misses far tiles", #far == 0)
+local hvx, hvy = Glass.hammerBurstVelocity(200, 100, 100, 100, 8000, 0.2)
+check("hammer burst is outward", hvx > 0)
+check("pane under hammer", Glass.paneHitByHammer(100, 100, 10, 220, 100, 100, 40) == true)
+check("pane away from hammer", Glass.paneHitByHammer(400, 100, 10, 220, 0, 0, 40) == false)
+grid[1].broken = true
+check("intact count skips broken", Glass.countIntact(grid) == 7)
+
 -- FL-style mixer
 dofile(here .. "../Mixer.lua")
 local vols = Mixer.defaults()
