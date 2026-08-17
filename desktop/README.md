@@ -33,4 +33,9 @@ Godot is resolved from `%USERPROFILE%\Downloads\Godot_v4.7.1-stable_win64.exe` (
 bash desktop/remake_linux_desktop_shortcuts.sh
 ```
 
-Writes `~/Desktop/AI Godot Studio.desktop`, `~/Desktop/Audio Studio.desktop`, and `~/Desktop/Chrome Cannon Glass.desktop`.
+Writes:
+
+- `~/Desktop/Audio Studio.desktop` — Godot mixer scene
+- `~/Desktop/Launch Audio Studio.sh` — same launch without a `.desktop` file
+- `~/Desktop/AI Godot Studio.desktop`
+- `~/Desktop/Chrome Cannon Glass.desktop`

@@ -19,6 +19,7 @@ audio = (here / "Launch-AudioStudio.bat").read_text(encoding="utf-8")
 open_pkg = (here / "Open-ChromeCannonGlass.bat").read_text(encoding="utf-8")
 url = (here / "Chrome Cannon Glass 1.0.0 final.url").read_text(encoding="utf-8")
 linux = (here / "remake_linux_desktop_shortcuts.sh").read_text(encoding="utf-8")
+sh_launch = (here / "Launch-AudioStudio.sh").read_text(encoding="utf-8")
 
 check("ps1 remakes AI Godot Studio.lnk", "AI Godot Studio.lnk" in ps1)
 check("ps1 remakes Audio Studio.lnk", "Audio Studio.lnk" in ps1)
@@ -33,6 +34,8 @@ check("audio bat launches audio_studio.tscn", "res://scenes/audio_studio.tscn" i
 check("open bat targets 1.0.0 zip or .codea", "ChromeCannonGlass-1.0.0-final.codea.zip" in open_pkg)
 check("url points at final zip", "ChromeCannonGlass-1.0.0-final.codea.zip" in url)
 check("linux remake writes Audio Studio.desktop", "Audio Studio" in linux and "audio_studio.tscn" in linux)
+check("linux remake copies Launch Audio Studio.sh", "Launch Audio Studio.sh" in linux)
+check("linux audio sh launches audio_studio.tscn", "res://scenes/audio_studio.tscn" in sh_launch)
 
 if fails:
     raise SystemExit(fails)
