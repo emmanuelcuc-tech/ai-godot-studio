@@ -237,3 +237,104 @@ function Mixer.neonRGB(elapsed, value)
     local h = Mixer.neonHue(elapsed)
     return Mixer.hsv(h, 1, value or 1)
 end
+
+-- Describe-to-song / record-melody / hum-instrument helpers.
+Mixer.DESCRIBE_PLACEHOLDER = "Describe to song or audio"
+
+function Mixer.hzToMidi(hz)
+    hz = tonumber(hz) or 0
+    if hz < 20 then
+        return nil
+    end
+    return 69 + 12 * math.log(hz / 440) / math.log(2)
+end
+
+function Mixer.midiToHz(midi)
+    midi = tonumber(midi) or 69
+    return 440 * (2 ^ ((midi - 69) / 12))
+end
+
+function Mixer.ampToMidi(amp, floor)
+    floor = floor or 0.03
+    amp = math.max(0, amp or 0)
+    if amp < floor then
+        return nil
+    end
+    local t = math.min(1, (amp - floor) / math.max(0.001, 1 - floor))
+    return 48 + t * 36
+end
+
+function Mixer.sampleNote(amp, freq, floor)
+    local midi = Mixer.hzToMidi(freq)
+    if not midi then
+        midi = Mixer.ampToMidi(amp, floor)
+    end
+    if not midi then
+        return nil
+    end
+    midi = math.floor(midi + 0.5)
+    if midi < 36 then midi = 36 end
+    if midi > 96 then midi = 96 end
+    return midi
+end
+
+function Mixer.quantizeMelody(samples, minDur)
+    minDur = minDur or 0.08
+    samples = samples or {}
+    local notes = {}
+    local cur, startT, lastT = nil, 0, 0
+    for _, s in ipairs(samples) do
+        local t = s.t or 0
+        lastT = t
+        local n = Mixer.sampleNote(s.amp, s.freq, 0.03)
+        if n ~= cur then
+            if cur then
+                local dur = t - startT
+                if dur >= minDur then
+                    notes[#notes + 1] = { midi = cur, t = startT, dur = dur }
+                end
+            end
+            cur = n
+            startT = t
+        end
+    end
+    if cur then
+        notes[#notes + 1] = {
+            midi = cur,
+            t = startT,
+            dur = math.max(minDur, lastT - startT),
+        }
+    end
+    return notes
+end
+
+function Mixer.humInstrument(samples)
+    local sum, n, peak = 0, 0, 0
+    local midiSum, midiN = 0, 0
+    for _, s in ipairs(samples or {}) do
+        local a = s.amp or 0
+        sum = sum + a
+        n = n + 1
+        if a > peak then peak = a end
+        local m = Mixer.sampleNote(a, s.freq, 0.03)
+        if m then
+            midiSum = midiSum + m
+            midiN = midiN + 1
+        end
+    end
+    return {
+        avg = (n > 0) and (sum / n) or 0,
+        peak = peak,
+        midi = (midiN > 0) and math.floor(midiSum / midiN + 0.5) or 60,
+        samples = n,
+    }
+end
+
+function Mixer.clipDescribe(text, maxLen)
+    text = tostring(text or "")
+    maxLen = maxLen or 140
+    if #text > maxLen then
+        return string.sub(text, 1, maxLen)
+    end
+    return text
+end

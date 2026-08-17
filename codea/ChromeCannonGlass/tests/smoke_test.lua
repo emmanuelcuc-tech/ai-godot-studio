@@ -160,6 +160,23 @@ GpuRam.applyProfile("high")
 check("high profile restored", GpuRam.profile == "high")
 check("high profile physics is heavier", GpuRam.physicsVel >= 20 and GpuRam.CHROME_STEPS >= 24)
 
+check("A4 is midi 69", math.abs(Mixer.hzToMidi(440) - 69) < 1e-6)
+check("midi 69 is 440Hz", math.abs(Mixer.midiToHz(69) - 440) < 1e-6)
+check("silent amp is not a note", Mixer.sampleNote(0.01, 0, 0.03) == nil)
+check("loud amp maps to a note", Mixer.sampleNote(0.8, 0, 0.03) ~= nil)
+local notes = Mixer.quantizeMelody({
+    { t = 0.0, amp = 0.7, freq = 440 },
+    { t = 0.2, amp = 0.7, freq = 440 },
+    { t = 0.3, amp = 0.7, freq = 523.25 },
+    { t = 0.5, amp = 0.7, freq = 523.25 },
+}, 0.05)
+check("melody has two notes", #notes == 2)
+check("first melody note is A4", notes[1].midi == 69)
+local hum = Mixer.humInstrument({ { amp = 0.6, freq = 220 }, { amp = 0.5, freq = 220 } })
+check("hum instrument has pitch", hum.midi ~= nil and hum.peak >= 0.5)
+check("describe placeholder", Mixer.DESCRIBE_PLACEHOLDER == "Describe to song or audio")
+check("describe clip", Mixer.clipDescribe("abc", 2) == "ab")
+
 if fails > 0 then
     print("\n" .. fails .. " failure(s)")
     os.exit(1)

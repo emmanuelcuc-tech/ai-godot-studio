@@ -9,6 +9,7 @@
 --   Tap FIRE / Space / Tab to shoot
 --   Tap RESET (or R) after the shot to reload panes + ball
 --   SETTINGS tab → Input Audio / Output Audio
+--   Describe to song or audio · Record melody · Hum instrument
 --   MIXER tab for FL-style Master + all channel volumes
 --   Save Settings stores everything in high performance mode
 --   Tweaking any mixer fader resets the screen glass
@@ -82,6 +83,16 @@ mixerLayoutCache = nil
 knobDrag = nil
 knobLastAng = 0
 HighPerformance = true
+songPrompt = ""
+editingPrompt = false
+captureMode = nil -- melody | hum
+captureSamples = {}
+captureStart = 0
+captureUntil = 0
+melodyQueue = nil
+melodyPlayAt = 0
+melodyIndex = 1
+humInstrument = nil
 
 function setup()
     supportedOrientations(LANDSCAPE_ANY)
@@ -194,6 +205,7 @@ function saveAllSettings()
         saveProjectData("settingsTab", settingsTab or "input")
         saveProjectData("neonSpeed", Mixer.NEON_SPEED or 0.2)
         saveProjectData("highPerformance", HighPerformance and 1 or 0)
+        saveProjectData("songPrompt", songPrompt or "")
     end)
 end
 
@@ -223,6 +235,10 @@ function loadAllSettings()
             HighPerformance = GpuRam.isHigh(hp)
         else
             HighPerformance = true
+        end
+        local sp = readProjectData("songPrompt")
+        if sp ~= nil then
+            songPrompt = Mixer.clipDescribe(tostring(sp))
         end
     end)
 end
@@ -432,6 +448,7 @@ function draw()
     end
     GpuRam.ensure(WIDTH, HEIGHT)
     GpuMegabytes = string.format("%.1f", (GpuRam.bytes or 0) / (1024 * 1024))
+    updateMelodyPlayback()
 
     if uiPage == "mixer" then
         drawMixerPage()
@@ -461,6 +478,7 @@ function draw()
     drawHUD()
     drawButtons()
     drawPageTabs()
+    drawSongCaptureBar()
     drawScreenGlassOverlay()
     drawMeters()
     drawMicSpeakerLamps()
@@ -671,7 +689,17 @@ function touched(touch)
             mixerDrag = nil
             knobDrag = nil
             aiming = false
+            stopDescribeEdit()
             return
+        end
+        if hitSongCapture(touch) then
+            mixerDrag = nil
+            knobDrag = nil
+            aiming = false
+            return
+        end
+        if editingPrompt then
+            stopDescribeEdit()
         end
         local kid = volumeKnobAt(touch.x, touch.y)
         if kid then
@@ -752,6 +780,10 @@ function aimFromTouch(touch)
 end
 
 function keyboard(key)
+    if editingPrompt then
+        handleDescribeKey(key)
+        return
+    end
     if key == "\t" or key == "tab" then
         if uiPage ~= "play" then
             uiPage = "play"
@@ -852,6 +884,216 @@ function hitSettingsTab(touch)
         end
     end
     return false
+end
+
+function songCaptureRects()
+    local y = (uiPage == "settings") and (HEIGHT - 218) or (HEIGHT - 140)
+    local h, gap = 42, 8
+    local melodyW, humW = 152, 178
+    local right = WIDTH - 24
+    if uiPage == "settings" then
+        right = WIDTH - 148
+    end
+    local x = 22
+    local describeW = math.max(160, right - x - melodyW - humW - gap * 2)
+    return {
+        describe = { x = x, y = y, w = describeW, h = h },
+        melody = { x = x + describeW + gap, y = y, w = melodyW, h = h },
+        hum = { x = x + describeW + gap + melodyW + gap, y = y, w = humW, h = h },
+    }
+end
+
+function hitSongCapture(touch)
+    local r = songCaptureRects()
+    if hitButton(touch, r.describe) then
+        startDescribeEdit()
+        return true
+    end
+    if hitButton(touch, r.melody) then
+        stopDescribeEdit()
+        startSongCapture("melody")
+        return true
+    end
+    if hitButton(touch, r.hum) then
+        stopDescribeEdit()
+        startSongCapture("hum")
+        return true
+    end
+    return false
+end
+
+function startDescribeEdit()
+    editingPrompt = true
+    pcall(function()
+        if showKeyboard then showKeyboard() end
+    end)
+    message = Mixer.DESCRIBE_PLACEHOLDER
+    messageTimer = 1.2
+end
+
+function stopDescribeEdit()
+    if not editingPrompt then return end
+    editingPrompt = false
+    songPrompt = Mixer.clipDescribe(songPrompt)
+    pcall(function()
+        if hideKeyboard then hideKeyboard() end
+    end)
+    saveAllSettings()
+end
+
+function handleDescribeKey(key)
+    if key == RETURN or key == "\n" or key == "\r" or key == "return" then
+        stopDescribeEdit()
+        return
+    end
+    if key == BACKSPACE or key == "\b" or key == "backspace" then
+        if #songPrompt > 0 then
+            songPrompt = string.sub(songPrompt, 1, #songPrompt - 1)
+        end
+        return
+    end
+    if type(key) == "string" and #key == 1 then
+        songPrompt = Mixer.clipDescribe(songPrompt .. key)
+    end
+end
+
+function readMicFreq()
+    if mic and mic.frequency ~= nil then
+        return tonumber(mic.frequency) or 0
+    end
+    return 0
+end
+
+function startSongCapture(mode)
+    if not micOn then
+        startMic()
+    end
+    captureMode = (mode == "hum") and "hum" or "melody"
+    captureSamples = {}
+    captureStart = ElapsedTime or 0
+    captureUntil = captureStart + 3.6
+    melodyQueue = nil
+    message = (captureMode == "hum")
+        and "Hum an instrument — hold a tone"
+        or "Record melody — sing or play notes"
+    messageTimer = 3.6
+end
+
+function finishSongCapture()
+    local mode = captureMode
+    captureMode = nil
+    if mode == "hum" then
+        humInstrument = Mixer.humInstrument(captureSamples)
+        playHumInstrument(humInstrument)
+        local label = (songPrompt ~= "" and songPrompt) or "hum"
+        message = string.format("Hum instrument · %s · MIDI %d", label, humInstrument.midi or 60)
+        messageTimer = 2.2
+    else
+        melodyQueue = Mixer.quantizeMelody(captureSamples, 0.07)
+        melodyPlayAt = ElapsedTime or 0
+        melodyIndex = 1
+        local label = (songPrompt ~= "" and songPrompt) or "melody"
+        message = string.format("Melody · %s · %d notes", label, #(melodyQueue or {}))
+        messageTimer = 2.2
+        if melodyQueue and #melodyQueue == 0 then
+            message = "No notes heard — try louder"
+            messageTimer = 1.8
+        end
+    end
+    saveAllSettings()
+end
+
+function updateSongCapture()
+    if not captureMode then return end
+    local now = ElapsedTime or 0
+    if now >= (captureUntil or 0) then
+        finishSongCapture()
+        return
+    end
+    captureSamples[#captureSamples + 1] = {
+        t = now - (captureStart or now),
+        amp = inputLevel or readMicAmp(),
+        freq = readMicFreq(),
+    }
+end
+
+function playMelodyNote(midi, dur)
+    local hz = Mixer.midiToHz(midi)
+    local vol = Mixer.toGain("output", mixVols or Mixer.defaults())
+    local played = false
+    pcall(function()
+        if sound then
+            sound({
+                ID = SOUND_BLIT,
+                StartFrequency = hz,
+                Duration = math.min(1.1, math.max(0.08, dur or 0.2)),
+                Volume = math.min(1, vol),
+            })
+            played = true
+        end
+    end)
+    if not played then
+        playOutputSound(SOUND_BLIT, math.floor(hz), "output")
+    else
+        outputPeak = math.max(outputPeak, math.min(1, vol))
+    end
+end
+
+function playHumInstrument(inst)
+    inst = inst or humInstrument
+    if not inst then return end
+    playMelodyNote(inst.midi or 60, 0.85)
+    playMelodyNote((inst.midi or 60) + 12, 0.45)
+end
+
+function updateMelodyPlayback()
+    if not melodyQueue or melodyIndex > #melodyQueue then
+        return
+    end
+    local n = melodyQueue[melodyIndex]
+    local t = (ElapsedTime or 0) - (melodyPlayAt or 0)
+    if t >= (n.t or 0) then
+        playMelodyNote(n.midi, n.dur)
+        melodyIndex = melodyIndex + 1
+    end
+end
+
+function drawSongCaptureBar()
+    local r = songCaptureRects()
+    local function chip(b, label, on)
+        if on then
+            fill(28, 10, 16, 250)
+        else
+            fill(12, 8, 9, 230)
+        end
+        rect(b.x, b.y, b.w, b.h, 8)
+        textAlign(CENTER)
+        textMode(CENTER)
+        neonText(label, b.x + b.w * 0.5, b.y + b.h * 0.5, 13)
+    end
+    if editingPrompt then
+        fill(22, 12, 16, 250)
+    else
+        fill(10, 7, 8, 230)
+    end
+    rect(r.describe.x, r.describe.y, r.describe.w, r.describe.h, 8)
+    textAlign(LEFT)
+    textMode(CORNER)
+    local shown = songPrompt
+    if shown == nil or shown == "" then
+        shown = Mixer.DESCRIBE_PLACEHOLDER
+    end
+    if editingPrompt then
+        shown = (songPrompt or "") .. "|"
+    end
+    if #shown > 42 then
+        shown = "…" .. string.sub(shown, #shown - 40)
+    end
+    neonText(shown, r.describe.x + 10, r.describe.y + 12, 14)
+    local recMelody = captureMode == "melody"
+    local recHum = captureMode == "hum"
+    chip(r.melody, recMelody and "RECORDING…" or "RECORD MELODY", recMelody)
+    chip(r.hum, recHum and "HUMMING…" or "HUM INSTRUMENT", recHum)
 end
 
 function setAllBtn()
@@ -1268,6 +1510,7 @@ function drawMixerPage()
     neonText("Drag faders  ·  SET ALL 80%  ·  tweak any strip to reset screen glass", 22, HEIGHT - 56, 13)
 
     drawPageTabs()
+    drawSongCaptureBar()
     local all = setAllBtn()
     fill(12, 8, 8, 230)
     rect(all.x, all.y, all.w, all.h, 8)
@@ -1296,13 +1539,14 @@ end
 function drawSettingsChrome(title, subtitle)
     drawLeather()
     fill(8, 5, 6, 210)
-    rect(0, HEIGHT - 172, WIDTH, 172)
+    rect(0, HEIGHT - 228, WIDTH, 228)
     textAlign(LEFT)
     textMode(CORNER)
     neonText("Settings  ·  " .. title, 22, HEIGHT - 34, 22)
     neonText(subtitle, 22, HEIGHT - 56, 13)
     drawPageTabs()
     drawAudioSettingsTabs()
+    drawSongCaptureBar()
 end
 
 function drawAudioSettingsTabs()
@@ -1345,7 +1589,7 @@ end
 
 function drawInputAudioPage()
     mixVols = mixVols or Mixer.defaults()
-    drawSettingsChrome("Input Audio", "Mic gain  ·  twist the INPUT knob or drag the fader  ·  lamp shows level")
+    drawSettingsChrome("Input Audio", "Describe to song or audio  ·  Record melody  ·  Hum instrument")
     drawMicSpeakerLamps()
     drawVolumeKnobs()
     drawSettingsFader(settingsFaderRect(), mixVols.input or Mixer.UNITY, "INPUT")
@@ -1476,6 +1720,7 @@ function updateAudioGlass()
     else
         micPulse = 0
     end
+    updateSongCapture()
     local tooLoud, _, source = Glass.isTooLoud(inputLevel, outputLevel, thresh)
     loudestSource = source
 

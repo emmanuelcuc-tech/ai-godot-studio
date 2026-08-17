@@ -37,7 +37,9 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 | **SET ALL 80%** | All faders including Master → unity (0.8) |
 | **Tab** | Shoot on PLAY · back to PLAY from MIXER |
 | **RESET** button or **R** | Reload panes + ball |
-| Sidebar **Save Settings** or **H** | Save everything **in high performance mode** |
+| **Describe to song or audio** | Tap the field next to Record melody / Hum instrument, type a prompt |
+| **RECORD MELODY** | Mic-capture ~3.6s of notes, then play them back |
+| **HUM INSTRUMENT** | Hold a hummed tone to make a playback instrument |
 | Sidebar **HighPerformance** | On = GPU/RAM pool + heavier physics (saved) |
 | **Yell into mic** | Red MIC lamp flashes / stays lit; IN column height = volume |
 | **FIRE / playback** | OUT column height = speaker volume |
@@ -48,7 +50,7 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 - **KE = ½mv²** decides whether a pane shatters; breaking costs energy
 - **5 glass panes** in a row; each explodes into flying shards
 - **Slow-mo** while the ball travels the glass corridor
-- **SETTINGS** page with **Input Audio** and **Output Audio** tabs (knobs + faders)
+- **Describe to song or audio** field next to **Record melody** and **Hum instrument** (mic capture → playback)
 - **MIXER page** (Fruity Loops–style) — **Master** plus every bus volume
 - **Main-screen glass overlay** — shatters when **mic input** or **speaker output** is too loud
 - **Black leather** backdrop with pebble grain and stitching
