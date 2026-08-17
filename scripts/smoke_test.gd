@@ -86,26 +86,29 @@ func _test_audio_studio_mixer() -> bool:
 		print("MIXER_FAIL=midi A4 hz")
 		return false
 	var hue0 := float(MB.neon_hue(0.0))
-	var hue_hold := float(MB.neon_hue(8.0))
+	var hue_early := float(MB.neon_hue(1.0))
+	var hue_mid := float(MB.neon_hue(6.0))
 	var hue_next := float(MB.neon_hue(12.0))
-	var hue_blend := float(MB.neon_hue(10.75))
 	if not is_equal_approx(hue0, 205.0):
 		print("MIXER_FAIL=neon start blue")
 		return false
-	if not is_equal_approx(hue0, hue_hold):
-		print("MIXER_FAIL=neon must hold 12s")
-		return false
 	if not is_equal_approx(hue_next, 282.0):
-		print("MIXER_FAIL=neon next stop")
+		print("MIXER_FAIL=neon next stop at 12s")
 		return false
-	if hue_blend <= hue0 + 1.0 or hue_blend >= hue_next - 1.0:
-		print("MIXER_FAIL=neon blend-in")
+	if hue_early <= hue0 or hue_early >= hue_mid:
+		print("MIXER_FAIL=neon slow gradual start")
+		return false
+	if hue_mid <= hue_early or hue_mid >= hue_next:
+		print("MIXER_FAIL=neon slow 12s blend")
+		return false
+	if absf(hue_early - hue0) >= absf(hue_mid - hue0) * 0.45:
+		print("MIXER_FAIL=neon blend is not slow at the start")
 		return false
 	var c0: Color = MB.neon_rgb(0.0)
-	var c_blend: Color = MB.neon_rgb(10.75)
+	var c_mid: Color = MB.neon_rgb(6.0)
 	var c1: Color = MB.neon_rgb(12.0)
-	if c_blend.is_equal_approx(c0) or c_blend.is_equal_approx(c1):
-		print("MIXER_FAIL=neon rgb blend")
+	if c_mid.is_equal_approx(c0) or c_mid.is_equal_approx(c1):
+		print("MIXER_FAIL=neon rgb slow blend")
 		return false
 	var half := float(MB.volume_from_fader_y(50.0, 100.0, 0.0))
 	if not is_equal_approx(half, 0.625):
@@ -124,6 +127,6 @@ func _test_audio_studio_mixer() -> bool:
 		print("MIXER_FAIL=hum midi")
 		return false
 	print("MIXER_OK=true VERSION=", MB.final_label())
-	print("MIXER_NEON_HOLD=", hue0, " BLEND=", hue_blend, " NEXT=", hue_next)
+	print("MIXER_NEON_0=", hue0, " EARLY=", hue_early, " MID=", hue_mid, " NEXT=", hue_next)
 	print("MIXER_MELODY_NOTES=", melody.size())
 	return true

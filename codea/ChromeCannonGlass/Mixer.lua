@@ -232,9 +232,9 @@ function Mixer.hsv(h, s, v)
     return (r + m) * 255, (g + m) * 255, (b + m) * 255
 end
 
--- Neon: hold a color, then blend to the next stop every 12 seconds.
+-- Neon: one slow gradual blend to the next stop every 12 seconds.
 Mixer.NEON_STEP = 12
-Mixer.NEON_BLEND = 2.5
+Mixer.NEON_BLEND = 12
 Mixer.NEON_STOPS = { 205, 282, 355 }
 Mixer.NEON_SPEED = 0.2 -- unused; kept so old saves still load
 
@@ -247,14 +247,10 @@ function Mixer.neonBlend(elapsed)
     local localT = elapsed % step
     local fromH = stops[(idx % n) + 1]
     local toH = stops[((idx + 1) % n) + 1]
-    local hold = step - Mixer.NEON_BLEND
-    local t = 0
-    if localT > hold then
-        t = (localT - hold) / Mixer.NEON_BLEND
-        if t < 0 then t = 0 end
-        if t > 1 then t = 1 end
-        t = t * t * (3 - 2 * t)
-    end
+    local t = localT / Mixer.NEON_BLEND
+    if t < 0 then t = 0 end
+    if t > 1 then t = 1 end
+    t = t * t * t * (t * (t * 6 - 15) + 10)
     return fromH, toH, t
 end
 

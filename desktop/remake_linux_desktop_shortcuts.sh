@@ -47,7 +47,11 @@ write_desktop "AI Godot Studio" \
   "env DISPLAY=${DISPLAY:-:1} $GODOT --path $ROOT --display-driver x11"
 
 write_desktop "Audio Studio" \
-  "Desktop Audio Studio 1.0.0 final — mixer, IN/OUT, describe / record / hum" \
+  "Desktop Audio Studio 1.0.1 desktop — 12s slow neon blend" \
+  "env DISPLAY=${DISPLAY:-:1} $GODOT --path $ROOT --display-driver x11 res://scenes/audio_studio.tscn"
+
+write_desktop "Audio Studio 1.0.1 desktop" \
+  "Saved desktop Audio Studio 1.0.1 — 12s gradual neon blend" \
   "env DISPLAY=${DISPLAY:-:1} $GODOT --path $ROOT --display-driver x11 res://scenes/audio_studio.tscn"
 
 if [[ -d "$ROOT/codea/dist/ChromeCannonGlass.codea" ]]; then

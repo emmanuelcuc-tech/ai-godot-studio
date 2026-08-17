@@ -6,13 +6,13 @@ const UNITY := 0.8
 const MAX := 1.25
 const CHANNELS: PackedStringArray = ["input", "output", "fire", "hit", "glass"]
 const STRIPS: PackedStringArray = ["input", "output", "fire", "hit", "glass", "master"]
-const VERSION := "1.0.0"
-const RELEASE := "final"
+const VERSION := "1.0.1"
+const RELEASE := "desktop"
 const DESCRIBE_PLACEHOLDER := "Describe to song or audio"
 const KNOB_MIN := -2.356194490192345
 const KNOB_MAX := 2.356194490192345
 const NEON_STEP_SEC := 12.0
-const NEON_BLEND_SEC := 2.5
+const NEON_BLEND_SEC := 12.0
 const NEON_STOPS: PackedFloat32Array = [205.0, 282.0, 355.0]
 
 
@@ -146,11 +146,9 @@ static func neon_blend(elapsed: float) -> Array:
 	var local := fposmod(elapsed, NEON_STEP_SEC)
 	var from_h := float(NEON_STOPS[idx % n])
 	var to_h := float(NEON_STOPS[(idx + 1) % n])
-	var hold := NEON_STEP_SEC - NEON_BLEND_SEC
-	var t := 0.0
-	if local > hold:
-		t = clampf((local - hold) / NEON_BLEND_SEC, 0.0, 1.0)
-		t = t * t * (3.0 - 2.0 * t)
+	var t := clampf(local / NEON_BLEND_SEC, 0.0, 1.0)
+	# Smootherstep: slow start and end across the full 12s blend.
+	t = t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
 	return [from_h, to_h, t]
 
 

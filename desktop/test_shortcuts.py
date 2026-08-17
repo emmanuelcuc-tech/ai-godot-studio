@@ -35,6 +35,7 @@ check("open bat targets 1.0.0 zip or .codea", "ChromeCannonGlass-1.0.0-final.cod
 check("url points at final zip", "ChromeCannonGlass-1.0.0-final.codea.zip" in url)
 check("linux remake writes Audio Studio.desktop", "Audio Studio" in linux and "audio_studio.tscn" in linux)
 check("linux remake copies Launch Audio Studio.sh", "Launch Audio Studio.sh" in linux)
+check("linux remake labels 1.0.1 desktop", "1.0.1 desktop" in linux)
 check("linux audio sh launches audio_studio.tscn", "res://scenes/audio_studio.tscn" in sh_launch)
 
 if fails:
