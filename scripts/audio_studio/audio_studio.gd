@@ -3,6 +3,7 @@ extends Control
 
 const KnobScript = preload("res://scripts/audio_studio/volume_knob.gd")
 const FaderScript = preload("res://scripts/audio_studio/volume_fader.gd")
+const MixerBus = preload("res://scripts/audio_studio/mixer_bus.gd")
 const SAVE_PATH := "user://audio_studio.cfg"
 
 var vols: Dictionary = MixerBus.defaults()

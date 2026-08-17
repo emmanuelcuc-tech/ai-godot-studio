@@ -66,7 +66,7 @@ static func set_all(vols: Dictionary, value: float) -> Dictionary:
 
 static func any_changed(prev: Dictionary, now: Dictionary, epsilon: float = 0.008) -> Array:
 	for k in STRIPS:
-		if abs(float(prev.get(k, 0.0)) - float(now.get(k, 0.0))) > epsilon:
+		if absf(float(prev.get(k, 0.0)) - float(now.get(k, 0.0))) > epsilon:
 			return [true, k]
 	return [false, ""]
 
@@ -110,7 +110,7 @@ static func hsv(h: float, s: float = 1.0, v: float = 1.0) -> Color:
 	v = clampf(v, 0.0, 1.0)
 	var c := v * s
 	var hp := h / 60.0
-	var x := c * (1.0 - abs(fmod(hp, 2.0) - 1.0))
+	var x := c * (1.0 - absf(fmod(hp, 2.0) - 1.0))
 	var m := v - c
 	var r := 0.0
 	var g := 0.0

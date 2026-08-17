@@ -88,7 +88,7 @@ func _test_audio_studio_mixer() -> bool:
 	var hue0 := float(MB.neon_hue(0.0, 0.2))
 	var hue_slow := float(MB.neon_hue(1.0, 0.2))
 	var hue_fast := float(MB.neon_hue(1.0, 8.0))
-	if abs(hue_slow - hue0) >= abs(hue_fast - hue0):
+	if absf(hue_slow - hue0) >= absf(hue_fast - hue0):
 		print("MIXER_FAIL=neon speed")
 		return false
 	var half := float(MB.volume_from_fader_y(50.0, 100.0, 0.0))

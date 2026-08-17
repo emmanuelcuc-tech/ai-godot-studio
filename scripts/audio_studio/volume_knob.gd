@@ -1,6 +1,8 @@
 extends Control
 ## Rotary volume knob (270° pot). Drag to twist.
 
+const MixerBus = preload("res://scripts/audio_studio/mixer_bus.gd")
+
 signal value_changed(value: float)
 
 var volume: float = MixerBus.UNITY

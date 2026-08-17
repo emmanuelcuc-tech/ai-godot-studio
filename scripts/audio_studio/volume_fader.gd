@@ -1,6 +1,8 @@
 extends Control
 ## Vertical mixer fader.
 
+const MixerBus = preload("res://scripts/audio_studio/mixer_bus.gd")
+
 signal value_changed(value: float)
 
 var volume: float = MixerBus.UNITY
