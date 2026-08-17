@@ -3,6 +3,7 @@ extends RefCounted
 ## When no API keys: apply keyword-driven upgrades to the current project files.
 
 const ArtPipelineScript = preload("res://scripts/art_pipeline.gd")
+const StudioGameConfigScript = preload("res://scripts/editors/studio_game_config.gd")
 
 
 static func apply(files: Array, direction: String, genre_id: String) -> Array:
@@ -50,6 +51,7 @@ static func apply(files: Array, direction: String, genre_id: String) -> Array:
 
 	# Always include Blender + Godot art tool guides
 	out = ArtPipelineScript.write_guides_into_files(out)
+	out = StudioGameConfigScript.inject_into_files(out)
 
 	return out
 
@@ -68,6 +70,21 @@ static func _add_simple_menu(out: Array, by_path: Dictionary) -> void:
 func _ready() -> void:
 	$VBox/Play.pressed.connect(func(): get_tree().change_scene_to_file(\"res://scenes/main.tscn\"))
 	$VBox/Quit.pressed.connect(func(): get_tree().quit())
+	if FileAccess.file_exists(\"res://studio_display.json\"):
+		var d = JSON.parse_string(FileAccess.get_file_as_string(\"res://studio_display.json\"))
+		if typeof(d) == TYPE_DICTIONARY:
+			var p: String = str(d.get(\"menu_background\", \"\"))
+			if not p.is_empty() and (ResourceLoader.exists(p) or FileAccess.file_exists(p)):
+				var tex = load(p)
+				if tex is Texture2D:
+					var tr := TextureRect.new()
+					tr.set_anchors_preset(Control.PRESET_FULL_RECT)
+					tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+					tr.texture = tex
+					tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					add_child(tr)
+					move_child(tr, 0)
 """
 	var menu_tscn := """[gd_scene load_steps=2 format=3]
 [ext_resource type=\"Script\" path=\"res://scripts/menu.gd\" id=\"1\"]

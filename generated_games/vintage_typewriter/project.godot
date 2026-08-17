@@ -1,0 +1,24 @@
+; Engine configuration file — Vintage Typewriter (Godot 4.7)
+; Mechanics/audio from TypingSimulator (MIT). No Capcom/Tyrant game assets.
+
+config_version=5
+
+[application]
+
+config/name="Vintage Typewriter"
+config/description="Typewriter UI adapted from TypingSimulator; package keyboard SFX only."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=860
+window/size/mode=2
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+
+renderer/rendering_method="forward_plus"

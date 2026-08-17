@@ -1,0 +1,441 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/typewriter.gd" id="1_tw"]
+[ext_resource type="Script" path="res://scripts/typewriter_sfx.gd" id="2_sfx"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_tw")
+
+[node name="BgWall" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.48, 0.1, 0.1, 1)
+
+[node name="RootVBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 6.0
+offset_right = -10.0
+offset_bottom = -6.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 6
+
+[node name="TopBar" type="HBoxContainer" parent="RootVBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="RootVBox/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.95, 0.92, 0.88, 1)
+theme_override_font_sizes/font_size = 18
+text = "Vintage Typewriter — Royal Quiet De Luxe (full / keys / striker)"
+
+[node name="ViewFollowBtn" type="Button" parent="RootVBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Follow"
+
+[node name="ViewFullBtn" type="Button" parent="RootVBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Full"
+
+[node name="ViewAllPaperBtn" type="Button" parent="RootVBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "All Paper"
+
+[node name="ViewKeysBtn" type="Button" parent="RootVBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Keys"
+
+[node name="ViewBottomBtn" type="Button" parent="RootVBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Bottom Close"
+
+[node name="SettingsBtn" type="Button" parent="RootVBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Settings"
+
+[node name="StageClip" type="Control" parent="RootVBox"]
+clip_contents = true
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 480)
+
+[node name="Stage" type="Control" parent="RootVBox/StageClip"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Machine" type="Control" parent="RootVBox/StageClip/Stage"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 180.0
+offset_top = 8.0
+offset_right = 900.0
+offset_bottom = 728.0
+
+[node name="RoyalPhoto" type="TextureRect" parent="RootVBox/StageClip/Stage/Machine"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5
+mouse_filter = 2
+
+[node name="PaperPanel" type="Control" parent="RootVBox/StageClip/Stage/Machine"]
+unique_name_in_owner = true
+clip_contents = true
+layout_mode = 0
+offset_left = 200.0
+offset_top = 20.0
+offset_right = 520.0
+offset_bottom = 220.0
+
+[node name="PaperSurface" type="Control" parent="RootVBox/StageClip/Stage/Machine/PaperPanel"]
+unique_name_in_owner = true
+clip_contents = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PaperTexture" type="TextureRect" parent="RootVBox/StageClip/Stage/Machine/PaperPanel/PaperSurface"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5
+mouse_filter = 2
+
+[node name="PaperFill" type="ColorRect" parent="RootVBox/StageClip/Stage/Machine/PaperPanel/PaperSurface"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.9, 0.86, 0.78, 1)
+
+[node name="PaperPlaceholder" type="Label" parent="RootVBox/StageClip/Stage/Machine/PaperPanel/PaperSurface"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -12.0
+offset_right = 100.0
+offset_bottom = 12.0
+theme_override_colors/font_color = Color(0.4, 0.35, 0.3, 1)
+text = "paper.png"
+horizontal_alignment = 1
+
+[node name="InkLayer" type="Control" parent="RootVBox/StageClip/Stage/Machine/PaperPanel/PaperSurface"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="PaperLabel" type="Label" parent="RootVBox/StageClip/Stage/Machine/PaperPanel/PaperSurface"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 18.0
+offset_top = 20.0
+offset_right = 300.0
+offset_bottom = 400.0
+theme_override_colors/font_color = Color(0.08, 0.08, 0.08, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+
+[node name="CaretLabel" type="Label" parent="RootVBox/StageClip/Stage/Machine/PaperPanel/PaperSurface"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 18.0
+offset_top = 20.0
+offset_right = 36.0
+offset_bottom = 44.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.12, 0.12, 0.12, 0.85)
+theme_override_font_sizes/font_size = 16
+text = "▌"
+
+[node name="StrikeHammer" type="ColorRect" parent="RootVBox/StageClip/Stage/Machine/PaperPanel/PaperSurface"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_right = 12.0
+offset_bottom = 16.0
+mouse_filter = 2
+color = Color(0.15, 0.15, 0.16, 0.9)
+
+[node name="KeyboardPanel" type="Control" parent="RootVBox/StageClip/Stage/Machine"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="KeyRows" type="Control" parent="RootVBox/StageClip/Stage/Machine/KeyboardPanel"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="KeyExtras" type="HBoxContainer" parent="RootVBox/StageClip/Stage/Machine/KeyboardPanel"]
+visible = false
+layout_mode = 0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 280.0
+offset_bottom = 40.0
+
+[node name="ShiftBtn" type="Button" parent="RootVBox/StageClip/Stage/Machine/KeyboardPanel/KeyExtras"]
+unique_name_in_owner = true
+layout_mode = 2
+toggle_mode = true
+text = "SHIFT"
+
+[node name="FeedUpBtn" type="Button" parent="RootVBox/StageClip/Stage/Machine/KeyboardPanel/KeyExtras"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FEED ↑"
+
+[node name="FeedDownBtn" type="Button" parent="RootVBox/StageClip/Stage/Machine/KeyboardPanel/KeyExtras"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FEED ↓"
+
+[node name="Controls" type="HBoxContainer" parent="RootVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="DraftEdit" type="TextEdit" parent="RootVBox/Controls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 72)
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Draft for Start Typing…"
+wrap_mode = 1
+
+[node name="CtrlCol" type="VBoxContainer" parent="RootVBox/Controls"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="BtnRow" type="HBoxContainer" parent="RootVBox/Controls/CtrlCol"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="StartBtn" type="Button" parent="RootVBox/Controls/CtrlCol/BtnRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Start Typing"
+
+[node name="PauseBtn" type="Button" parent="RootVBox/Controls/CtrlCol/BtnRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Pause Typing"
+
+[node name="EndBtn" type="Button" parent="RootVBox/Controls/CtrlCol/BtnRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "End Typing"
+
+[node name="LoadBtn" type="Button" parent="RootVBox/Controls/CtrlCol/BtnRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Type From File"
+
+[node name="FeedRow" type="HBoxContainer" parent="RootVBox/Controls/CtrlCol"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="UIShiftBtn" type="Button" parent="RootVBox/Controls/CtrlCol/FeedRow"]
+unique_name_in_owner = true
+layout_mode = 2
+toggle_mode = true
+text = "SHIFT"
+
+[node name="UIFeedUpBtn" type="Button" parent="RootVBox/Controls/CtrlCol/FeedRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FEED ↑"
+
+[node name="UIFeedDownBtn" type="Button" parent="RootVBox/Controls/CtrlCol/FeedRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FEED ↓"
+
+[node name="SpeedRow" type="HBoxContainer" parent="RootVBox/Controls/CtrlCol"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SpeedLbl" type="Label" parent="RootVBox/Controls/CtrlCol/SpeedRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "Speed"
+
+[node name="SpeedSlider" type="HSlider" parent="RootVBox/Controls/CtrlCol/SpeedRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 1.0
+max_value = 30.0
+value = 10.0
+
+[node name="SpeedValue" type="Label" parent="RootVBox/Controls/CtrlCol/SpeedRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "10"
+
+[node name="StatusLabel" type="Label" parent="RootVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.92, 0.88, 1)
+text = "Status: Stopped"
+
+[node name="TypewriterSfx" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("2_sfx")
+
+[node name="SettingsPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = -210.0
+offset_right = 230.0
+offset_bottom = 210.0
+
+[node name="SettingsVBox" type="VBoxContainer" parent="SettingsPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SettingsTitle" type="Label" parent="SettingsPanel/SettingsVBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Settings"
+horizontal_alignment = 1
+
+[node name="InkRow" type="HBoxContainer" parent="SettingsPanel/SettingsVBox"]
+layout_mode = 2
+
+[node name="InkLbl" type="Label" parent="SettingsPanel/SettingsVBox/InkRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Ink color"
+
+[node name="InkColorPicker" type="ColorPickerButton" parent="SettingsPanel/SettingsVBox/InkRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 28)
+layout_mode = 2
+color = Color(0.1, 0.1, 0.1, 1)
+
+[node name="FontColorRow" type="HBoxContainer" parent="SettingsPanel/SettingsVBox"]
+layout_mode = 2
+
+[node name="FontColorLbl" type="Label" parent="SettingsPanel/SettingsVBox/FontColorRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Font color"
+
+[node name="FontColorPicker" type="ColorPickerButton" parent="SettingsPanel/SettingsVBox/FontColorRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 28)
+layout_mode = 2
+color = Color(0.1, 0.1, 0.1, 1)
+
+[node name="FontSizeRow" type="HBoxContainer" parent="SettingsPanel/SettingsVBox"]
+layout_mode = 2
+
+[node name="FontSizeLbl" type="Label" parent="SettingsPanel/SettingsVBox/FontSizeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Font size"
+
+[node name="FontSizeSpin" type="SpinBox" parent="SettingsPanel/SettingsVBox/FontSizeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 12.0
+max_value = 48.0
+value = 16.0
+
+[node name="FontStyleRow" type="HBoxContainer" parent="SettingsPanel/SettingsVBox"]
+layout_mode = 2
+
+[node name="FontStyleLbl" type="Label" parent="SettingsPanel/SettingsVBox/FontStyleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Font style"
+
+[node name="FontStyleOpt" type="OptionButton" parent="SettingsPanel/SettingsVBox/FontStyleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PackRow" type="HBoxContainer" parent="SettingsPanel/SettingsVBox"]
+layout_mode = 2
+
+[node name="PackLbl" type="Label" parent="SettingsPanel/SettingsVBox/PackRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Sound source"
+
+[node name="SoundPackOpt" type="OptionButton" parent="SettingsPanel/SettingsVBox/PackRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SettingsCloseBtn" type="Button" parent="SettingsPanel/SettingsVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Close"

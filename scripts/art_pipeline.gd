@@ -72,7 +72,7 @@ static func pipeline_prompt_block() -> String:
 
 
 static func write_guides_into_files(files: Array) -> Array:
-	var by := {}
+	var by: Dictionary = {}
 	for f in files:
 		if typeof(f) == TYPE_DICTIONARY:
 			by[str(f.get("path", ""))] = f
@@ -85,7 +85,7 @@ static func _put(files: Array, by: Dictionary, path: String, content: String) ->
 	if by.has(path):
 		by[path]["content"] = content
 	else:
-		var f := {"path": path, "content": content}
+		var f: Dictionary = {"path": path, "content": content}
 		files.append(f)
 		by[path] = f
 
@@ -125,6 +125,20 @@ static func open_blender(exe_path: String) -> Error:
 	if exe.is_empty() or not FileAccess.file_exists(exe):
 		return ERR_FILE_NOT_FOUND
 	return OS.create_process(exe, PackedStringArray())
+
+
+static func run_python(exe_path: String, script_path: String, extra_args: PackedStringArray = PackedStringArray()) -> int:
+	var exe := exe_path
+	if exe.is_empty() or not FileAccess.file_exists(exe):
+		exe = guess_blender_path()
+	if exe.is_empty() or not FileAccess.file_exists(exe):
+		return ERR_FILE_NOT_FOUND
+	if not FileAccess.file_exists(script_path):
+		return ERR_FILE_NOT_FOUND
+	var args := PackedStringArray(["--background", "--python", script_path, "--"])
+	args.append_array(extra_args)
+	var output: Array = []
+	return OS.execute(exe, args, output, true, false)
 
 
 static func open_blender_docs() -> void:

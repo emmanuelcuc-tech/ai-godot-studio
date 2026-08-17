@@ -102,6 +102,25 @@ func load_preview(index: int) -> Error:
 	return _fetch_http.get_bytes(url, headers)
 
 
+func download_url(url: String, dest_abs: String) -> Error:
+	var u: String = url.strip_edges()
+	if u.is_empty() or dest_abs.is_empty():
+		return ERR_INVALID_PARAMETER
+	if not (u.begins_with("https://") or u.begins_with("http://")):
+		return ERR_INVALID_PARAMETER
+	var host: String = u.trim_prefix("https://").trim_prefix("http://")
+	var slash: int = host.find("/")
+	if slash >= 0:
+		host = host.substr(0, slash)
+	host = host.to_lower()
+	if host == "localhost" or host.begins_with("127.") or host.begins_with("0.") or host.begins_with("10.") or host.begins_with("192.168."):
+		return ERR_UNAUTHORIZED
+	_pending_index = -1
+	_pending_meta = {"url": u, "save_as": dest_abs, "source": "direct", "license": "provided"}
+	var headers := PackedStringArray(["User-Agent: AI-Godot-Studio/1.0 (texture browser)"])
+	return _fetch_http.get_bytes(u, headers)
+
+
 func download_full(index: int, dest_abs: String) -> Error:
 	## Sync-friendly: if we already have cache for this result, copy it.
 	var item := get_result(index)

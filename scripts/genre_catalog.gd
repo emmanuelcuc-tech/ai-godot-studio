@@ -223,6 +223,45 @@ static func by_id(genre_id: String) -> Dictionary:
 	return {}
 
 
+static func index_for_id(genre_id: String) -> int:
+	for i in GENRES.size():
+		if str(GENRES[i]["id"]) == genre_id:
+			return i + 1
+	return 0
+
+
+static func index_for_text(text: String) -> int:
+	var q: String = text.strip_edges().to_lower()
+	if q.is_empty():
+		return 0
+	for i in GENRES.size():
+		var g: Dictionary = GENRES[i]
+		if str(g.get("id", "")).to_lower() == q or str(g.get("name", "")).to_lower() == q:
+			return i + 1
+	if q.contains("shoot") or q.contains("fps") or q.contains("doom"):
+		return index_for_id("fps")
+	if q.contains("platform"):
+		return index_for_id("platformer")
+	if q.contains("rpg") or q.contains("open world"):
+		return index_for_id("open_world")
+	if q.contains("race") or q.contains("racing"):
+		return index_for_id("racing")
+	if q.contains("voxel") or q.contains("minecraft") or q.contains("block"):
+		return index_for_id("voxel")
+	if q.contains("brawl") or q.contains("beat"):
+		return index_for_id("beat_em_up")
+	if q.contains("fight"):
+		return index_for_id("fighting")
+	if q.contains("space") or q.contains("shmup"):
+		return index_for_id("space_shooter")
+	if q.contains("sim"):
+		return index_for_id("simulation")
+	if q.contains("puzzle") or q.contains("arena"):
+		return index_for_id("arena")
+	var detected: Dictionary = detect(text, "custom")
+	return index_for_id(str(detected.get("id", "")))
+
+
 static func detect(request: String, selected_id: String = "custom") -> Dictionary:
 	# Famous titles (Minecraft, Doom, …) use the same pipeline via GameInspirations.
 	var Insp = load("res://scripts/game_inspirations.gd")
