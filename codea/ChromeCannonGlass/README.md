@@ -20,7 +20,8 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
    - `Main.lua` → **Main**
    - `Glass.lua` → **Glass**
    - `Mixer.lua` → **Mixer**
-3. Buffer order: **Main**, **Glass**, **Mixer** → Play.
+   - `GpuRam.lua` → **GpuRam**
+3. Buffer order: **Main**, **Glass**, **Mixer**, **GpuRam** → Play.
 
 ## Controls (iPad)
 
@@ -50,7 +51,8 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 - **MIXER page** (Fruity Loops–style) — **Master** plus every bus volume
 - **Main-screen glass overlay** — shatters when **mic input** or **speaker output** is too loud
 - **Black leather** backdrop with pebble grain and stitching
-- **Neon tube type** cycling bright blue → pink → red
+- **Neon tube type** cycling bright blue → pink → red (**slow**, ~31s per cycle; sidebar **NeonSpeed**)
+- **GPU/RAM pool** — 2× leather atlas, bloom ping-pong, glow, and scratch textures (tens of MB of VRAM)
 - Tweaking **any mixer fader** always **resets** the screen glass
 - **Save / Load** (sidebar + auto-save on mixer tweak / exit)
 - Touch-friendly FIRE / RESET for iPad (no keyboard required)
@@ -68,7 +70,7 @@ FL Studio scripts (repaired `import general` vs `flpianoroll`): `flstudio/Chrome
 |------|---------|
 | `codea/dist/ChromeCannonGlass.codea.zip` | **Download this** → unzip → drop into Codea |
 | `codea/dist/ChromeCannonGlass.codea/` | Unzipped project package |
-| `Main.lua` / `Glass.lua` / `Mixer.lua` | Source buffers |
+| `Main.lua` / `Glass.lua` / `Mixer.lua` / `GpuRam.lua` | Source buffers |
 | `Info.plist` | Buffer order + metadata |
 | `tests/smoke_test.lua` | Headless math checks |
 | `flstudio/ChromeCannonGlass/` | FL Studio MIDI mixer + piano-roll velocity scripts |

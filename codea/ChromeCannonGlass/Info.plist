@@ -7,9 +7,10 @@
 		<string>Main</string>
 		<string>Glass</string>
 		<string>Mixer</string>
+		<string>GpuRam</string>
 	</array>
 	<key>Description</key>
-	<string>Chrome cannon with SETTINGS tabs for Input Audio and Output Audio, FL-style mixer (Master + all volumes), and screen glass that shatters when input/output is too loud.</string>
+	<string>Chrome cannon with slow neon color, GPU/RAM texture pool, SETTINGS tabs for Input Audio and Output Audio, and screen glass that shatters when input/output is too loud.</string>
 	<key>Author</key>
 	<string>AI Godot Studio / Codea</string>
 	<key>Name</key>

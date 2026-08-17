@@ -8,8 +8,9 @@ Load on iPad:
 5. Tap it → Play (landscape)
 
 PLAY tab: drag to aim, FIRE (or Tab) to shoot, RESET to reload.
-Black leather background. Neon tube type cycles bright blue → pink → red.
+Black leather background (baked GPU texture). Neon tube type cycles slowly bright blue → pink → red.
 Tabs: PLAY · SETTINGS · MIXER.
 SETTINGS has two tabs: INPUT AUDIO (mic) and OUTPUT AUDIO (speaker).
 Twist knobs on those tabs to set mic and speaker volume.
+Sidebar NeonSpeed slows/speeds the tube color. GpuMegabytes shows the texture pool.
 Sidebar Save / Load stores mixer volumes. Tweaking any fader resets screen glass.

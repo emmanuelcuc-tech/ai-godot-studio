@@ -223,9 +223,13 @@ function Mixer.hsv(h, s, v)
 end
 
 -- Neon bulb hue: bright blue → pink → red → blue (all hues on that arc).
-function Mixer.neonHue(elapsed)
+-- Speed is rad/s of the sine; 0.2 ≈ 31s per full tube cycle (was 1.35 ≈ 4.7s).
+Mixer.NEON_SPEED = 0.2
+
+function Mixer.neonHue(elapsed, speed)
     elapsed = elapsed or 0
-    local wave = 0.5 + 0.5 * math.sin(elapsed * 1.35)
+    speed = speed or Mixer.NEON_SPEED or 0.2
+    local wave = 0.5 + 0.5 * math.sin(elapsed * speed)
     return 205 + 155 * wave
 end
 

@@ -87,6 +87,7 @@ function setup()
 
     parameter.number("MuzzleSpeed", 400, 1600, MUZZLE_SPEED)
     parameter.number("LoudnessBreak", 0.15, 1.2, LoudnessBreak)
+    parameter.number("NeonSpeed", 0.05, 0.6, Mixer.NEON_SPEED)
     parameter.action("Fire Cannon", function()
         fireCannon()
     end)
@@ -137,6 +138,9 @@ function setup()
     startMic()
     layoutScene()
     resetScene()
+    GpuRam.boot(WIDTH, HEIGHT)
+    GpuMegabytes = string.format("%.1f", GpuRam.megabytes(WIDTH, HEIGHT))
+    parameter.watch("GpuMegabytes")
 end
 
 function startMic()
@@ -168,6 +172,7 @@ function saveAllSettings()
         saveProjectData("loudness", LoudnessBreak or 0.62)
         saveProjectData("uiPage", uiPage or "play")
         saveProjectData("settingsTab", settingsTab or "input")
+        saveProjectData("neonSpeed", Mixer.NEON_SPEED or 0.2)
     end)
 end
 
@@ -187,6 +192,11 @@ function loadAllSettings()
         local page = readProjectData("uiPage")
         local tab = readProjectData("settingsTab")
         uiPage, settingsTab = Mixer.normalizePage(page, tab)
+        local ns = readProjectData("neonSpeed")
+        if ns then
+            Mixer.NEON_SPEED = math.max(0.05, math.min(0.6, tonumber(ns) or 0.2))
+            NeonSpeed = Mixer.NEON_SPEED
+        end
     end)
 end
 
@@ -383,6 +393,12 @@ function fireCannon()
 end
 
 function draw()
+    if NeonSpeed then
+        Mixer.NEON_SPEED = NeonSpeed
+    end
+    GpuRam.ensure(WIDTH, HEIGHT)
+    GpuMegabytes = string.format("%.1f", (GpuRam.bytes or 0) / (1024 * 1024))
+
     if uiPage == "mixer" then
         drawMixerPage()
         updateSettingsAudio()
@@ -824,7 +840,12 @@ function neonText(str, x, y, size)
     fontSize(size)
     local t = ElapsedTime or 0
     local r, g, b = Mixer.neonRGB(t, 1)
-    -- Tube glow (light-bulb halo)
+    -- Tube glow (light-bulb halo) — extra GPU passes
+    fill(r, g, b, 18)
+    text(str, x + 3, y)
+    text(str, x - 3, y)
+    text(str, x, y + 3)
+    text(str, x, y - 3)
     fill(r, g, b, 28)
     text(str, x + 2, y)
     text(str, x - 2, y)
@@ -842,37 +863,11 @@ function neonText(str, x, y, size)
 end
 
 function drawLeather()
-    background(5, 3, 4)
-    noStroke()
-    -- Hide patches
-    for i = 0, 22 do
-        local gx = (i * 137 + 19) % (WIDTH + 80) - 40
-        local gy = (i * 89 + 7) % (HEIGHT + 60) - 30
-        fill(12 + (i % 5), 8, 9, 70)
-        ellipse(gx, gy, 220 - (i % 6) * 18, 110)
+    GpuRam.ensure(WIDTH, HEIGHT)
+    if GpuRam.drawCached() then
+        return
     end
-    -- Pebbled grain
-    for i = 0, 90 do
-        local x = (i * 73 + 11) % WIDTH
-        local y = (i * 47 + 23) % HEIGHT
-        fill(18, 12, 12, 40)
-        ellipse(x, y, 16 + (i % 6) * 3, 11 + (i % 4) * 2)
-        fill(3, 1, 2, 50)
-        ellipse(x + 3, y - 2, 7, 5)
-    end
-    -- Wet sheen
-    fill(42, 30, 32, 18)
-    ellipse(WIDTH * 0.38, HEIGHT * 0.72, WIDTH * 0.85, HEIGHT * 0.28)
-    fill(28, 20, 22, 14)
-    ellipse(WIDTH * 0.7, HEIGHT * 0.25, WIDTH * 0.5, HEIGHT * 0.2)
-    -- Stitching
-    stroke(32, 22, 20, 90)
-    strokeWidth(1.2)
-    line(14, 14, WIDTH - 14, 14)
-    line(14, HEIGHT - 14, WIDTH - 14, HEIGHT - 14)
-    line(14, 14, 14, HEIGHT - 14)
-    line(WIDTH - 14, 14, WIDTH - 14, HEIGHT - 14)
-    noStroke()
+    GpuRam.paintLeather(WIDTH, HEIGHT, GpuRam.grain)
 end
 
 function drawBackdrop()
@@ -995,8 +990,9 @@ end
 function drawMetallicBall(x, y, r, angle)
     fill(20, 22, 28, 90)
     ellipse(x + 3, y - 3, r * 2.15)
-    for i = 8, 1, -1 do
-        local t = i / 8
+    local steps = (GpuRam and GpuRam.CHROME_STEPS) or 24
+    for i = steps, 1, -1 do
+        local t = i / steps
         local shade = 70 + t * 140
         fill(shade, shade + 4, shade + 12)
         ellipse(x - r * 0.08 * (1 - t), y + r * 0.08 * (1 - t), r * 2 * t)
@@ -1025,8 +1021,9 @@ function drawHUD()
     textMode(CORNER)
     neonText("Chrome Cannon Glass", 22, HEIGHT - 34, 24)
     neonText(string.format(
-        "Aim · FIRE/Tab · panes %d/%d · KE %.0f · IN %.2f OUT %.2f",
-        brokenCount, PANE_COUNT, lastKe, inputLevel, outputLevel), 22, HEIGHT - 58, 14)
+        "Aim · FIRE/Tab · panes %d/%d · KE %.0f · IN %.2f OUT %.2f · GPU %.0fMB",
+        brokenCount, PANE_COUNT, lastKe, inputLevel, outputLevel,
+        (GpuRam.bytes or 0) / (1024 * 1024)), 22, HEIGHT - 58, 14)
 
     if messageTimer > 0 and message ~= "" then
         textAlign(CENTER)
