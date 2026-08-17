@@ -8,3 +8,5 @@ Load on iPad:
 5. Tap it → Play (landscape)
 
 Controls: drag to aim, FIRE (or Tab) to shoot, RESET to reload.
+Yell into the mic or crank OutputVolume and fire to shatter the main-screen glass.
+Tweaking InputGain or OutputVolume resets the screen glass each time.

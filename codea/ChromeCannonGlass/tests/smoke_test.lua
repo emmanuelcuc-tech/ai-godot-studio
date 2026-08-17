@@ -57,6 +57,24 @@ check("muzzle along +x", math.abs(mx - 78) < 1e-9 and math.abs(my) < 1e-9)
 local vx, vy = Glass.muzzleVelocity(0, 980)
 check("muzzle vel right", math.abs(vx - 980) < 1e-9 and math.abs(vy) < 1e-9)
 
+-- Screen-glass audio
+local inn, outt = Glass.audioLevels(0.4, 2, 1, 0.8)
+check("input = mic * gain", math.abs(inn - 0.8) < 1e-9)
+check("output = peak * volume", math.abs(outt - 0.8) < 1e-9)
+local loud, peak, src = Glass.isTooLoud(0.9, 0.2, 0.62)
+check("too loud on input", loud == true and src == "input")
+local quiet = Glass.isTooLoud(0.1, 0.1, 0.62)
+check("quiet is not too loud", quiet == false)
+check("tweak input resets", Glass.tweakChanged(1, 0.7, 1.5, 0.7) == true)
+check("tweak output resets", Glass.tweakChanged(1, 0.7, 1, 1.2) == true)
+check("no tweak when still", Glass.tweakChanged(1, 0.7, 1, 0.7) == false)
+
+local tiles = Glass.screenTileGrid(8, 5, 800, 400)
+check("screen grid 8x5", #tiles == 40)
+check("first tile centered in cell", math.abs(tiles[1].x - 50) < 1e-6 and math.abs(tiles[1].y - 40) < 1e-6)
+local bvx, bvy = Glass.screenBurstVelocity(800, 400, 400, 200, 1)
+check("burst flies away from center", bvx > 0 and bvy > 0)
+
 if fails > 0 then
     print("\n" .. fails .. " failure(s)")
     os.exit(1)

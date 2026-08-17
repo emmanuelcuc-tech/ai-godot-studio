@@ -114,3 +114,62 @@ function Glass.muzzleVelocity(angle, speed)
     speed = speed or 900
     return math.cos(angle) * speed, math.sin(angle) * speed
 end
+
+-- Audio: input = mic * gain, output = peak * volume (both 0+).
+function Glass.audioLevels(micAmp, inputGain, outputPeak, outputVolume)
+    local inputLevel = math.max(0, (micAmp or 0) * (inputGain or 1))
+    local outputLevel = math.max(0, (outputPeak or 0) * (outputVolume or 1))
+    return inputLevel, outputLevel
+end
+
+function Glass.isTooLoud(inputLevel, outputLevel, threshold)
+    threshold = threshold or 0.62
+    local loudest = math.max(inputLevel or 0, outputLevel or 0)
+    return loudest >= threshold, loudest, (inputLevel or 0) >= (outputLevel or 0) and "input" or "output"
+end
+
+-- True when InputGain or OutputVolume sliders moved enough to reset glass.
+function Glass.tweakChanged(prevIn, prevOut, newIn, newOut, epsilon)
+    epsilon = epsilon or 0.012
+    prevIn = prevIn or newIn or 0
+    prevOut = prevOut or newOut or 0
+    newIn = newIn or 0
+    newOut = newOut or 0
+    return math.abs(newIn - prevIn) > epsilon or math.abs(newOut - prevOut) > epsilon
+end
+
+-- Grid of screen-glass tiles covering the display (centers + sizes).
+function Glass.screenTileGrid(cols, rows, width, height)
+    cols = math.max(1, math.floor(cols or 8))
+    rows = math.max(1, math.floor(rows or 5))
+    width = width or 1024
+    height = height or 768
+    local tw, th = width / cols, height / rows
+    local tiles = {}
+    for r = 1, rows do
+        for c = 1, cols do
+            tiles[#tiles + 1] = {
+                x = (c - 0.5) * tw,
+                y = (r - 0.5) * th,
+                w = tw,
+                h = th,
+                col = c,
+                row = r,
+            }
+        end
+    end
+    return tiles
+end
+
+-- Burst velocity for a screen tile flying off the display.
+function Glass.screenBurstVelocity(tileX, tileY, cx, cy, loudness)
+    loudness = math.max(0.2, loudness or 1)
+    local dx = (tileX or 0) - (cx or 0)
+    local dy = (tileY or 0) - (cy or 0)
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len < 1 then
+        dx, dy, len = 1, 0.4, 1
+    end
+    local sp = 220 + loudness * 480
+    return (dx / len) * sp, (dy / len) * sp + 80
+end

@@ -27,7 +27,9 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 | **FIRE** button | Shoot chrome ball |
 | **Tab** or **Space** (hardware keyboard) | Shoot |
 | **RESET** button or **R** | Reload panes + ball |
-| Sidebar **MuzzleSpeed** / **Fire** / **Reset** | Tune & fire |
+| Sidebar **InputGain** / **OutputVolume** | Tweaking either **resets** the main-screen glass |
+| Sidebar **LoudnessBreak** | How loud is “too loud” |
+| **Yell into mic** or **crank output + FIRE** | Main screen glass shatters and flies away |
 
 ## What you get
 
@@ -35,6 +37,8 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 - **KE = ½mv²** decides whether a pane shatters; breaking costs energy
 - **5 glass panes** in a row; each explodes into flying shards
 - **Slow-mo** while the ball travels the glass corridor
+- **Main-screen glass overlay** — shatters when **mic input** or **speaker output** is too loud
+- Tweaking **InputGain** or **OutputVolume** always **resets** the screen glass
 - Touch-friendly FIRE / RESET for iPad (no keyboard required)
 
 ## Requirements

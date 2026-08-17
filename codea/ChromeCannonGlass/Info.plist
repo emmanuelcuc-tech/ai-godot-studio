@@ -8,7 +8,7 @@
 		<string>Glass</string>
 	</array>
 	<key>Description</key>
-	<string>Aim a cannon and fire a chrome ball through five spaced glass panes. Real kinetic energy, shard destruction, and slow-motion flight.</string>
+	<string>Chrome cannon through five glass panes. Main-screen glass shatters when mic input or speaker output is too loud; tweaking InputGain or OutputVolume resets it.</string>
 	<key>Author</key>
 	<string>AI Godot Studio / Codea</string>
 	<key>Name</key>
