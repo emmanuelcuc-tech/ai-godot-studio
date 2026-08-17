@@ -6,6 +6,14 @@ Mixer.UNITY = 0.8
 Mixer.MAX = 1.25
 Mixer.CHANNELS = { "input", "output", "fire", "hit", "glass" }
 Mixer.STRIPS = { "input", "output", "fire", "hit", "glass", "master" }
+Mixer.PAGES = { "play", "input", "output", "mixer" }
+
+function Mixer.isPage(id)
+    for _, p in ipairs(Mixer.PAGES) do
+        if p == id then return true end
+    end
+    return false
+end
 
 function Mixer.defaults()
     return {

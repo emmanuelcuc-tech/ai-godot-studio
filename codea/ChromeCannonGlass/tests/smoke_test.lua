@@ -120,6 +120,9 @@ local h0 = Mixer.neonHue(0)
 local h1 = Mixer.neonHue(math.pi / (2 * 1.35))
 check("neon hue in blue-pink-red arc", h0 >= 205 and h0 <= 360 and h1 >= 205 and h1 <= 360)
 check("neon hue travels", math.abs(h1 - h0) > 20)
+check("settings pages include input/output", Mixer.isPage("input") and Mixer.isPage("output"))
+check("play is a page", Mixer.isPage("play") == true)
+check("unknown page rejected", Mixer.isPage("foo") == false)
 
 if fails > 0 then
     print("\n" .. fails .. " failure(s)")

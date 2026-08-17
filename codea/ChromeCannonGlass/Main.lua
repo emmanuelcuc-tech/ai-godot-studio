@@ -71,7 +71,7 @@ micPulse = 0
 MIC_FLOOR = 0.03
 
 -- FL-style mixer (Master + strips). Filled in setup() after Mixer.lua loads.
-uiPage = "play" -- play | mixer
+uiPage = "play" -- play | input | output | mixer
 mixVols = nil
 prevMixVols = nil
 mixerDrag = nil
@@ -93,6 +93,12 @@ function setup()
     end)
     parameter.action("Reset Screen Glass", function()
         resetScreenGlass()
+    end)
+    parameter.action("Input Audio", function()
+        uiPage = "input"
+    end)
+    parameter.action("Output Audio", function()
+        uiPage = "output"
     end)
     parameter.action("Mixer Page", function()
         uiPage = "mixer"
@@ -176,7 +182,7 @@ function loadAllSettings()
         local ld = readProjectData("loudness")
         if ld then LoudnessBreak = ld end
         local page = readProjectData("uiPage")
-        if page == "mixer" or page == "play" then
+        if Mixer.isPage(page) then
             uiPage = page
         end
     end)
@@ -361,11 +367,17 @@ end
 function draw()
     if uiPage == "mixer" then
         drawMixerPage()
-        updateSlowMo()
-        updateAudioGlass()
-        if messageTimer > 0 then
-            messageTimer = messageTimer - DeltaTime
-        end
+        updateSettingsAudio()
+        return
+    end
+    if uiPage == "input" then
+        drawInputAudioPage()
+        updateSettingsAudio()
+        return
+    end
+    if uiPage == "output" then
+        drawOutputAudioPage()
+        updateSettingsAudio()
         return
     end
 
@@ -395,6 +407,14 @@ function draw()
     if fireFlash > 0 then
         fireFlash = math.max(0, fireFlash - DeltaTime * 2.2)
     end
+    if messageTimer > 0 then
+        messageTimer = messageTimer - DeltaTime
+    end
+end
+
+function updateSettingsAudio()
+    updateSlowMo()
+    updateAudioGlass()
     if messageTimer > 0 then
         messageTimer = messageTimer - DeltaTime
     end
@@ -580,14 +600,7 @@ end
 
 function touched(touch)
     if touch.state == BEGAN then
-        if hitButton(touch, playTabBtn()) then
-            uiPage = "play"
-            mixerDrag = nil
-            knobDrag = nil
-            return
-        end
-        if hitButton(touch, mixerTabBtn()) then
-            uiPage = "mixer"
+        if hitSettingsTab(touch) then
             mixerDrag = nil
             knobDrag = nil
             aiming = false
@@ -607,6 +620,7 @@ function touched(touch)
                 mixVols = Mixer.setAll(mixVols or Mixer.defaults(), Mixer.UNITY)
                 syncGainsFromMixer()
                 resetScreenGlass()
+                saveAllSettings()
                 message = "All volumes (incl. Master) set to 80%"
                 messageTimer = 1.8
                 return
@@ -614,6 +628,15 @@ function touched(touch)
             local id = mixerStripAt(touch.x, touch.y)
             if id then
                 mixerDrag = id
+                applyMixerTouch(touch)
+            end
+            return
+        end
+        if uiPage == "input" or uiPage == "output" then
+            local sf = settingsFaderRect()
+            if sf and touch.x >= sf.x and touch.x <= sf.x + sf.w
+                and touch.y >= sf.y and touch.y <= sf.y + sf.h then
+                mixerDrag = sf.id
                 applyMixerTouch(touch)
             end
             return
@@ -634,7 +657,7 @@ function touched(touch)
     elseif touch.state == MOVING then
         if knobDrag then
             applyKnobTwist(touch)
-        elseif uiPage == "mixer" and mixerDrag then
+        elseif (uiPage == "mixer" or uiPage == "input" or uiPage == "output") and mixerDrag then
             applyMixerTouch(touch)
         elseif aiming then
             aimFromTouch(touch)
@@ -663,11 +686,15 @@ end
 
 function keyboard(key)
     if key == "\t" or key == "tab" then
-        if uiPage == "mixer" then
+        if uiPage ~= "play" then
             uiPage = "play"
         else
             fireCannon()
         end
+    elseif key == "i" or key == "I" then
+        uiPage = "input"
+    elseif key == "o" or key == "O" then
+        uiPage = "output"
     elseif key == "m" or key == "M" then
         uiPage = (uiPage == "mixer") and "play" or "mixer"
     elseif key == " " then
@@ -698,11 +725,38 @@ function resetBtn()
 end
 
 function playTabBtn()
-    return { x = 22, y = HEIGHT - 92, w = 108, h = 34 }
+    return tabRects()[1]
 end
 
 function mixerTabBtn()
-    return { x = 138, y = HEIGHT - 92, w = 108, h = 34 }
+    return tabRects()[4]
+end
+
+function tabRects()
+    local items = {
+        { id = "play", label = "PLAY" },
+        { id = "input", label = "IN" },
+        { id = "output", label = "OUT" },
+        { id = "mixer", label = "MIXER" },
+    }
+    local w, gap = 94, 8
+    local x = 22
+    local out = {}
+    for i, it in ipairs(items) do
+        out[i] = { id = it.id, label = it.label, x = x, y = HEIGHT - 92, w = w, h = 34 }
+        x = x + w + gap
+    end
+    return out
+end
+
+function hitSettingsTab(touch)
+    for _, t in ipairs(tabRects()) do
+        if hitButton(touch, t) then
+            uiPage = t.id
+            return true
+        end
+    end
+    return false
 end
 
 function setAllBtn()
@@ -961,7 +1015,6 @@ function drawButtons()
 end
 
 function drawPageTabs()
-    local p, m = playTabBtn(), mixerTabBtn()
     local function tab(b, label, on)
         if on then
             fill(18, 10, 12, 240)
@@ -971,10 +1024,11 @@ function drawPageTabs()
         rect(b.x, b.y, b.w, b.h, 8)
         textAlign(CENTER)
         textMode(CENTER)
-        neonText(label, b.x + b.w * 0.5, b.y + b.h * 0.5, 16)
+        neonText(label, b.x + b.w * 0.5, b.y + b.h * 0.5, 15)
     end
-    tab(p, "PLAY", uiPage == "play")
-    tab(m, "MIXER", uiPage == "mixer")
+    for _, t in ipairs(tabRects()) do
+        tab(t, t.label, uiPage == t.id)
+    end
 end
 
 function mixerStripRects()
@@ -1007,16 +1061,46 @@ end
 function applyMixerTouch(touch)
     if not mixerDrag then return end
     mixVols = mixVols or Mixer.defaults()
-    local rects = mixerStripRects()
-    local r = rects[mixerDrag]
+    local r
+    local sf = settingsFaderRect()
+    if sf and sf.id == mixerDrag then
+        r = sf
+    else
+        r = mixerStripRects()[mixerDrag]
+    end
     if not r then return end
     local pad = 28
     mixVols[mixerDrag] = Mixer.volumeFromFaderY(touch.y, r.y + pad, r.y + r.h - pad)
     syncGainsFromMixer()
 end
 
+function settingsFaderRect()
+    if uiPage ~= "input" and uiPage ~= "output" then
+        return nil
+    end
+    return {
+        id = (uiPage == "input") and "input" or "output",
+        x = WIDTH - 128,
+        y = 88,
+        w = 78,
+        h = HEIGHT - 220,
+    }
+end
+
 function volumeKnobLayout()
-    -- Same IN / OUT pots on PLAY and MIXER so you can always twist them.
+    mixVols = mixVols or Mixer.defaults()
+    if uiPage == "input" then
+        return { input = { x = WIDTH * 0.42, y = HEIGHT * 0.42, r = 92 } }
+    end
+    if uiPage == "output" then
+        return {
+            output = { x = WIDTH * 0.5, y = HEIGHT * 0.44, r = 78 },
+            fire = { x = WIDTH * 0.22, y = HEIGHT * 0.52, r = 38 },
+            hit = { x = WIDTH * 0.78, y = HEIGHT * 0.52, r = 38 },
+            glass = { x = WIDTH * 0.22, y = HEIGHT * 0.22, r = 38 },
+            master = { x = WIDTH * 0.78, y = HEIGHT * 0.22, r = 38 },
+        }
+    end
     return {
         input = { x = WIDTH * 0.48, y = 96, r = 46 },
         output = { x = WIDTH * 0.48 + 114, y = 96, r = 46 },
@@ -1025,8 +1109,11 @@ end
 
 function volumeKnobAt(px, py)
     local layout = volumeKnobLayout()
-    if Mixer.hitKnob(px, py, layout.input) then return "input" end
-    if Mixer.hitKnob(px, py, layout.output) then return "output" end
+    for id, k in pairs(layout) do
+        if Mixer.hitKnob(px, py, k) then
+            return id
+        end
+    end
     return nil
 end
 
@@ -1044,8 +1131,13 @@ end
 function drawVolumeKnobs()
     mixVols = mixVols or Mixer.defaults()
     local layout = volumeKnobLayout()
-    drawTwistKnob(layout.input, mixVols.input, "IN")
-    drawTwistKnob(layout.output, mixVols.output, "OUT")
+    local names = {
+        input = "IN", output = "OUT", fire = "FIRE",
+        hit = "HIT", glass = "GLASS", master = "MASTER",
+    }
+    for id, k in pairs(layout) do
+        drawTwistKnob(k, mixVols[id], names[id] or string.upper(id))
+    end
 end
 
 function drawTwistKnob(k, vol, label)
@@ -1118,6 +1210,75 @@ function drawMixerPage()
         rectMode(CENTER)
         rect(WIDTH * 0.5, 36, math.min(WIDTH * 0.9, 720), 40)
         rectMode(CORNER)
+        neonText(message, WIDTH * 0.5, 36, 18)
+    end
+end
+
+function drawSettingsChrome(title, subtitle)
+    drawLeather()
+    fill(8, 5, 6, 200)
+    rect(0, HEIGHT - 108, WIDTH, 108)
+    textAlign(LEFT)
+    textMode(CORNER)
+    neonText(title, 22, HEIGHT - 34, 22)
+    neonText(subtitle, 22, HEIGHT - 56, 13)
+    drawPageTabs()
+end
+
+function drawSettingsFader(r, vol, label)
+    if not r then return end
+    fill(12, 8, 9)
+    rect(r.x, r.y, r.w, r.h, 8)
+    local pad = 28
+    local y0, y1 = r.y + pad, r.y + r.h - pad
+    local fx = r.x + r.w * 0.5
+    stroke(20, 16, 16)
+    strokeWidth(6)
+    line(fx, y0, fx, y1)
+    noStroke()
+    local fy = Mixer.faderYFromVolume(vol, y0, y1)
+    local nr, ng, nb = Mixer.neonRGB(ElapsedTime or 0, 1)
+    fill(nr, ng, nb)
+    rect(fx - 16, fy - 9, 32, 18, 4)
+    textAlign(CENTER)
+    textMode(CENTER)
+    neonText(label, r.x + r.w * 0.5, r.y + r.h - 12, 12)
+    neonText(string.format("%.0f%%", (vol / Mixer.UNITY) * 100), r.x + r.w * 0.5, r.y + 14, 12)
+end
+
+function drawInputAudioPage()
+    mixVols = mixVols or Mixer.defaults()
+    drawSettingsChrome("Input Audio", "Twist the IN knob  ·  or drag the fader  ·  mic lamp shows level")
+    drawMicSpeakerLamps()
+    drawVolumeKnobs()
+    drawSettingsFader(settingsFaderRect(), mixVols.input or Mixer.UNITY, "IN")
+    textAlign(CENTER)
+    textMode(CENTER)
+    neonText(micOn and "MIC LIVE" or "MIC OFF", WIDTH * 0.42, HEIGHT * 0.18, 16)
+    neonText(string.format("level %.2f  ·  %s", inputLevel, micLampMode), WIDTH * 0.42, HEIGHT * 0.12, 14)
+    if messageTimer > 0 and message ~= "" then
+        neonText(message, WIDTH * 0.5, 36, 18)
+    end
+end
+
+function drawOutputAudioPage()
+    mixVols = mixVols or Mixer.defaults()
+    drawSettingsChrome("Output Audio", "Twist OUT / FIRE / HIT / GLASS / MASTER  ·  fader is speaker level")
+    drawVolumeKnobs()
+    drawSettingsFader(settingsFaderRect(), mixVols.output or Mixer.UNITY, "OUT")
+    local wellH = math.min(200, HEIGHT * 0.28)
+    local x = 56
+    fill(16, 16, 20, 200)
+    rect(x - 14, 90, 28, wellH, 4)
+    local h = Mixer.volumeHeight(math.min(1, outputLevel), wellH - 6)
+    if h > 1 then
+        fill(255, 170, 50, 220)
+        rect(x - 10, 93, 20, h, 3)
+    end
+    textAlign(CENTER)
+    textMode(CENTER)
+    neonText(string.format("SPK %.0f", math.min(1, outputLevel) * 100), x, 90 + wellH + 14, 12)
+    if messageTimer > 0 and message ~= "" then
         neonText(message, WIDTH * 0.5, 36, 18)
     end
 end
