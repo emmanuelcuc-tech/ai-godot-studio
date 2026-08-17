@@ -99,11 +99,24 @@ function setup()
         mixVols = Mixer.setAll(mixVols or Mixer.defaults(), Mixer.UNITY)
         syncGainsFromMixer()
         resetScreenGlass()
+        saveAllSettings()
         message = "All volumes (incl. Master) set to 80%"
         messageTimer = 1.8
     end)
+    parameter.action("Save Settings", function()
+        saveAllSettings()
+        message = "Settings saved"
+        messageTimer = 1.4
+    end)
+    parameter.action("Load Settings", function()
+        loadAllSettings()
+        syncGainsFromMixer()
+        message = "Settings loaded"
+        messageTimer = 1.4
+    end)
 
     mixVols = Mixer.defaults()
+    loadAllSettings()
     prevMixVols = Mixer.copy(mixVols)
     syncGainsFromMixer()
 
@@ -127,11 +140,44 @@ function startMic()
 end
 
 function cleanup()
+    saveAllSettings()
     if mic and mic.stop then
         pcall(function()
             mic.stop()
         end)
     end
+end
+
+function saveAllSettings()
+    mixVols = mixVols or Mixer.defaults()
+    pcall(function()
+        for _, k in ipairs(Mixer.STRIPS) do
+            saveProjectData("vol_" .. k, mixVols[k])
+        end
+        saveProjectData("muzzle", MUZZLE_SPEED)
+        saveProjectData("loudness", LoudnessBreak or 0.62)
+        saveProjectData("uiPage", uiPage or "play")
+    end)
+end
+
+function loadAllSettings()
+    mixVols = mixVols or Mixer.defaults()
+    pcall(function()
+        for _, k in ipairs(Mixer.STRIPS) do
+            local v = readProjectData("vol_" .. k)
+            if v ~= nil then
+                mixVols[k] = Mixer.clamp(v)
+            end
+        end
+        local mz = readProjectData("muzzle")
+        if mz then MUZZLE_SPEED = mz end
+        local ld = readProjectData("loudness")
+        if ld then LoudnessBreak = ld end
+        local page = readProjectData("uiPage")
+        if page == "mixer" or page == "play" then
+            uiPage = page
+        end
+    end)
 end
 
 function readMicAmp()
@@ -321,9 +367,8 @@ function draw()
         return
     end
 
-    -- Soft workshop atmosphere
-    background(22, 26, 34)
-    drawBackdrop()
+    -- Black leather studio
+    drawLeather()
     drawGround()
     drawCannon()
     drawPanes()
@@ -654,30 +699,88 @@ end
 
 -- Drawing --------------------------------------------------------------
 
-function drawBackdrop()
-    -- Floor shadow band + ceiling wash
+function neonFill(alpha, value)
+    local t = ElapsedTime or 0
+    local r, g, b = Mixer.neonRGB(t, value or 1)
+    fill(r, g, b, alpha or 255)
+    return r, g, b
+end
+
+function neonText(str, x, y, size)
+    size = size or 22
+    font("HelveticaNeue-Bold")
+    fontSize(size)
+    local t = ElapsedTime or 0
+    local r, g, b = Mixer.neonRGB(t, 1)
+    -- Tube glow (light-bulb halo)
+    fill(r, g, b, 28)
+    text(str, x + 2, y)
+    text(str, x - 2, y)
+    text(str, x, y + 2)
+    text(str, x, y - 2)
+    fill(r, g, b, 70)
+    text(str, x + 1, y)
+    text(str, x - 1, y)
+    -- Phosphor
+    fill(r, g, b, 220)
+    text(str, x, y)
+    -- Hot filament
+    fill(math.min(255, r + 90), math.min(255, g + 90), math.min(255, b + 90), 255)
+    text(str, x, y)
+end
+
+function drawLeather()
+    background(5, 3, 4)
     noStroke()
-    for i = 0, 10 do
-        local t = i / 10
-        fill(28 + t * 8, 32 + t * 6, 42 + t * 4)
-        rect(0, HEIGHT * (0.55 + t * 0.045), WIDTH, HEIGHT * 0.05)
+    -- Hide patches
+    for i = 0, 22 do
+        local gx = (i * 137 + 19) % (WIDTH + 80) - 40
+        local gy = (i * 89 + 7) % (HEIGHT + 60) - 30
+        fill(12 + (i % 5), 8, 9, 70)
+        ellipse(gx, gy, 220 - (i % 6) * 18, 110)
     end
-    -- Soft spotlight over corridor
-    fill(60, 70, 90, 28)
-    ellipse(WIDTH * 0.55, corridorY + 40, WIDTH * 0.7, PANE_H * 1.6)
+    -- Pebbled grain
+    for i = 0, 90 do
+        local x = (i * 73 + 11) % WIDTH
+        local y = (i * 47 + 23) % HEIGHT
+        fill(18, 12, 12, 40)
+        ellipse(x, y, 16 + (i % 6) * 3, 11 + (i % 4) * 2)
+        fill(3, 1, 2, 50)
+        ellipse(x + 3, y - 2, 7, 5)
+    end
+    -- Wet sheen
+    fill(42, 30, 32, 18)
+    ellipse(WIDTH * 0.38, HEIGHT * 0.72, WIDTH * 0.85, HEIGHT * 0.28)
+    fill(28, 20, 22, 14)
+    ellipse(WIDTH * 0.7, HEIGHT * 0.25, WIDTH * 0.5, HEIGHT * 0.2)
+    -- Stitching
+    stroke(32, 22, 20, 90)
+    strokeWidth(1.2)
+    line(14, 14, WIDTH - 14, 14)
+    line(14, HEIGHT - 14, WIDTH - 14, HEIGHT - 14)
+    line(14, 14, 14, HEIGHT - 14)
+    line(WIDTH - 14, 14, WIDTH - 14, HEIGHT - 14)
+    noStroke()
+end
+
+function drawBackdrop()
 end
 
 function drawGround()
     noStroke()
-    fill(38, 42, 52)
+    fill(8, 5, 6)
     rect(0, 0, WIDTH, groundY)
-    fill(48, 54, 66)
-    rect(0, groundY - 6, WIDTH, 8)
-    -- Floor planks
-    stroke(30, 34, 42)
+    for i = 0, 24 do
+        fill(16, 10, 10, 40)
+        ellipse((i * 53) % WIDTH, groundY * 0.45, 50, 22)
+    end
+    fill(22, 14, 14)
+    rect(0, groundY - 5, WIDTH, 6)
+    -- Leather stitch on floor edge
+    stroke(36, 24, 22, 100)
     strokeWidth(1)
-    for x = 0, WIDTH, 48 do
-        line(x, 8, x + 20, groundY - 10)
+    for x = 20, WIDTH - 20, 18 do
+        line(x, groundY - 2, x + 8, groundY - 2)
     end
     noStroke()
 end
@@ -717,7 +820,8 @@ function drawCannon()
 
     -- Aim guide
     if state == "ready" then
-        stroke(180, 200, 255, 70)
+        local nr, ng, nb = Mixer.neonRGB(ElapsedTime or 0, 1)
+        stroke(nr, ng, nb, 90)
         strokeWidth(2)
         local mx, my = Glass.cannonMuzzle(cannonPos.x, cannonPos.y, aimAngle, 78)
         local ex = mx + math.cos(aimAngle) * 160
@@ -742,11 +846,10 @@ function drawPanes()
             line(p.x - 2, p.y - PANE_H * 0.4, p.x + 2, p.y + PANE_H * 0.35)
             noStroke()
             -- Pane number
-            fill(220, 235, 255, 160)
             fontSize(14)
             textAlign(CENTER)
             textMode(CENTER)
-            text(tostring(p.index), p.x, p.y + PANE_H * 0.5 + 18)
+            neonText(tostring(p.index), p.x, p.y + PANE_H * 0.5 + 18, 14)
         else
             -- Empty frame posts
             fill(50, 54, 62, 120)
@@ -806,67 +909,52 @@ function drawMetallicBall(x, y, r, angle)
 end
 
 function drawHUD()
-    fill(230, 235, 245)
-    font("HelveticaNeue-Light")
-    fontSize(22)
     textAlign(LEFT)
     textMode(CORNER)
-    text("Chrome Cannon Glass", 22, HEIGHT - 34)
-
-    fontSize(15)
-    fill(160, 175, 195)
-    text(string.format(
+    neonText("Chrome Cannon Glass", 22, HEIGHT - 34, 24)
+    neonText(string.format(
         "Aim · FIRE/Tab · panes %d/%d · KE %.0f · IN %.2f OUT %.2f",
-        brokenCount, PANE_COUNT, lastKe, inputLevel, outputLevel), 22, HEIGHT - 56)
+        brokenCount, PANE_COUNT, lastKe, inputLevel, outputLevel), 22, HEIGHT - 58, 14)
 
     if messageTimer > 0 and message ~= "" then
-        fontSize(22)
         textAlign(CENTER)
         textMode(CENTER)
-        fill(0, 0, 0, 150)
+        fill(0, 0, 0, 160)
         rectMode(CENTER)
         rect(WIDTH * 0.5, HEIGHT * 0.9, math.min(WIDTH * 0.9, 720), 48)
         rectMode(CORNER)
-        fill(255, 230, 150)
-        text(message, WIDTH * 0.5, HEIGHT * 0.9)
+        neonText(message, WIDTH * 0.5, HEIGHT * 0.9, 20)
     end
 end
 
 function drawButtons()
     local f, r = fireBtn(), resetBtn()
-    -- Reset
-    fill(50, 58, 72)
+    fill(12, 8, 8, 220)
     rect(r.x, r.y, r.w, r.h, 10)
-    fill(200, 210, 225)
-    fontSize(18)
     textAlign(CENTER)
     textMode(CENTER)
-    text("RESET", r.x + r.w * 0.5, r.y + r.h * 0.5)
-    -- Fire
+    neonText("RESET", r.x + r.w * 0.5, r.y + r.h * 0.5, 18)
     if state == "ready" then
-        fill(180, 70, 55)
+        fill(40, 8, 12, 230)
     else
-        fill(90, 50, 45)
+        fill(18, 8, 8, 230)
     end
     rect(f.x, f.y, f.w, f.h, 10)
-    fill(255, 240, 230)
-    text("FIRE", f.x + f.w * 0.5, f.y + f.h * 0.5)
+    neonText("FIRE", f.x + f.w * 0.5, f.y + f.h * 0.5, 18)
 end
 
 function drawPageTabs()
     local p, m = playTabBtn(), mixerTabBtn()
     local function tab(b, label, on)
         if on then
-            fill(232, 148, 72)
+            fill(18, 10, 12, 240)
         else
-            fill(48, 52, 62)
+            fill(10, 7, 8, 220)
         end
         rect(b.x, b.y, b.w, b.h, 8)
-        fill(on and 20 or 220, on and 20 or 225, on and 18 or 235)
-        fontSize(16)
         textAlign(CENTER)
         textMode(CENTER)
-        text(label, b.x + b.w * 0.5, b.y + b.h * 0.5)
+        neonText(label, b.x + b.w * 0.5, b.y + b.h * 0.5, 16)
     end
     tab(p, "PLAY", uiPage == "play")
     tab(m, "MIXER", uiPage == "mixer")
@@ -911,29 +999,21 @@ function applyMixerTouch(touch)
 end
 
 function drawMixerPage()
-    background(28, 28, 32)
-    -- FL-ish top bar
-    fill(18, 18, 20)
+    drawLeather()
+    fill(8, 5, 6, 200)
     rect(0, HEIGHT - 108, WIDTH, 108)
-    fill(232, 148, 72)
-    font("HelveticaNeue-Light")
-    fontSize(22)
     textAlign(LEFT)
     textMode(CORNER)
-    text("Mixer  ·  Master + all volumes", 22, HEIGHT - 34)
-    fontSize(14)
-    fill(170, 170, 180)
-    text("Drag faders  ·  SET ALL 80%  ·  tweak any strip to reset screen glass", 22, HEIGHT - 56)
+    neonText("Mixer  ·  Master + all volumes", 22, HEIGHT - 34, 22)
+    neonText("Drag faders  ·  SET ALL 80%  ·  tweak any strip to reset screen glass", 22, HEIGHT - 56, 13)
 
     drawPageTabs()
     local all = setAllBtn()
-    fill(70, 78, 92)
+    fill(12, 8, 8, 230)
     rect(all.x, all.y, all.w, all.h, 8)
-    fill(240, 230, 210)
-    fontSize(14)
     textAlign(CENTER)
     textMode(CENTER)
-    text("SET ALL 80%", all.x + all.w * 0.5, all.y + all.h * 0.5)
+    neonText("SET ALL 80%", all.x + all.w * 0.5, all.y + all.h * 0.5, 14)
 
     mixVols = mixVols or Mixer.defaults()
     local rects = mixerStripRects()
@@ -942,15 +1022,13 @@ function drawMixerPage()
     end
 
     if messageTimer > 0 and message ~= "" then
-        fontSize(20)
         textAlign(CENTER)
         textMode(CENTER)
-        fill(0, 0, 0, 150)
+        fill(0, 0, 0, 160)
         rectMode(CENTER)
         rect(WIDTH * 0.5, 36, math.min(WIDTH * 0.9, 720), 40)
         rectMode(CORNER)
-        fill(255, 230, 150)
-        text(message, WIDTH * 0.5, 36)
+        neonText(message, WIDTH * 0.5, 36, 18)
     end
 end
 
@@ -958,9 +1036,9 @@ function drawMixerStrip(r, id, vol)
     if not r then return end
     local master = (id == "master")
     if master then
-        fill(48, 40, 34)
+        fill(18, 10, 10)
     else
-        fill(40, 42, 48)
+        fill(12, 8, 9)
     end
     rect(r.x, r.y, r.w, r.h, 8)
 
@@ -1011,14 +1089,10 @@ function drawMixerStrip(r, id, vol)
     fill(255, 200, 80, 160)
     rect(fx + 16, uy - 1, 8, 2)
 
-    fill(230, 230, 235)
-    fontSize(13)
     textAlign(CENTER)
     textMode(CENTER)
-    text(Mixer.stripLabel(id), r.x + r.w * 0.5, r.y + 14)
-    fontSize(12)
-    fill(180, 180, 190)
-    text(string.format("%.0f%%", (vol / Mixer.UNITY) * 100), r.x + r.w * 0.5, r.y + r.h - 14)
+    neonText(Mixer.stripLabel(id), r.x + r.w * 0.5, r.y + 14, 13)
+    neonText(string.format("%.0f%%", (vol / Mixer.UNITY) * 100), r.x + r.w * 0.5, r.y + r.h - 14, 12)
 end
 
 -- Main-screen glass (loud input/output) --------------------------------
@@ -1040,6 +1114,7 @@ function updateAudioGlass()
             Mixer.stripLabel(which))
         messageTimer = 1.6
         prevMixVols = Mixer.copy(mixVols)
+        saveAllSettings()
     end
 
     outputPeak = outputPeak * math.max(0, 1 - dt * 1.35)
@@ -1170,8 +1245,8 @@ function drawMeters()
     fontSize(12)
     textAlign(LEFT)
     textMode(CORNER)
-    text(screenBroken and "screen: shattered — tweak MIXER to reset"
-        or "screen: intact — too loud = break", 22, 58)
+    neonText(screenBroken and "screen: shattered — tweak MIXER to reset"
+        or "screen: intact — too loud = break", 22, 58, 12)
 end
 
 function drawMicSpeakerLamps()
@@ -1209,11 +1284,9 @@ function drawMicSpeakerLamps()
         fill(50, 16, 18)
         ellipse(micX, baseY + 52, 14)
     end
-    fill(230, 230, 235)
-    fontSize(11)
     textAlign(CENTER)
     textMode(CENTER)
-    text("MIC", micX, baseY - 18)
+    neonText("MIC", micX, baseY - 18, 12)
 
     -- Volume as HEIGHT: mic column (red) + speaker playback column (amber)
     local function volumeColumn(x, level, r, g, b, label)
@@ -1228,9 +1301,7 @@ function drawMicSpeakerLamps()
             fill(255, math.min(255, g + 40), math.min(255, b + 40), 200)
             rect(x - 8, baseY + 73 + h - 4, 16, 5)
         end
-        fill(200, 205, 215)
-        fontSize(11)
-        text(label, x, baseY + 70 + wellH + 12)
+        neonText(label, x, baseY + 70 + wellH + 12, 11)
     end
     volumeColumn(micX, micHeight, 230, 36, 40, string.format("IN %.0f", micHeight * 100))
     volumeColumn(outX, math.min(1, outputLevel), 255, 170, 50, string.format("OUT %.0f", math.min(1, outputLevel) * 100))

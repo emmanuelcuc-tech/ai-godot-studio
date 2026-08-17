@@ -103,6 +103,15 @@ check("mic lamp remains after audio", hold2 > 0)
 check("volume height scales", math.abs(Mixer.volumeHeight(0.5, 200) - 100) < 1e-9)
 check("volume height silent is 0", Mixer.volumeHeight(0, 200) == 0)
 
+local hr, hg, hb = Mixer.hsv(210, 1, 1)
+check("hsv blue is blue-ish", hb > hr and hb > hg)
+local rr, rg, rb = Mixer.hsv(0, 1, 1)
+check("hsv red is red", rr > 200 and rg < 40 and rb < 40)
+local h0 = Mixer.neonHue(0)
+local h1 = Mixer.neonHue(math.pi / (2 * 1.35))
+check("neon hue in blue-pink-red arc", h0 >= 205 and h0 <= 360 and h1 >= 205 and h1 <= 360)
+check("neon hue travels", math.abs(h1 - h0) > 20)
+
 if fails > 0 then
     print("\n" .. fails .. " failure(s)")
     os.exit(1)

@@ -8,6 +8,6 @@ Load on iPad:
 5. Tap it → Play (landscape)
 
 PLAY tab: drag to aim, FIRE (or Tab) to shoot, RESET to reload.
+Black leather background. Neon tube type cycles bright blue → pink → red.
 MIXER tab: Fruity Loops–style Master + all volumes. SET ALL 80% for unity.
-Yell into the mic or crank Master/OUT and fire to shatter the main-screen glass.
-Tweaking any mixer fader resets the screen glass.
+Sidebar Save / Load stores mixer volumes. Tweaking any fader resets screen glass.

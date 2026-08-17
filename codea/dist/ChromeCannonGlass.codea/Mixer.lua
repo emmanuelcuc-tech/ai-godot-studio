@@ -137,3 +137,42 @@ function Mixer.volumeHeight(level, maxH)
     local t = math.min(1, math.max(0, level or 0))
     return t * maxH
 end
+
+-- HSV → r,g,b in 0–255. Hue in degrees.
+function Mixer.hsv(h, s, v)
+    h = (h or 0) % 360
+    if h < 0 then h = h + 360 end
+    s = math.min(1, math.max(0, s or 1))
+    v = math.min(1, math.max(0, v or 1))
+    local c = v * s
+    local hp = h / 60
+    local x = c * (1 - math.abs(hp % 2 - 1))
+    local m = v - c
+    local r, g, b = 0, 0, 0
+    if hp < 1 then
+        r, g, b = c, x, 0
+    elseif hp < 2 then
+        r, g, b = x, c, 0
+    elseif hp < 3 then
+        r, g, b = 0, c, x
+    elseif hp < 4 then
+        r, g, b = 0, x, c
+    elseif hp < 5 then
+        r, g, b = x, 0, c
+    else
+        r, g, b = c, 0, x
+    end
+    return (r + m) * 255, (g + m) * 255, (b + m) * 255
+end
+
+-- Neon bulb hue: bright blue → pink → red → blue (all hues on that arc).
+function Mixer.neonHue(elapsed)
+    elapsed = elapsed or 0
+    local wave = 0.5 + 0.5 * math.sin(elapsed * 1.35)
+    return 205 + 155 * wave
+end
+
+function Mixer.neonRGB(elapsed, value)
+    local h = Mixer.neonHue(elapsed)
+    return Mixer.hsv(h, 1, value or 1)
+end

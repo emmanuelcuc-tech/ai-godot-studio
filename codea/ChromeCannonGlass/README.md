@@ -46,7 +46,10 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 - **Slow-mo** while the ball travels the glass corridor
 - **MIXER page** (Fruity Loops–style) — **Master** plus every bus volume
 - **Main-screen glass overlay** — shatters when **mic input** or **speaker output** is too loud
+- **Black leather** backdrop with pebble grain and stitching
+- **Neon tube type** cycling bright blue → pink → red
 - Tweaking **any mixer fader** always **resets** the screen glass
+- **Save / Load** (sidebar + auto-save on mixer tweak / exit)
 - Touch-friendly FIRE / RESET for iPad (no keyboard required)
 
 FL Studio scripts (repaired `import general` vs `flpianoroll`): `flstudio/ChromeCannonGlass/`
