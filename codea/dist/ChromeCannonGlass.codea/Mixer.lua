@@ -232,20 +232,48 @@ function Mixer.hsv(h, s, v)
     return (r + m) * 255, (g + m) * 255, (b + m) * 255
 end
 
--- Neon bulb hue: bright blue → pink → red → blue (all hues on that arc).
--- Speed is rad/s of the sine; 0.2 ≈ 31s per full tube cycle (was 1.35 ≈ 4.7s).
-Mixer.NEON_SPEED = 0.2
+-- Neon: hold a color, then blend to the next stop every 12 seconds.
+Mixer.NEON_STEP = 12
+Mixer.NEON_BLEND = 2.5
+Mixer.NEON_STOPS = { 205, 282, 355 }
+Mixer.NEON_SPEED = 0.2 -- unused; kept so old saves still load
 
-function Mixer.neonHue(elapsed, speed)
-    elapsed = elapsed or 0
-    speed = speed or Mixer.NEON_SPEED or 0.2
-    local wave = 0.5 + 0.5 * math.sin(elapsed * speed)
-    return 205 + 155 * wave
+function Mixer.neonBlend(elapsed)
+    elapsed = math.max(0, tonumber(elapsed) or 0)
+    local stops = Mixer.NEON_STOPS
+    local n = #stops
+    local step = Mixer.NEON_STEP
+    local idx = math.floor(elapsed / step)
+    local localT = elapsed % step
+    local fromH = stops[(idx % n) + 1]
+    local toH = stops[((idx + 1) % n) + 1]
+    local hold = step - Mixer.NEON_BLEND
+    local t = 0
+    if localT > hold then
+        t = (localT - hold) / Mixer.NEON_BLEND
+        if t < 0 then t = 0 end
+        if t > 1 then t = 1 end
+        t = t * t * (3 - 2 * t)
+    end
+    return fromH, toH, t
+end
+
+function Mixer.neonHue(elapsed, _speed)
+    local a, c, t = Mixer.neonBlend(elapsed)
+    local d = c - a
+    if d > 180 then d = d - 360 end
+    if d < -180 then d = d + 360 end
+    local h = a + d * t
+    h = h % 360
+    if h < 0 then h = h + 360 end
+    return h
 end
 
 function Mixer.neonRGB(elapsed, value)
-    local h = Mixer.neonHue(elapsed)
-    return Mixer.hsv(h, 1, value or 1)
+    local a, c, t = Mixer.neonBlend(elapsed)
+    local r1, g1, b1 = Mixer.hsv(a, 1, value or 1)
+    local r2, g2, b2 = Mixer.hsv(c, 1, value or 1)
+    return r1 + (r2 - r1) * t, g1 + (g2 - g1) * t, b1 + (b2 - b1) * t
 end
 
 -- Describe-to-song / record-melody / hum-instrument helpers.

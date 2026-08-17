@@ -11,6 +11,9 @@ const RELEASE := "final"
 const DESCRIBE_PLACEHOLDER := "Describe to song or audio"
 const KNOB_MIN := -2.356194490192345
 const KNOB_MAX := 2.356194490192345
+const NEON_STEP_SEC := 12.0
+const NEON_BLEND_SEC := 2.5
+const NEON_STOPS: PackedFloat32Array = [205.0, 282.0, 355.0]
 
 
 static func final_label() -> String:
@@ -136,13 +139,39 @@ static func hsv(h: float, s: float = 1.0, v: float = 1.0) -> Color:
 	return Color(r + m, g + m, b + m, 1.0)
 
 
-static func neon_hue(elapsed: float, speed: float = 0.2) -> float:
-	var wave := 0.5 + 0.5 * sin(elapsed * speed)
-	return 205.0 + 155.0 * wave
+static func neon_blend(elapsed: float) -> Array:
+	elapsed = maxf(0.0, elapsed)
+	var n := NEON_STOPS.size()
+	var idx := int(floor(elapsed / NEON_STEP_SEC))
+	var local := fposmod(elapsed, NEON_STEP_SEC)
+	var from_h := float(NEON_STOPS[idx % n])
+	var to_h := float(NEON_STOPS[(idx + 1) % n])
+	var hold := NEON_STEP_SEC - NEON_BLEND_SEC
+	var t := 0.0
+	if local > hold:
+		t = clampf((local - hold) / NEON_BLEND_SEC, 0.0, 1.0)
+		t = t * t * (3.0 - 2.0 * t)
+	return [from_h, to_h, t]
+
+
+static func neon_hue(elapsed: float, _speed: float = 0.2) -> float:
+	var b: Array = neon_blend(elapsed)
+	var a := float(b[0])
+	var c := float(b[1])
+	var t := float(b[2])
+	var d := c - a
+	if d > 180.0:
+		d -= 360.0
+	elif d < -180.0:
+		d += 360.0
+	return fposmod(a + d * t, 360.0)
 
 
 static func neon_rgb(elapsed: float, value: float = 1.0) -> Color:
-	return hsv(neon_hue(elapsed), 1.0, value)
+	var b: Array = neon_blend(elapsed)
+	var from_c := hsv(float(b[0]), 1.0, value)
+	var to_c := hsv(float(b[1]), 1.0, value)
+	return from_c.lerp(to_c, float(b[2]))
 
 
 static func hz_to_midi(hz: float) -> float:
