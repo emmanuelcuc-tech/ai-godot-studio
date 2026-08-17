@@ -7,6 +7,7 @@ Load on iPad:
 4. Open Codea — the project appears on the home screen
 5. Tap it → Play (landscape)
 
-Controls: drag to aim, FIRE (or Tab) to shoot, RESET to reload.
-Yell into the mic or crank OutputVolume and fire to shatter the main-screen glass.
-Tweaking InputGain or OutputVolume resets the screen glass each time.
+PLAY tab: drag to aim, FIRE (or Tab) to shoot, RESET to reload.
+MIXER tab: Fruity Loops–style Master + all volumes. SET ALL 80% for unity.
+Yell into the mic or crank Master/OUT and fire to shatter the main-screen glass.
+Tweaking any mixer fader resets the screen glass.

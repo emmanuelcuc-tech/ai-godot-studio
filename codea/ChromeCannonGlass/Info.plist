@@ -6,9 +6,10 @@
 	<array>
 		<string>Main</string>
 		<string>Glass</string>
+		<string>Mixer</string>
 	</array>
 	<key>Description</key>
-	<string>Chrome cannon through five glass panes. Main-screen glass shatters when mic input or speaker output is too loud; tweaking InputGain or OutputVolume resets it.</string>
+	<string>Chrome cannon, FL-style mixer (Master + all volumes), screen glass that shatters when input/output is too loud. Tweaking any fader resets the glass.</string>
 	<key>Author</key>
 	<string>AI Godot Studio / Codea</string>
 	<key>Name</key>

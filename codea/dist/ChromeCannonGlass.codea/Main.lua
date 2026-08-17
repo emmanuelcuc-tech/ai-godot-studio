@@ -8,8 +8,9 @@
 --   Drag finger near cannon (or vertical drag) to aim
 --   Tap FIRE / Space / Tab to shoot
 --   Tap RESET (or R) after the shot to reload panes + ball
---   Sidebar InputGain / OutputVolume — reset screen glass when tweaked
---   Yell into mic or crank output + fire to break the screen glass
+--   Tap MIXER tab for FL-style Master + all channel volumes
+--   Tweaking any mixer fader resets the screen glass
+--   Yell into mic or crank Master/OUT + fire to break the screen glass
 
 DISPLAYED_NAME = "Chrome Cannon Glass"
 
@@ -63,13 +64,18 @@ prevInputGain, prevOutputVolume = 1, 0.7
 screenBreakCooldown = 0
 micOn = false
 
+-- FL-style mixer (Master + strips). Filled in setup() after Mixer.lua loads.
+uiPage = "play" -- play | mixer
+mixVols = nil
+prevMixVols = nil
+mixerDrag = nil
+mixerLayoutCache = nil
+
 function setup()
     supportedOrientations(LANDSCAPE_ANY)
     displayMode(FULLSCREEN_NO_BUTTONS)
 
     parameter.number("MuzzleSpeed", 400, 1600, MUZZLE_SPEED)
-    parameter.number("InputGain", 0, 3, InputGain)
-    parameter.number("OutputVolume", 0, 3, OutputVolume)
     parameter.number("LoudnessBreak", 0.15, 1.2, LoudnessBreak)
     parameter.action("Fire Cannon", function()
         fireCannon()
@@ -80,6 +86,20 @@ function setup()
     parameter.action("Reset Screen Glass", function()
         resetScreenGlass()
     end)
+    parameter.action("Mixer Page", function()
+        uiPage = "mixer"
+    end)
+    parameter.action("Set All 80%", function()
+        mixVols = Mixer.setAll(mixVols or Mixer.defaults(), Mixer.UNITY)
+        syncGainsFromMixer()
+        resetScreenGlass()
+        message = "All volumes (incl. Master) set to 80%"
+        messageTimer = 1.8
+    end)
+
+    mixVols = Mixer.defaults()
+    prevMixVols = Mixer.copy(mixVols)
+    syncGainsFromMixer()
 
     physics.continuous = true
     physics.iterations(14, 10)
@@ -115,8 +135,16 @@ function readMicAmp()
     return 0
 end
 
-function playOutputSound(kind, seed)
-    local vol = math.min(3, math.max(0, OutputVolume or 0.7))
+function syncGainsFromMixer()
+    mixVols = mixVols or Mixer.defaults()
+    InputGain = Mixer.toGain("input", mixVols)
+    OutputVolume = Mixer.toGain("output", mixVols)
+end
+
+function playOutputSound(kind, seed, bus)
+    bus = bus or "output"
+    mixVols = mixVols or Mixer.defaults()
+    local vol = Mixer.toGain(bus, mixVols)
     local src
     if seed then
         src = sound(kind, seed)
@@ -125,11 +153,10 @@ function playOutputSound(kind, seed)
     end
     if src then
         pcall(function()
-            src.volume = math.min(1, vol)
+            src.volume = math.min(1, math.max(0, vol))
         end)
     end
-    -- Peak is 1 at full blast; OutputVolume scales it in Glass.audioLevels
-    outputPeak = math.max(outputPeak, 1)
+    outputPeak = math.max(outputPeak, math.min(1, Mixer.effective(bus, mixVols)))
 end
 
 function layoutScene()
@@ -274,10 +301,20 @@ function fireCannon()
     targetSlowMo = 0.22
     message = string.format("Fired · KE %.0f  ·  slow-mo through glass", lastKe)
     messageTimer = 2.5
-    playOutputSound(SOUND_EXPLODE, 29480)
+    playOutputSound(SOUND_EXPLODE, 29480, "fire")
 end
 
 function draw()
+    if uiPage == "mixer" then
+        drawMixerPage()
+        updateSlowMo()
+        updateAudioGlass()
+        if messageTimer > 0 then
+            messageTimer = messageTimer - DeltaTime
+        end
+        return
+    end
+
     -- Soft workshop atmosphere
     background(22, 26, 34)
     drawBackdrop()
@@ -291,6 +328,7 @@ function draw()
     end
     drawHUD()
     drawButtons()
+    drawPageTabs()
     drawScreenGlassOverlay()
     drawMeters()
 
@@ -410,7 +448,7 @@ function collide(contact)
     local ke = Glass.kineticEnergy(mass, speed)
 
     if not Glass.shouldShatter(ke, SHATTER_KE, 1) then
-        playOutputSound(SOUND_HIT, 20112)
+    playOutputSound(SOUND_HIT, 20112, "hit")
         return
     end
 
@@ -480,13 +518,40 @@ function shatterPane(pane, impactVx, impactVy, ke)
     message = string.format("Pane %d shattered · KE left %.0f · %d/%d",
         pane.index, lastKe, brokenCount, PANE_COUNT)
     messageTimer = 2.2
-    playOutputSound(SOUND_HIT, 31882)
+    playOutputSound(SOUND_HIT, 31882, "glass")
 end
 
 -- Input ----------------------------------------------------------------
 
 function touched(touch)
     if touch.state == BEGAN then
+        if hitButton(touch, playTabBtn()) then
+            uiPage = "play"
+            mixerDrag = nil
+            return
+        end
+        if hitButton(touch, mixerTabBtn()) then
+            uiPage = "mixer"
+            mixerDrag = nil
+            aiming = false
+            return
+        end
+        if uiPage == "mixer" then
+            if hitButton(touch, setAllBtn()) then
+                mixVols = Mixer.setAll(mixVols or Mixer.defaults(), Mixer.UNITY)
+                syncGainsFromMixer()
+                resetScreenGlass()
+                message = "All volumes (incl. Master) set to 80%"
+                messageTimer = 1.8
+                return
+            end
+            local id = mixerStripAt(touch.x, touch.y)
+            if id then
+                mixerDrag = id
+                applyMixerTouch(touch)
+            end
+            return
+        end
         if hitButton(touch, fireBtn()) then
             fireCannon()
             return
@@ -500,10 +565,15 @@ function touched(touch)
             aiming = true
             aimFromTouch(touch)
         end
-    elseif touch.state == MOVING and aiming then
-        aimFromTouch(touch)
+    elseif touch.state == MOVING then
+        if uiPage == "mixer" and mixerDrag then
+            applyMixerTouch(touch)
+        elseif aiming then
+            aimFromTouch(touch)
+        end
     elseif touch.state == ENDED or touch.state == CANCELLED then
         aiming = false
+        mixerDrag = nil
     end
 end
 
@@ -523,8 +593,16 @@ function aimFromTouch(touch)
 end
 
 function keyboard(key)
-    if key == "\t" or key == "tab" or key == " " then
-        fireCannon()
+    if key == "\t" or key == "tab" then
+        if uiPage == "mixer" then
+            uiPage = "play"
+        else
+            fireCannon()
+        end
+    elseif key == "m" or key == "M" then
+        uiPage = (uiPage == "mixer") and "play" or "mixer"
+    elseif key == " " then
+        if uiPage == "play" then fireCannon() end
     elseif key == "r" or key == "R" then
         resetScene()
     elseif key == "w" or key == "W" then
@@ -548,6 +626,18 @@ end
 
 function resetBtn()
     return { x = WIDTH - 290, y = 28, w = 120, h = 52 }
+end
+
+function playTabBtn()
+    return { x = 22, y = HEIGHT - 92, w = 108, h = 34 }
+end
+
+function mixerTabBtn()
+    return { x = 138, y = HEIGHT - 92, w = 108, h = 34 }
+end
+
+function setAllBtn()
+    return { x = WIDTH - 188, y = HEIGHT - 92, w = 166, h = 34 }
 end
 
 function hitButton(touch, b)
@@ -756,21 +846,189 @@ function drawButtons()
     text("FIRE", f.x + f.w * 0.5, f.y + f.h * 0.5)
 end
 
+function drawPageTabs()
+    local p, m = playTabBtn(), mixerTabBtn()
+    local function tab(b, label, on)
+        if on then
+            fill(232, 148, 72)
+        else
+            fill(48, 52, 62)
+        end
+        rect(b.x, b.y, b.w, b.h, 8)
+        fill(on and 20 or 220, on and 20 or 225, on and 18 or 235)
+        fontSize(16)
+        textAlign(CENTER)
+        textMode(CENTER)
+        text(label, b.x + b.w * 0.5, b.y + b.h * 0.5)
+    end
+    tab(p, "PLAY", uiPage == "play")
+    tab(m, "MIXER", uiPage == "mixer")
+end
+
+function mixerStripRects()
+    local strips = Mixer.STRIPS
+    local n = #strips
+    local gap = 10
+    local stripW = math.min(88, (WIDTH - 80) / n - gap)
+    local total = n * stripW + (n - 1) * gap
+    local x0 = (WIDTH - total) * 0.5
+    local y0 = 70
+    local h = HEIGHT - 190
+    local rects = {}
+    for i, id in ipairs(strips) do
+        local x = x0 + (i - 1) * (stripW + gap)
+        rects[id] = { x = x, y = y0, w = stripW, h = h, id = id }
+    end
+    return rects
+end
+
+function mixerStripAt(px, py)
+    local rects = mixerStripRects()
+    for id, r in pairs(rects) do
+        if px >= r.x and px <= r.x + r.w and py >= r.y and py <= r.y + r.h then
+            return id
+        end
+    end
+    return nil
+end
+
+function applyMixerTouch(touch)
+    if not mixerDrag then return end
+    mixVols = mixVols or Mixer.defaults()
+    local rects = mixerStripRects()
+    local r = rects[mixerDrag]
+    if not r then return end
+    local pad = 28
+    mixVols[mixerDrag] = Mixer.volumeFromFaderY(touch.y, r.y + pad, r.y + r.h - pad)
+    syncGainsFromMixer()
+end
+
+function drawMixerPage()
+    background(28, 28, 32)
+    -- FL-ish top bar
+    fill(18, 18, 20)
+    rect(0, HEIGHT - 108, WIDTH, 108)
+    fill(232, 148, 72)
+    font("HelveticaNeue-Light")
+    fontSize(22)
+    textAlign(LEFT)
+    textMode(CORNER)
+    text("Mixer  ·  Master + all volumes", 22, HEIGHT - 34)
+    fontSize(14)
+    fill(170, 170, 180)
+    text("Drag faders  ·  SET ALL 80%  ·  tweak any strip to reset screen glass", 22, HEIGHT - 56)
+
+    drawPageTabs()
+    local all = setAllBtn()
+    fill(70, 78, 92)
+    rect(all.x, all.y, all.w, all.h, 8)
+    fill(240, 230, 210)
+    fontSize(14)
+    textAlign(CENTER)
+    textMode(CENTER)
+    text("SET ALL 80%", all.x + all.w * 0.5, all.y + all.h * 0.5)
+
+    mixVols = mixVols or Mixer.defaults()
+    local rects = mixerStripRects()
+    for _, id in ipairs(Mixer.STRIPS) do
+        drawMixerStrip(rects[id], id, mixVols[id] or Mixer.UNITY)
+    end
+
+    if messageTimer > 0 and message ~= "" then
+        fontSize(20)
+        textAlign(CENTER)
+        textMode(CENTER)
+        fill(0, 0, 0, 150)
+        rectMode(CENTER)
+        rect(WIDTH * 0.5, 36, math.min(WIDTH * 0.9, 720), 40)
+        rectMode(CORNER)
+        fill(255, 230, 150)
+        text(message, WIDTH * 0.5, 36)
+    end
+end
+
+function drawMixerStrip(r, id, vol)
+    if not r then return end
+    local master = (id == "master")
+    if master then
+        fill(48, 40, 34)
+    else
+        fill(40, 42, 48)
+    end
+    rect(r.x, r.y, r.w, r.h, 8)
+
+    -- meter
+    local meterW = 10
+    local mx = r.x + 8
+    fill(12, 12, 14)
+    rect(mx, r.y + 24, meterW, r.h - 70)
+    local peak = 0
+    if id == "input" then peak = math.min(1, inputLevel) end
+    if id == "output" or id == "master" then peak = math.min(1, outputLevel) end
+    if id == "fire" or id == "hit" or id == "glass" then
+        peak = math.min(1, outputPeak)
+    end
+    local mh = (r.h - 70) * peak
+    if peak > 0.85 then
+        fill(220, 70, 50)
+    elseif peak > 0.6 then
+        fill(220, 180, 50)
+    else
+        fill(70, 180, 90)
+    end
+    rect(mx, r.y + 24, meterW, mh)
+
+    -- fader track
+    local pad = 28
+    local y0, y1 = r.y + pad, r.y + r.h - pad
+    local fx = r.x + r.w * 0.62
+    stroke(20, 20, 24)
+    strokeWidth(6)
+    line(fx, y0, fx, y1)
+    noStroke()
+    local fy = Mixer.faderYFromVolume(vol, y0, y1)
+    if master then
+        fill(232, 148, 72)
+    else
+        fill(200, 200, 210)
+    end
+    rect(fx - 14, fy - 8, 28, 16, 4)
+
+    -- unity tick (0.8)
+    local uy = Mixer.faderYFromVolume(Mixer.UNITY, y0, y1)
+    fill(255, 200, 80, 160)
+    rect(fx + 16, uy - 1, 8, 2)
+
+    fill(230, 230, 235)
+    fontSize(13)
+    textAlign(CENTER)
+    textMode(CENTER)
+    text(Mixer.stripLabel(id), r.x + r.w * 0.5, r.y + 14)
+    fontSize(12)
+    fill(180, 180, 190)
+    text(string.format("%.0f%%", (vol / Mixer.UNITY) * 100), r.x + r.w * 0.5, r.y + r.h - 14)
+end
+
 -- Main-screen glass (loud input/output) --------------------------------
 
 function updateAudioGlass()
+    mixVols = mixVols or Mixer.defaults()
+    prevMixVols = prevMixVols or Mixer.copy(mixVols)
+    syncGainsFromMixer()
     local inG = InputGain or 1
     local outV = OutputVolume or 0.7
     local thresh = LoudnessBreak or 0.62
     local dt = DeltaTime or 0.016
 
-    if Glass.tweakChanged(prevInputGain, prevOutputVolume, inG, outV) then
+    local tweaked, which = Mixer.anyChanged(prevMixVols, mixVols)
+    if tweaked then
         resetScreenGlass()
         screenBreakCooldown = SCREEN_BREAK_COOLDOWN
-        message = "Input/output tweaked — screen glass reset"
+        message = string.format("%s fader tweaked — screen glass reset",
+            Mixer.stripLabel(which))
         messageTimer = 1.6
+        prevMixVols = Mixer.copy(mixVols)
     end
-    prevInputGain, prevOutputVolume = inG, outV
 
     outputPeak = outputPeak * math.max(0, 1 - dt * 1.35)
     if outputPeak < 0.02 then outputPeak = 0 end
@@ -832,7 +1090,7 @@ function shatterScreenGlass(source, loudness)
     end
     message = string.format("SCREEN GLASS SHATTERED — loud %s (%.2f)", source, loudness)
     messageTimer = 2.8
-    playOutputSound(SOUND_EXPLODE, 19221)
+    playOutputSound(SOUND_EXPLODE, 19221, "glass")
 end
 
 function drawScreenShards()

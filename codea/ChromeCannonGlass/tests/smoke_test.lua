@@ -75,6 +75,23 @@ check("first tile centered in cell", math.abs(tiles[1].x - 50) < 1e-6 and math.a
 local bvx, bvy = Glass.screenBurstVelocity(800, 400, 400, 200, 1)
 check("burst flies away from center", bvx > 0 and bvy > 0)
 
+-- FL-style mixer
+dofile(here .. "../Mixer.lua")
+local vols = Mixer.defaults()
+check("unity is 0.8", vols.master == 0.8 and vols.input == 0.8)
+check("master effective is master", math.abs(Mixer.effective("master", vols) - 0.8) < 1e-9)
+check("unity channel gain is 1", math.abs(Mixer.toGain("output", vols) - 1) < 1e-9)
+local boosted = Mixer.copy(vols)
+boosted.master = 1.0
+check("master boosts all buses", Mixer.toGain("output", boosted) > Mixer.toGain("output", vols))
+local all80 = Mixer.setAll(Mixer.copy(vols), 0.8)
+check("set all includes master", all80.master == 0.8 and all80.fire == 0.8 and all80.glass == 0.8)
+local changed, which = Mixer.anyChanged(vols, boosted)
+check("mixer tweak detected", changed == true and which == "master")
+check("no mixer tweak when still", Mixer.anyChanged(vols, Mixer.copy(vols)) == false)
+local yvol = Mixer.volumeFromFaderY(100, 0, 100)
+check("fader top is max", math.abs(yvol - Mixer.MAX) < 1e-9)
+
 if fails > 0 then
     print("\n" .. fails .. " failure(s)")
     os.exit(1)
