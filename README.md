@@ -67,6 +67,15 @@ If a compiler is detected, Create may start this build in the background. First 
 & "C:\Users\kortn\Downloads\Godot_v4.7.1-stable_win64.exe" --path "C:\Users\kortn\Projects\ai-godot-studio"
 ```
 
+### Remake the desktop shortcut (updated program)
+
+Double-click [`desktop/Make-DesktopShortcut.vbs`](desktop/Make-DesktopShortcut.vbs) (or run [`desktop/Make-DesktopShortcut.ps1`](desktop/Make-DesktopShortcut.ps1)). That replaces stale Desktop icons with:
+
+- **AI Godot Studio** → this repo in Godot 4.7
+- **Chrome Cannon Glass** → `codea/dist/ChromeCannonGlass.codea` (**1.0.0 final**)
+
+Details: [`desktop/README.md`](desktop/README.md)
+
 Output games: `generated_games/`
 
 ## Legal
