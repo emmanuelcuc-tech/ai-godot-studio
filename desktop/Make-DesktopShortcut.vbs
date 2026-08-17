@@ -39,10 +39,12 @@ End If
 
 names = Array( _
   "AI Godot Studio.lnk", _
+  "Audio Studio.lnk", _
   "Chrome Cannon Glass.lnk", _
   "ChromeCannonGlass.lnk", _
   "ai-godot-studio.lnk", _
   "Launch-AIGodotStudio.bat", _
+  "Launch-AudioStudio.bat", _
   "Open-ChromeCannonGlass.bat" _
 )
 For i = 0 To UBound(names)
@@ -51,6 +53,7 @@ For i = 0 To UBound(names)
 Next
 
 fso.CopyFile scriptDir & "\Launch-AIGodotStudio.bat", desktop & "\Launch-AIGodotStudio.bat", True
+fso.CopyFile scriptDir & "\Launch-AudioStudio.bat", desktop & "\Launch-AudioStudio.bat", True
 fso.CopyFile scriptDir & "\Open-ChromeCannonGlass.bat", desktop & "\Open-ChromeCannonGlass.bat", True
 If fso.FileExists(scriptDir & "\Chrome Cannon Glass 1.0.0 final.url") Then
   fso.CopyFile scriptDir & "\Chrome Cannon Glass 1.0.0 final.url", desktop & "\Chrome Cannon Glass 1.0.0 final.url", True
@@ -62,7 +65,16 @@ If godot <> "" Then
   sc.Arguments = "--path """ & repo & """"
   sc.WorkingDirectory = repo
   sc.WindowStyle = 1
-  sc.Description = "AI Godot Studio 2.0 — updated (Chrome Cannon Glass 1.0.0 final)"
+  sc.Description = "AI Godot Studio 2.0 — Create + desktop Audio Studio"
+  sc.IconLocation = godot & ",0"
+  sc.Save
+
+  Set sc = sh.CreateShortcut(desktop & "\Audio Studio.lnk")
+  sc.TargetPath = godot
+  sc.Arguments = "--path """ & repo & """ res://scenes/audio_studio.tscn"
+  sc.WorkingDirectory = repo
+  sc.WindowStyle = 1
+  sc.Description = "Desktop Audio Studio 1.0.0 final — mixer, IN/OUT, describe / record / hum"
   sc.IconLocation = godot & ",0"
   sc.Save
 End If
@@ -82,5 +94,6 @@ sc.Save
 
 MsgBox "Desktop shortcuts remade:" & vbCrLf & vbCrLf & _
   "AI Godot Studio.lnk -> " & godot & vbCrLf & _
+  "Audio Studio.lnk -> mixer / IN/OUT / describe-record-hum" & vbCrLf & _
   "Chrome Cannon Glass.lnk -> 1.0.0 final package" & vbCrLf & vbCrLf & _
   "Project: " & repo, vbInformation, "Desktop shortcut"

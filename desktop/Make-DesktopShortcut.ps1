@@ -25,10 +25,12 @@ if (-not $godot -and (Test-Path $downloads)) {
 
 $stale = @(
     "AI Godot Studio.lnk",
+    "Audio Studio.lnk",
     "Chrome Cannon Glass.lnk",
     "ChromeCannonGlass.lnk",
     "ai-godot-studio.lnk",
     "Launch-AIGodotStudio.bat",
+    "Launch-AudioStudio.bat",
     "Open-ChromeCannonGlass.bat"
 )
 foreach ($name in $stale) {
@@ -37,6 +39,7 @@ foreach ($name in $stale) {
 }
 
 Copy-Item (Join-Path $here "Launch-AIGodotStudio.bat") (Join-Path $desktop "Launch-AIGodotStudio.bat") -Force
+Copy-Item (Join-Path $here "Launch-AudioStudio.bat") (Join-Path $desktop "Launch-AudioStudio.bat") -Force
 Copy-Item (Join-Path $here "Open-ChromeCannonGlass.bat") (Join-Path $desktop "Open-ChromeCannonGlass.bat") -Force
 Copy-Item (Join-Path $here "Chrome Cannon Glass 1.0.0 final.url") (Join-Path $desktop "Chrome Cannon Glass 1.0.0 final.url") -Force
 
@@ -48,9 +51,18 @@ if ($godot) {
     $sc.Arguments = "--path `"$repo`""
     $sc.WorkingDirectory = $repo
     $sc.WindowStyle = 1
-    $sc.Description = "AI Godot Studio 2.0 — updated (Chrome Cannon Glass 1.0.0 final)"
+    $sc.Description = "AI Godot Studio 2.0 — Create + desktop Audio Studio"
     $sc.IconLocation = "$godot,0"
     $sc.Save()
+
+    $scA = $w.CreateShortcut((Join-Path $desktop "Audio Studio.lnk"))
+    $scA.TargetPath = $godot
+    $scA.Arguments = "--path `"$repo`" res://scenes/audio_studio.tscn"
+    $scA.WorkingDirectory = $repo
+    $scA.WindowStyle = 1
+    $scA.Description = "Desktop Audio Studio 1.0.0 final — mixer, IN/OUT, describe / record / hum"
+    $scA.IconLocation = "$godot,0"
+    $scA.Save()
 }
 
 $pkg = Join-Path $repo "codea\dist\ChromeCannonGlass.codea"
@@ -68,4 +80,5 @@ $sc2.Save()
 
 Write-Host "Desktop shortcuts remade on $desktop"
 Write-Host "  AI Godot Studio.lnk -> $godot --path $repo"
+Write-Host "  Audio Studio.lnk -> $godot --path $repo res://scenes/audio_studio.tscn"
 Write-Host "  Chrome Cannon Glass.lnk -> 1.0.0 final package"

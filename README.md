@@ -17,6 +17,18 @@ Describe a game → **Create Game** builds a playable **Godot 4** project using 
 
 Type new directions and press **Create Game** again to **modify** the same game (updates C++ sources and GDScript). Uncheck **Create with C++** in the Create tab or Settings for GDScript-only.
 
+## Audio Studio (desktop)
+
+The **Audio Studio** tab remakes the Codea mixer as a Godot 4 desktop app: leather UI, neon labels, IN/OUT/FIRE/HIT/GLASS/MASTER knobs and faders (unity **80%**), mic lamp, volume-height meters, **Describe to song or audio** next to **RECORD MELODY** / **HUM INSTRUMENT**, and **SAVE HIGH PERF**.
+
+Open it from the studio tab, or launch the scene directly:
+
+```powershell
+& "C:\Users\kortn\Downloads\Godot_v4.7.1-stable_win64.exe" --path "C:\Users\kortn\Projects\ai-godot-studio" res://scenes/audio_studio.tscn
+```
+
+Mixer math lives in `scripts/audio_studio/mixer_bus.gd` (not mixed with FL Studio piano-roll scripts).
+
 ## Pipeline (ChatGPT-driven)
 
 1. Detect genre from your directions  
@@ -71,7 +83,8 @@ If a compiler is detected, Create may start this build in the background. First 
 
 Double-click [`desktop/Make-DesktopShortcut.vbs`](desktop/Make-DesktopShortcut.vbs) (or run [`desktop/Make-DesktopShortcut.ps1`](desktop/Make-DesktopShortcut.ps1)). That replaces stale Desktop icons with:
 
-- **AI Godot Studio** → this repo in Godot 4.7
+- **AI Godot Studio** → this repo in Godot 4.7 (Create + Audio Studio tab)
+- **Audio Studio** → `res://scenes/audio_studio.tscn` (desktop mixer)
 - **Chrome Cannon Glass** → `codea/dist/ChromeCannonGlass.codea` (**1.0.0 final**)
 
 Details: [`desktop/README.md`](desktop/README.md)
