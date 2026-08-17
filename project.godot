@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="AI Godot Studio"
-config/description="Describe a game. Create builds Godot 4 + C++ GDExtension (with GDScript fallback), AI, and internet resources. Run to play."
+config/description="Describe a game. Create builds Godot 4 + C++ GDExtension (with GDScript fallback), AI, internet resources, and a desktop Audio Studio mixer."
 config/version="2.0.0"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
@@ -35,6 +35,10 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/size/min_viewport_width=960
 window/size/min_viewport_height=640
+
+[audio]
+
+driver/enable_input=true
 
 [rendering]
 

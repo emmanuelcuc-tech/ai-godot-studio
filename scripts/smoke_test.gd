@@ -44,4 +44,89 @@ func _run() -> void:
 	print("CPP_TOOL_PYTHON=", info.get("python", ""))
 	print("CPP_TOOL_READY=", info.get("ready", false))
 
+	if not _test_audio_studio_mixer():
+		quit(1)
+		return
 	quit(0)
+
+
+func _test_audio_studio_mixer() -> bool:
+	var MB = load("res://scripts/audio_studio/mixer_bus.gd")
+	if MB == null:
+		print("MIXER_FAIL=load mixer_bus.gd")
+		return false
+	if not is_equal_approx(float(MB.UNITY), 0.8):
+		print("MIXER_FAIL=unity")
+		return false
+	var vols: Dictionary = MB.defaults()
+	if not is_equal_approx(float(vols.get("master", 0.0)), 0.8):
+		print("MIXER_FAIL=default master")
+		return false
+	if not is_equal_approx(float(MB.to_gain("output", vols)), 1.0):
+		print("MIXER_FAIL=unity output gain")
+		return false
+	vols["input"] = 0.5
+	if not is_equal_approx(float(MB.effective("input", vols)), 0.5):
+		print("MIXER_FAIL=master * input / unity")
+		return false
+	vols["master"] = 1.0
+	if not is_equal_approx(float(MB.effective("input", vols)), 0.5 * 1.0 / 0.8):
+		print("MIXER_FAIL=master boost")
+		return false
+	if not is_equal_approx(float(MB.from_gain(1.0)), 0.8):
+		print("MIXER_FAIL=from_gain")
+		return false
+	if MB.describe_to_song("  neon glass  ") != "neon glass":
+		print("MIXER_FAIL=describe_to_song")
+		return false
+	if not is_equal_approx(float(MB.hz_to_midi(440.0)), 69.0):
+		print("MIXER_FAIL=A4 midi")
+		return false
+	if not is_equal_approx(float(MB.midi_to_hz(69.0)), 440.0):
+		print("MIXER_FAIL=midi A4 hz")
+		return false
+	var hue0 := float(MB.neon_hue(0.0))
+	var hue_early := float(MB.neon_hue(1.0))
+	var hue_mid := float(MB.neon_hue(6.0))
+	var hue_next := float(MB.neon_hue(12.0))
+	if not is_equal_approx(hue0, 205.0):
+		print("MIXER_FAIL=neon start blue")
+		return false
+	if not is_equal_approx(hue_next, 282.0):
+		print("MIXER_FAIL=neon next stop at 12s")
+		return false
+	if hue_early <= hue0 or hue_early >= hue_mid:
+		print("MIXER_FAIL=neon slow gradual start")
+		return false
+	if hue_mid <= hue_early or hue_mid >= hue_next:
+		print("MIXER_FAIL=neon slow 12s blend")
+		return false
+	if absf(hue_early - hue0) >= absf(hue_mid - hue0) * 0.45:
+		print("MIXER_FAIL=neon blend is not slow at the start")
+		return false
+	var c0: Color = MB.neon_rgb(0.0)
+	var c_mid: Color = MB.neon_rgb(6.0)
+	var c1: Color = MB.neon_rgb(12.0)
+	if c_mid.is_equal_approx(c0) or c_mid.is_equal_approx(c1):
+		print("MIXER_FAIL=neon rgb slow blend")
+		return false
+	var half := float(MB.volume_from_fader_y(50.0, 100.0, 0.0))
+	if not is_equal_approx(half, 0.625):
+		print("MIXER_FAIL=fader y")
+		return false
+	var melody: Array = MB.quantize_melody([
+		{"t": 0.0, "amp": 0.4, "freq": 440.0},
+		{"t": 0.2, "amp": 0.4, "freq": 440.0},
+		{"t": 0.4, "amp": 0.0, "freq": 0.0},
+	], 0.08)
+	if melody.is_empty():
+		print("MIXER_FAIL=quantize melody")
+		return false
+	var hum: Dictionary = MB.hum_instrument([{"t": 0.0, "amp": 0.5, "freq": 440.0}])
+	if int(hum.get("midi", 0)) != 69:
+		print("MIXER_FAIL=hum midi")
+		return false
+	print("MIXER_OK=true VERSION=", MB.final_label())
+	print("MIXER_NEON_0=", hue0, " EARLY=", hue_early, " MID=", hue_mid, " NEXT=", hue_next)
+	print("MIXER_MELODY_NOTES=", melody.size())
+	return true

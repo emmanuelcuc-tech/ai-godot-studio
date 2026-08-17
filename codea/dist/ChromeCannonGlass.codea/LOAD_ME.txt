@@ -1,0 +1,22 @@
+Chrome Cannon Glass — 1.0.0 final
+
+Load on iPad:
+1. Unzip so you have a folder named ChromeCannonGlass.codea
+2. Open the Files app → On My iPad → Codea
+3. Copy ChromeCannonGlass.codea into the Codea folder
+4. Open Codea — the project appears on the home screen
+5. Tap it → Play (landscape)
+
+This is the final 1.0.0 package. PLAY saves on launch.
+RESTART (or F / sidebar Save & Restart) saves high performance and reboots PLAY.
+RESET reloads panes only.
+
+PLAY tab: drag the cannon to aim, tap/click glass to hammer, FIRE to shoot, RESET to reload.
+GLASS REPAIR restores panes. GLASS REMOVE cracks all glass at once (real physics shards).
+Black leather background (baked GPU texture). Neon tube type cycles slowly bright blue → pink → red.
+Tabs: PLAY · SETTINGS · MIXER.
+SETTINGS has two tabs: INPUT AUDIO (mic) and OUTPUT AUDIO (speaker).
+Describe to song or audio sits next to RECORD MELODY and HUM INSTRUMENT.
+Twist knobs on those tabs to set mic and speaker volume.
+Sidebar NeonSpeed slows/speeds the tube color. GpuMegabytes shows the texture pool.
+HighPerformance stays on after save/load. Tweaking any fader resets screen glass.

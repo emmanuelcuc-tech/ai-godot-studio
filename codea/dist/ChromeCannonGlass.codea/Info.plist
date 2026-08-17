@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Buffer Order</key>
+	<array>
+		<string>Main</string>
+		<string>Glass</string>
+		<string>Mixer</string>
+		<string>GpuRam</string>
+	</array>
+	<key>Version</key>
+	<string>1.0.0 final</string>
+	<key>Description</key>
+	<string>Chrome Cannon Glass 1.0.0 final — chrome cannon, Input/Output settings, describe-to-song, high-performance GPU save &amp; restart.</string>
+	<key>Author</key>
+	<string>AI Godot Studio / Codea</string>
+	<key>Name</key>
+	<string>ChromeCannonGlass</string>
+</dict>
+</plist>

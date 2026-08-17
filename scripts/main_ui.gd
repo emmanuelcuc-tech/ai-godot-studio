@@ -59,7 +59,9 @@ func _ready() -> void:
 	open_btn.disabled = true
 	folder_btn.disabled = true
 	_refresh_session()
-	_log("[b]AI Godot Studio[/b]\n1. Describe a game — ChatGPT turns it into [i]instructions + asset list[/i]\n2. [b]Create Game[/b] — Godot 4 + [i]C++ GDExtension[/i] template → search → AI plan → C++ & GDScript → textures\n3. [b]Run Game[/b] plays immediately (GDScript fallback). Build `build_cpp.ps1` for native C++.\n4. New directions + Create → modifies C++ sources and fallback scripts\n5. [b]New Game[/b] clears · [b]Save Game[/b] keeps a copy\n")
+	_log("[b]AI Godot Studio[/b]\n1. Describe a game — ChatGPT turns it into [i]instructions + asset list[/i]\n2. [b]Create Game[/b] — Godot 4 + [i]C++ GDExtension[/i] template → search → AI plan → C++ & GDScript → textures\n3. [b]Run Game[/b] plays immediately (GDScript fallback). Build `build_cpp.ps1` for native C++.\n4. New directions + Create → modifies C++ sources and fallback scripts\n5. [b]New Game[/b] clears · [b]Save Game[/b] keeps a copy\n6. [b]Audio Studio[/b] tab — desktop mixer, IN/OUT knobs, describe / record melody / hum\n")
+	var tabs: TabContainer = %Tabs
+	tabs.tab_changed.connect(_on_tab_changed)
 	if not AppSettings.has_any_ai_key():
 		_log("[color=#F4A261]Add your ChatGPT / OpenAI key in Settings so Create Game uses AI instructions to code and pull assets.[/color]\n")
 	if AppSettings.godot_executable.is_empty():
@@ -277,6 +279,17 @@ func _on_folder() -> void:
 func _on_status(message: String) -> void:
 	status_label.text = message
 	_log("%s\n" % message)
+
+
+func _on_tab_changed(tab: int) -> void:
+	var tabs: TabContainer = %Tabs
+	var title := tabs.get_tab_title(tab)
+	if title == "Audio Studio":
+		status_label.text = "Audio Studio — mixer, IN/OUT, melody & hum"
+	elif title == "Settings":
+		status_label.text = "Settings"
+	else:
+		status_label.text = "Create — pick a template"
 
 
 func _log(bbcode: String) -> void:

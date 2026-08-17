@@ -17,3 +17,5 @@ user://
 Thumbs.db
 .env
 api_keys.cfg
+__pycache__/
+*.pyc
