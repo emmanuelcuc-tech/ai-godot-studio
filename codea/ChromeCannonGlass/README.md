@@ -30,8 +30,9 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 | **FIRE** button | Shoot chrome ball |
 | **Tab** or **Space** (hardware keyboard) | Shoot |
 | **RESET** button or **R** | Reload panes + ball |
-| **IN** tab (or **I**) | Input audio settings — twist IN knob / fader |
-| **OUT** tab (or **O**) | Output audio settings — twist OUT and FX knobs |
+| **SETTINGS** tab | Opens audio settings |
+| **INPUT AUDIO** tab (or **I**) | Mic / input gain — twist INPUT knob or fader |
+| **OUTPUT AUDIO** tab (or **O**) | Speaker / output — twist OUTPUT and FX knobs |
 | **SET ALL 80%** | All faders including Master → unity (0.8) |
 | **Tab** | Shoot on PLAY · back to PLAY from MIXER |
 | **RESET** button or **R** | Reload panes + ball |
@@ -45,6 +46,7 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 - **KE = ½mv²** decides whether a pane shatters; breaking costs energy
 - **5 glass panes** in a row; each explodes into flying shards
 - **Slow-mo** while the ball travels the glass corridor
+- **SETTINGS** page with **Input Audio** and **Output Audio** tabs (knobs + faders)
 - **MIXER page** (Fruity Loops–style) — **Master** plus every bus volume
 - **Main-screen glass overlay** — shatters when **mic input** or **speaker output** is too loud
 - **Black leather** backdrop with pebble grain and stitching

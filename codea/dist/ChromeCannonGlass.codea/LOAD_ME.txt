@@ -9,6 +9,7 @@ Load on iPad:
 
 PLAY tab: drag to aim, FIRE (or Tab) to shoot, RESET to reload.
 Black leather background. Neon tube type cycles bright blue → pink → red.
-Tabs: PLAY · IN (input audio) · OUT (output audio) · MIXER.
-Twist knobs on IN/OUT tabs to set mic and speaker volume.
+Tabs: PLAY · SETTINGS · MIXER.
+SETTINGS has two tabs: INPUT AUDIO (mic) and OUTPUT AUDIO (speaker).
+Twist knobs on those tabs to set mic and speaker volume.
 Sidebar Save / Load stores mixer volumes. Tweaking any fader resets screen glass.

@@ -4,7 +4,7 @@
 |------|----------------|
 | `ChromeCannonGlass.codea.zip` | Unzip → copy `ChromeCannonGlass.codea` into **Files → On My iPad → Codea** → open Codea |
 
-FL-style **MIXER** tab: Master + all channel volumes. Screen glass shatters when mic input or speaker output is too loud; tweaking any fader resets it.
+FL-style **MIXER** tab: Master + all channel volumes. **SETTINGS** has **Input Audio** and **Output Audio** tabs. Screen glass shatters when mic input or speaker output is too loud; tweaking any fader resets it.
 
 FL Studio MIDI / piano-roll scripts: `../../flstudio/ChromeCannonGlass/`
 

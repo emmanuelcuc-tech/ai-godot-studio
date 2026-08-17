@@ -6,13 +6,28 @@ Mixer.UNITY = 0.8
 Mixer.MAX = 1.25
 Mixer.CHANNELS = { "input", "output", "fire", "hit", "glass" }
 Mixer.STRIPS = { "input", "output", "fire", "hit", "glass", "master" }
-Mixer.PAGES = { "play", "input", "output", "mixer" }
+Mixer.PAGES = { "play", "settings", "mixer" }
+Mixer.SETTINGS_TABS = { "input", "output" }
 
 function Mixer.isPage(id)
     for _, p in ipairs(Mixer.PAGES) do
         if p == id then return true end
     end
     return false
+end
+
+function Mixer.isSettingsTab(id)
+    return id == "input" or id == "output"
+end
+
+-- Legacy saves stored uiPage as "input" / "output"; those are now settings tabs.
+function Mixer.normalizePage(page, tab)
+    if page == "input" or page == "output" then
+        return "settings", page
+    end
+    local p = Mixer.isPage(page) and page or "play"
+    local t = Mixer.isSettingsTab(tab) and tab or "input"
+    return p, t
 end
 
 function Mixer.defaults()
