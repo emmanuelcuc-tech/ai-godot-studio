@@ -35,7 +35,8 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 | **Tab** | Shoot on PLAY · back to PLAY from MIXER |
 | **RESET** button or **R** | Reload panes + ball |
 | Sidebar **LoudnessBreak** | How loud is “too loud” |
-| **Yell into mic** or **crank Master/OUT + FIRE** | Main screen glass shatters and flies away |
+| **Yell into mic** | Red MIC lamp flashes / stays lit; IN column height = volume |
+| **FIRE / playback** | OUT column height = speaker volume |
 
 ## What you get
 

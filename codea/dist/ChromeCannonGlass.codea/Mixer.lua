@@ -105,3 +105,35 @@ function Mixer.stripLabel(id)
     }
     return names[id] or string.upper(tostring(id))
 end
+
+-- Mic lamp: flash on transients, remain red while audio holds.
+-- Returns hold, lit, height 0–1, mode "off"|"flash"|"hold".
+function Mixer.micLamp(level, hold, dt, floor)
+    floor = floor or 0.03
+    dt = math.max(0, dt or 0.016)
+    level = math.max(0, level or 0)
+    hold = math.max(0, hold or 0)
+    if level >= floor then
+        hold = math.max(hold, 0.28)
+    else
+        hold = math.max(0, hold - dt)
+    end
+    local lit = hold > 0
+    local height = math.min(1, level)
+    local mode = "off"
+    if lit then
+        if level >= floor * 2.5 then
+            mode = "hold"
+        else
+            mode = "flash"
+        end
+    end
+    return hold, lit, height, mode
+end
+
+-- Map a 0–1 audio level to a pixel column height.
+function Mixer.volumeHeight(level, maxH)
+    maxH = maxH or 1
+    local t = math.min(1, math.max(0, level or 0))
+    return t * maxH
+end

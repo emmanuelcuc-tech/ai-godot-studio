@@ -1,33 +1,51 @@
-# FL Studio scripts — Chrome Cannon Glass mixer
+# FL Studio scripts (follows `flstudio/SKILL.md`)
 
-The snippets that mixed `import general` (MIDI) with `import flpianoroll` (piano roll) cannot run in one file. FL Studio loads them in **different sandboxes**. They are split and repaired here.
+Three **separate** contexts — do not mix modules across files.
 
-## 1. MIDI script — Master + all mixer volumes
+| Context | Modules | This repo |
+|---------|---------|-----------|
+| MIDI controller | `general`, `mixer`, `device`, `transport`, … | `device_ChromeCannonGlass.py` |
+| Piano roll | `flpianoroll`, `enveditor` | `Shared/Python/User Scripts/SetAllVelocities.py` |
+| Edison | `enveditor` | `Shared/Python/User Scripts/EdisonReady.py` |
 
-Copy the folder into:
+## MIDI — Master + all mixer volumes
 
-`Documents/Image-Line/FL Studio/Settings/Hardware/Chrome Cannon Glass/`
+Copy to:
 
-Files:
+`Documents/Image-Line/FL Studio/Settings/Hardware/Chrome Cannon Glass/device_ChromeCannonGlass.py`
 
-- `device_ChromeCannonGlass.py`
-- `mixer_util.py`
+Enable in **Options → MIDI**.
 
-Then in FL Studio: **Options → MIDI** → enable the device / assign this script.
+On start:
+
+```text
+API Version: …
+Connected: …
+```
 
 | Control | Action |
 |---------|--------|
-| **CC7** channel 1 | **Master** volume |
-| **CC7** other channels | Mixer tracks 1… |
-| **CC64** (sustain down) | Set **all** tracks including Master to **80%** (unity) |
-| Note-on | Select mixer track |
+| **CC7** | Volume of the **current** mixer track (`mixer.trackNumber()`) |
+| **CC8** | **Master** volume (track `0`) |
+| **CC64** | Set **all** tracks including Master to **0.8** (unity) |
+| Note-on | `mixer.setActiveTrack(note % 8)` |
+| `OnRefresh` | Echo Master volume back to the controller (CC7 ch1) |
 
-On start it prints `API Version: …` via `general.getVersion()`.
+## Piano roll — all note velocities 80%
 
-## 2. Piano roll script — all note velocities 80%
+Copy to:
 
-Copy `SetAllVelocities.py` into FL’s piano-roll scripts folder (Scripts menu in the piano roll).
+`Shared\Python\User Scripts\SetAllVelocities.py`
 
-Open a pattern, run the script. Every note is set to `velocity = 0.8`.
+Open a pattern in the piano roll, then run it from the **Scripts** menu.
 
-This file **must not** `import general` or define `OnInit` — those only exist in MIDI scripts.
+```python
+import flpianoroll
+score = flpianoroll.score
+for note in score.notes:
+    note.velocity = 0.8
+```
+
+## Skill
+
+Full API map: [`SKILL.md`](../SKILL.md) (FL Studio 20.8.4+, Python 3.6+).

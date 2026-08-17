@@ -63,6 +63,12 @@ LoudnessBreak = 0.62
 prevInputGain, prevOutputVolume = 1, 0.7
 screenBreakCooldown = 0
 micOn = false
+micHold = 0
+micLit = false
+micLampMode = "off"
+micHeight = 0
+micPulse = 0
+MIC_FLOOR = 0.03
 
 -- FL-style mixer (Master + strips). Filled in setup() after Mixer.lua loads.
 uiPage = "play" -- play | mixer
@@ -331,6 +337,7 @@ function draw()
     drawPageTabs()
     drawScreenGlassOverlay()
     drawMeters()
+    drawMicSpeakerLamps()
 
     updateSlowMo()
     updateBallKe()
@@ -969,7 +976,12 @@ function drawMixerStrip(r, id, vol)
         peak = math.min(1, outputPeak)
     end
     local mh = (r.h - 70) * peak
-    if peak > 0.85 then
+    if id == "input" then
+        local pulse = 0.55 + 0.45 * math.abs(math.sin((micPulse or 0) * 3.1))
+        if micLampMode == "hold" then pulse = 1 end
+        if not micLit then pulse = 0.15 end
+        fill(220 * pulse, 24, 28, 80 + 175 * pulse)
+    elseif peak > 0.85 then
         fill(220, 70, 50)
     elseif peak > 0.6 then
         fill(220, 180, 50)
@@ -1034,6 +1046,13 @@ function updateAudioGlass()
     if outputPeak < 0.02 then outputPeak = 0 end
 
     inputLevel, outputLevel = Glass.audioLevels(readMicAmp(), inG, outputPeak, outV)
+    micHold, micLit, micHeight, micLampMode = Mixer.micLamp(inputLevel, micHold, dt, MIC_FLOOR)
+    if micLit then
+        local pulseRate = (micLampMode == "flash") and 14 or 3
+        micPulse = (micPulse or 0) + dt * pulseRate
+    else
+        micPulse = 0
+    end
     local tooLoud, _, source = Glass.isTooLoud(inputLevel, outputLevel, thresh)
     loudestSource = source
 
@@ -1147,30 +1166,74 @@ end
 
 function drawMeters()
     local thresh = LoudnessBreak or 0.62
-    local function bar(x, y, w, h, value, label, hot)
-        fill(20, 22, 28, 180)
-        rect(x, y, w, h, 6)
-        local t = math.min(1, value / math.max(0.05, thresh * 1.4))
-        if hot then
-            fill(220, 70, 55)
-        else
-            fill(80, 170, 120)
-        end
-        rect(x + 4, y + 4, (w - 8) * t, h - 8, 4)
-        fill(230, 235, 245)
-        fontSize(13)
-        textAlign(LEFT)
-        textMode(CORNER)
-        text(string.format("%s  %.2f", label, value), x, y + h + 4)
-    end
-    local inHot = inputLevel >= thresh
-    local outHot = outputLevel >= thresh
-    bar(22, 22, 160, 16, inputLevel, micOn and "IN  mic" or "IN  (no mic)", inHot)
-    bar(200, 22, 160, 16, outputLevel, "OUT  speaker", outHot)
     fill(160, 175, 195)
     fontSize(12)
-    text(screenBroken and "screen: shattered — tweak IN/OUT to reset"
+    textAlign(LEFT)
+    textMode(CORNER)
+    text(screenBroken and "screen: shattered — tweak MIXER to reset"
         or "screen: intact — too loud = break", 22, 58)
+end
+
+function drawMicSpeakerLamps()
+    local colH = math.min(220, HEIGHT * 0.32)
+    local baseY = 88
+    local micX = 48
+    local outX = 118
+
+    -- Microphone body
+    fill(36, 38, 44)
+    ellipse(micX, baseY + 18, 28, 36)
+    fill(58, 60, 68)
+    rect(micX - 6, baseY - 8, 12, 22)
+    fill(22, 22, 26)
+    ellipse(micX, baseY + 28, 18, 10)
+
+    -- Red lamp: flash / pulse, or remain lit while audio holds
+    local pulse = 0.5 + 0.5 * math.abs(math.sin((micPulse or 0) * 2.4))
+    local glow = 0
+    if micLampMode == "hold" then
+        glow = 1
+    elseif micLampMode == "flash" then
+        glow = pulse
+    elseif micLit then
+        glow = 0.35 + 0.65 * pulse
+    end
+    if glow > 0 then
+        fill(220, 20, 28, 40 + 90 * glow)
+        ellipse(micX, baseY + 52, 34 + 10 * glow)
+        fill(255, 30, 36, 160 + 95 * glow)
+        ellipse(micX, baseY + 52, 16 + 4 * glow)
+        fill(255, 180, 180, 80 + 120 * glow)
+        ellipse(micX - 3, baseY + 55, 5)
+    else
+        fill(50, 16, 18)
+        ellipse(micX, baseY + 52, 14)
+    end
+    fill(230, 230, 235)
+    fontSize(11)
+    textAlign(CENTER)
+    textMode(CENTER)
+    text("MIC", micX, baseY - 18)
+
+    -- Volume as HEIGHT: mic column (red) + speaker playback column (amber)
+    local function volumeColumn(x, level, r, g, b, label)
+        local wellH = colH
+        fill(16, 16, 20, 200)
+        rect(x - 11, baseY + 70, 22, wellH, 4)
+        local h = Mixer.volumeHeight(level, wellH - 6)
+        if h > 1 then
+            fill(r, g, b, 220)
+            rect(x - 8, baseY + 73, 16, h, 3)
+            -- hot cap
+            fill(255, math.min(255, g + 40), math.min(255, b + 40), 200)
+            rect(x - 8, baseY + 73 + h - 4, 16, 5)
+        end
+        fill(200, 205, 215)
+        fontSize(11)
+        text(label, x, baseY + 70 + wellH + 12)
+    end
+    volumeColumn(micX, micHeight, 230, 36, 40, string.format("IN %.0f", micHeight * 100))
+    volumeColumn(outX, math.min(1, outputLevel), 255, 170, 50, string.format("OUT %.0f", math.min(1, outputLevel) * 100))
 end
 
 -- Helpers --------------------------------------------------------------

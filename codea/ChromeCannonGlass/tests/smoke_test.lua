@@ -92,6 +92,17 @@ check("no mixer tweak when still", Mixer.anyChanged(vols, Mixer.copy(vols)) == f
 local yvol = Mixer.volumeFromFaderY(100, 0, 100)
 check("fader top is max", math.abs(yvol - Mixer.MAX) < 1e-9)
 
+local hold, lit, h, mode = Mixer.micLamp(0, 0, 0.016, 0.03)
+check("mic lamp off when silent", lit == false and mode == "off")
+hold, lit, h, mode = Mixer.micLamp(0.5, 0, 0.016, 0.03)
+check("mic lamp holds red on loud audio", lit == true and mode == "hold" and h > 0.4)
+hold, lit, h, mode = Mixer.micLamp(0.04, 0, 0.016, 0.03)
+check("mic lamp flashes on light audio", lit == true and mode == "flash")
+local hold2 = Mixer.micLamp(0, 0.2, 0.05, 0.03)
+check("mic lamp remains after audio", hold2 > 0)
+check("volume height scales", math.abs(Mixer.volumeHeight(0.5, 200) - 100) < 1e-9)
+check("volume height silent is 0", Mixer.volumeHeight(0, 200) == 0)
+
 if fails > 0 then
     print("\n" .. fails .. " failure(s)")
     os.exit(1)
