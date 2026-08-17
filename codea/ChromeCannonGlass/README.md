@@ -30,7 +30,7 @@ Aim a **cannon**, fire a **chrome ball**, and watch it punch through **five spac
 | **FIRE** button | Shoot chrome ball |
 | **Tab** or **Space** (hardware keyboard) | Shoot |
 | **RESET** button or **R** | Reload panes + ball |
-| **MIXER** tab (or **M**) | FL-style mixer: Master + IN/OUT/FIRE/HIT/GLASS |
+| **Twist IN / OUT knobs** | Change input and output volume (circular drag) |
 | **SET ALL 80%** | All faders including Master → unity (0.8) |
 | **Tab** | Shoot on PLAY · back to PLAY from MIXER |
 | **RESET** button or **R** | Reload panes + ball |

@@ -76,6 +76,8 @@ mixVols = nil
 prevMixVols = nil
 mixerDrag = nil
 mixerLayoutCache = nil
+knobDrag = nil
+knobLastAng = 0
 
 function setup()
     supportedOrientations(LANDSCAPE_ANY)
@@ -383,6 +385,7 @@ function draw()
     drawScreenGlassOverlay()
     drawMeters()
     drawMicSpeakerLamps()
+    drawVolumeKnobs()
 
     updateSlowMo()
     updateBallKe()
@@ -580,12 +583,23 @@ function touched(touch)
         if hitButton(touch, playTabBtn()) then
             uiPage = "play"
             mixerDrag = nil
+            knobDrag = nil
             return
         end
         if hitButton(touch, mixerTabBtn()) then
             uiPage = "mixer"
             mixerDrag = nil
+            knobDrag = nil
             aiming = false
+            return
+        end
+        local kid = volumeKnobAt(touch.x, touch.y)
+        if kid then
+            knobDrag = kid
+            aiming = false
+            mixerDrag = nil
+            local k = volumeKnobLayout()[kid]
+            knobLastAng = Glass.atan2(touch.y - k.y, touch.x - k.x)
             return
         end
         if uiPage == "mixer" then
@@ -618,7 +632,9 @@ function touched(touch)
             aimFromTouch(touch)
         end
     elseif touch.state == MOVING then
-        if uiPage == "mixer" and mixerDrag then
+        if knobDrag then
+            applyKnobTwist(touch)
+        elseif uiPage == "mixer" and mixerDrag then
             applyMixerTouch(touch)
         elseif aiming then
             aimFromTouch(touch)
@@ -626,6 +642,7 @@ function touched(touch)
     elseif touch.state == ENDED or touch.state == CANCELLED then
         aiming = false
         mixerDrag = nil
+        knobDrag = nil
     end
 end
 
@@ -998,6 +1015,78 @@ function applyMixerTouch(touch)
     syncGainsFromMixer()
 end
 
+function volumeKnobLayout()
+    -- Same IN / OUT pots on PLAY and MIXER so you can always twist them.
+    return {
+        input = { x = WIDTH * 0.48, y = 96, r = 46 },
+        output = { x = WIDTH * 0.48 + 114, y = 96, r = 46 },
+    }
+end
+
+function volumeKnobAt(px, py)
+    local layout = volumeKnobLayout()
+    if Mixer.hitKnob(px, py, layout.input) then return "input" end
+    if Mixer.hitKnob(px, py, layout.output) then return "output" end
+    return nil
+end
+
+function applyKnobTwist(touch)
+    if not knobDrag then return end
+    local k = volumeKnobLayout()[knobDrag]
+    if not k then return end
+    local ang = Glass.atan2(touch.y - k.y, touch.x - k.x)
+    mixVols = mixVols or Mixer.defaults()
+    mixVols[knobDrag] = Mixer.twistVolume(mixVols[knobDrag] or Mixer.UNITY, knobLastAng, ang)
+    knobLastAng = ang
+    syncGainsFromMixer()
+end
+
+function drawVolumeKnobs()
+    mixVols = mixVols or Mixer.defaults()
+    local layout = volumeKnobLayout()
+    drawTwistKnob(layout.input, mixVols.input, "IN")
+    drawTwistKnob(layout.output, mixVols.output, "OUT")
+end
+
+function drawTwistKnob(k, vol, label)
+    if not k then return end
+    fill(6, 4, 4, 220)
+    ellipse(k.x, k.y, k.r * 2.45)
+    fill(32, 26, 26)
+    ellipse(k.x, k.y, k.r * 2.05)
+    fill(16, 12, 12)
+    ellipse(k.x, k.y, k.r * 1.72)
+    -- Tick marks
+    stroke(40, 32, 32, 140)
+    strokeWidth(1)
+    for i = 0, 10 do
+        local a = Mixer.KNOB_MIN + (Mixer.KNOB_MAX - Mixer.KNOB_MIN) * (i / 10)
+        local x1 = k.x + math.cos(a) * k.r * 0.82
+        local y1 = k.y + math.sin(a) * k.r * 0.82
+        local x2 = k.x + math.cos(a) * k.r * 0.95
+        local y2 = k.y + math.sin(a) * k.r * 0.95
+        line(x1, y1, x2, y2)
+    end
+    noStroke()
+    local ang = Mixer.knobAngleFromVolume(vol or Mixer.UNITY)
+    local nr, ng, nb = Mixer.neonRGB(ElapsedTime or 0, 1)
+    local ix = k.x + math.cos(ang) * k.r * 0.7
+    local iy = k.y + math.sin(ang) * k.r * 0.7
+    stroke(nr, ng, nb, 230)
+    strokeWidth(3)
+    line(k.x, k.y, ix, iy)
+    noStroke()
+    fill(nr, ng, nb, 230)
+    ellipse(ix, iy, 9)
+    fill(8, 6, 6)
+    ellipse(k.x, k.y, 10)
+    textAlign(CENTER)
+    textMode(CENTER)
+    neonText(label, k.x, k.y + k.r + 16, 13)
+    neonText(string.format("%.0f%%", ((vol or Mixer.UNITY) / Mixer.UNITY) * 100),
+        k.x, k.y - k.r - 12, 12)
+end
+
 function drawMixerPage()
     drawLeather()
     fill(8, 5, 6, 200)
@@ -1020,6 +1109,7 @@ function drawMixerPage()
     for _, id in ipairs(Mixer.STRIPS) do
         drawMixerStrip(rects[id], id, mixVols[id] or Mixer.UNITY)
     end
+    drawVolumeKnobs()
 
     if messageTimer > 0 and message ~= "" then
         textAlign(CENTER)

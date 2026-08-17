@@ -9,5 +9,5 @@ Load on iPad:
 
 PLAY tab: drag to aim, FIRE (or Tab) to shoot, RESET to reload.
 Black leather background. Neon tube type cycles bright blue → pink → red.
-MIXER tab: Fruity Loops–style Master + all volumes. SET ALL 80% for unity.
+Twist the IN and OUT knobs (circular drag) to change input and output volume.
 Sidebar Save / Load stores mixer volumes. Tweaking any fader resets screen glass.

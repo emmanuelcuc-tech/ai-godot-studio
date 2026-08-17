@@ -92,6 +92,15 @@ check("no mixer tweak when still", Mixer.anyChanged(vols, Mixer.copy(vols)) == f
 local yvol = Mixer.volumeFromFaderY(100, 0, 100)
 check("fader top is max", math.abs(yvol - Mixer.MAX) < 1e-9)
 
+local a80 = Mixer.knobAngleFromVolume(0.8)
+check("knob angle roundtrip", math.abs(Mixer.volumeFromKnobAngle(a80) - 0.8) < 1e-6)
+local twisted = Mixer.twistVolume(0.8, 0, 0.4)
+check("twist clockwise raises volume", twisted > 0.8)
+local down = Mixer.twistVolume(0.8, 0.4, 0)
+check("twist counter-clockwise lowers volume", down < 0.8)
+check("knob hit inside", Mixer.hitKnob(10, 10, { x = 10, y = 10, r = 20 }) == true)
+check("knob miss outside", Mixer.hitKnob(80, 10, { x = 10, y = 10, r = 20 }) == false)
+
 local hold, lit, h, mode = Mixer.micLamp(0, 0, 0.016, 0.03)
 check("mic lamp off when silent", lit == false and mode == "off")
 hold, lit, h, mode = Mixer.micLamp(0.5, 0, 0.016, 0.03)

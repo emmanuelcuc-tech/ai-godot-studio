@@ -94,6 +94,40 @@ function Mixer.faderYFromVolume(vol, y0, y1)
     return y0 + t * (y1 - y0)
 end
 
+-- Rotary knobs: -135° (min) … +135° (max), 270° twist like FL / hardware pots.
+Mixer.KNOB_MIN = -2.356194490192345  -- -135°
+Mixer.KNOB_MAX = 2.356194490192345   -- +135°
+
+function Mixer.knobAngleFromVolume(vol)
+    local t = Mixer.clamp(vol) / Mixer.MAX
+    return Mixer.KNOB_MIN + t * (Mixer.KNOB_MAX - Mixer.KNOB_MIN)
+end
+
+function Mixer.volumeFromKnobAngle(ang)
+    local span = Mixer.KNOB_MAX - Mixer.KNOB_MIN
+    local t = ((ang or 0) - Mixer.KNOB_MIN) / span
+    if t < 0 then t = 0 end
+    if t > 1 then t = 1 end
+    return Mixer.clamp(t * Mixer.MAX)
+end
+
+-- Apply a twist: shortest signed delta between two atan2 angles.
+function Mixer.twistVolume(vol, prevAng, newAng)
+    local d = (newAng or 0) - (prevAng or 0)
+    while d > math.pi do d = d - 2 * math.pi end
+    while d < -math.pi do d = d + 2 * math.pi end
+    local span = Mixer.KNOB_MAX - Mixer.KNOB_MIN
+    return Mixer.clamp((vol or 0) + d / span * Mixer.MAX)
+end
+
+function Mixer.hitKnob(px, py, knob)
+    if not knob then return false end
+    local dx = px - knob.x
+    local dy = py - knob.y
+    local r = (knob.r or 36) + 10
+    return dx * dx + dy * dy <= r * r
+end
+
 function Mixer.stripLabel(id)
     local names = {
         master = "MASTER",
