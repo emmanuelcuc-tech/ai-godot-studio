@@ -1,20 +1,16 @@
-# Anatomy Ballistics — Swift Playgrounds
+# Anatomy Ballistics — Swift + Safari (iPad)
 
-Finished playable **SwiftUI** app for **iPad Swift Playgrounds** (free from Apple).
+Playable finished game for iPad in **two free ways**:
 
-## Open on iPad
-1. Install **Swift Playgrounds** (App Store, free).
-2. Unzip `swift/dist/AnatomyBallistics.swiftpm.zip`.
-3. Tap `AnatomyBallistics.swiftpm` → open in Swift Playgrounds.
-4. Run → **TAP TO PLAY** → drag aim → **FIRE**.
+## A) Swift Playgrounds
+1. Install free **Swift Playgrounds** (App Store)
+2. Open `AnatomyBallistics.swiftpm`
+3. Run → **TAP TO PLAY** → **FIRE**
 
-See `HOW_TO_SWIFT_PLAYGROUNDS.txt`.
+## B) Safari
+1. Open `OPEN_IN_SAFARI.html` in **Safari**
+2. **TAP TO PLAY** → **FIRE**
 
-## Also: Safari (no Playgrounds)
-`browser/AnatomyBallistics/OPEN_IN_SAFARI.html` — open in Safari and play.
+**Best download:** `swift/dist/SWIFT_AND_SAFARI_IPAD.zip` (both options + START_HERE.txt)
 
-## What’s in the app
-- Soft-body figure (skin / muscle / bone)
-- Organs + vitals (HR, BP, brain, SpO₂, bile…)
-- Real .22 LR stage table (40→15 ft, then wall)
-- Cinematic cameras, blood/bile gush, FIRE / NEXT / RESET
+See `START_HERE_SWIFT_AND_SAFARI.txt`.
