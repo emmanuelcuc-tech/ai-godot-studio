@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Buffer Order</key>
+	<array>
+		<string>Main</string>
+		<string>Vec3</string>
+		<string>TwentyTwo</string>
+		<string>Bones</string>
+		<string>Organs</string>
+		<string>Stages</string>
+		<string>Ballistics</string>
+		<string>SoftBody</string>
+		<string>Blood</string>
+		<string>Anatomy</string>
+		<string>Camera</string>
+	</array>
+	<key>Version</key>
+	<string>1.1.0</string>
+	<key>Name</key>
+	<string>AnatomyBallistics</string>
+	<key>Description</key>
+	<string>Anatomy Ballistics 1.1.0 — .22 LR soft-body anatomy sandbox. Ranges 40–15 ft then drywall+wood wall. Organ vitals, bone fractures, blood/bile, cinematic cameras.</string>
+	<key>Author</key>
+	<string>AI Godot Studio / Codea</string>
+</dict>
+</plist>
