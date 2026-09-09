@@ -69,6 +69,17 @@ If a compiler is detected, Create may start this build in the background. First 
 
 Output games: `generated_games/`
 
+## Play on iPad (no PC)
+
+| Game | Download |
+|------|----------|
+| **Metallic Labyrinth** (tilt maze) | [MetallicLabyrinth.codea.zip](codea/dist/MetallicLabyrinth.codea.zip) |
+| **Anatomy Ballistics** (.22 LR sandbox) | [AnatomyBallistics.codea.zip](codea/dist/AnatomyBallistics.codea.zip) |
+
+On the iPad: unzip → copy the `.codea` folder into **Files → On My iPad → Codea** → open Codea → Play.
+
+Paste fallbacks: [MetallicLabyrinth.lua](codea/dist/MetallicLabyrinth.lua) and [AnatomyBallistics.lua](codea/dist/AnatomyBallistics.lua).
+
 ## Legal
 
 Spiritual recreations / style matches only — original or CC0 art. No commercial ROMs, WADs, or ripped game assets.

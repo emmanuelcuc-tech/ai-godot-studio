@@ -1,10 +1,10 @@
-Anatomy Ballistics — 1.1.0 COMPLETE
+Anatomy Ballistics — 1.1.0
 
-Save / load on iPad:
-1. Unzip this archive
-2. You should see a folder named AnatomyBallistics.codea
-3. Files app → On My iPad → Codea
-4. Copy AnatomyBallistics.codea into that Codea folder
-5. Open Codea → tap AnatomyBallistics → Play (landscape)
+On iPad:
+1. Download AnatomyBallistics.codea.zip
+2. Unzip it (tap the zip in Files)
+3. Copy the AnatomyBallistics.codea folder into Files → On My iPad → Codea
+4. Open Codea → tap AnatomyBallistics → Play (landscape)
+5. Drag to aim, double-tap to fire
 
-Double-tap to shoot · RESET rebuilds · NEXT advances range stages
+RESET rebuilds the body · NEXT steps 40→15 ft, then the house wall
