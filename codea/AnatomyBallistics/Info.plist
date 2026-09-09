@@ -16,8 +16,12 @@
 		<string>Anatomy</string>
 		<string>Camera</string>
 	</array>
+	<key>Version</key>
+	<string>1.1.0</string>
+	<key>Name</key>
+	<string>AnatomyBallistics</string>
 	<key>Description</key>
-	<string>.22 LR anatomy sandbox: staged ranges 40–15 ft then drywall+wood wall, organ vitals, bone density fractures, blood/bile fluids, cinematic cameras.</string>
+	<string>Anatomy Ballistics 1.1.0 — .22 LR soft-body anatomy sandbox. Ranges 40–15 ft then drywall+wood wall. Organ vitals, bone fractures, blood/bile, cinematic cameras.</string>
 	<key>Author</key>
 	<string>AI Godot Studio / Codea</string>
 </dict>

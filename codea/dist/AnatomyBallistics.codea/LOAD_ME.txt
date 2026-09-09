@@ -1,20 +1,23 @@
-Anatomy Ballistics 1.1.0 (Codea)
+Anatomy Ballistics — 1.1.0 COMPLETE
 
-INSTALL
-1. Unzip AnatomyBallistics.codea.zip if needed.
-2. Open the Files app on your iPad.
-3. Copy the folder named AnatomyBallistics.codea
-   into: On My iPad → Codea
-4. Open the Codea app — the project appears on the home screen.
-5. Tap it → Play (landscape).
+Load on iPad:
+1. Unzip so you have a folder named AnatomyBallistics.codea
+2. Open the Files app → On My iPad → Codea
+3. Copy AnatomyBallistics.codea into the Codea folder
+4. Open Codea — the project appears on the home screen
+5. Tap it → Play (landscape)
 
 CONTROLS
-• Drag — red aim reticle
-• Double-tap — fire .22 LR (3s cooldown)
-• RESET — rebuild body, restart at 40 ft
-• NEXT — advance range stage
-• Stages: 40→15 ft (5 ft steps), then drywall+wood wall
+• Drag finger — red semi-opaque aim reticle
+• Double-tap — fire .22 LR (3 second cooldown)
+• RESET button / R — rebuild body; restart at 40 ft
+• NEXT button / N — advance range stage
+• AutoAdvance (sidebar) — after impact, step closer
 
-BUFFERS (Info.plist order)
+STAGES
+1–6  Open air: 40 → 35 → 30 → 25 → 20 → 15 ft
+7    House wall: ½″ drywall + pine stud + ½″ drywall
+
+INCLUDED BUFFERS
 Main, Vec3, TwentyTwo, Bones, Organs, Stages,
 Ballistics, SoftBody, Blood, Anatomy, Camera
