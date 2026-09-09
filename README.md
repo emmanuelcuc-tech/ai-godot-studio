@@ -71,9 +71,14 @@ Output games: `generated_games/`
 
 ## Play on iPad (no PC)
 
-Download **[codea/dist/MetallicLabyrinth.codea.zip](codea/dist/MetallicLabyrinth.codea.zip)**. On the iPad: unzip → copy `MetallicLabyrinth.codea` into **Files → On My iPad → Codea** → open Codea → Play. Tilt to roll the ball.
+| Game | Download |
+|------|----------|
+| **Metallic Labyrinth** (tilt maze) | [MetallicLabyrinth.codea.zip](codea/dist/MetallicLabyrinth.codea.zip) |
+| **Anatomy Ballistics** (.22 LR sandbox) | [AnatomyBallistics.codea.zip](codea/dist/AnatomyBallistics.codea.zip) |
 
-Paste fallback: [codea/dist/MetallicLabyrinth.lua](codea/dist/MetallicLabyrinth.lua) is the same game in one file.
+On the iPad: unzip → copy the `.codea` folder into **Files → On My iPad → Codea** → open Codea → Play.
+
+Paste fallbacks: [MetallicLabyrinth.lua](codea/dist/MetallicLabyrinth.lua) and [AnatomyBallistics.lua](codea/dist/AnatomyBallistics.lua).
 
 ## Legal
 

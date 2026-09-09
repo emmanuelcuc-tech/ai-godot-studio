@@ -2,13 +2,22 @@
 
 Sandbox soft-body **human anatomy** shot with real **.22 LR** ballistics tables. Ranges start at **40 ft** and step closer by **5 ft** to **15 ft**, then a **house-wall** stage (½″ drywall + pine stud + ½″ drywall). Organs run with heartbeat, brain activity, blood / bile / gastric fluids; bones use density-based fracture thresholds.
 
-## Install
+## One-file download (iPad, no PC)
 
-1. Download [`codea/dist/AnatomyBallistics.codea.zip`](../dist/AnatomyBallistics.codea.zip)
-2. Unzip → copy `AnatomyBallistics.codea` into **On My iPad → Codea**
-3. Open Codea → Play (landscape)
+Download **[AnatomyBallistics.codea.zip](../dist/AnatomyBallistics.codea.zip)** — that is the only file you need.
 
-Or paste buffers from `codea/AnatomyBallistics/` (see `Info.plist` buffer order).
+1. On the iPad, tap the zip in Safari / Files to unzip it.
+2. Copy `AnatomyBallistics.codea` into **Files → On My iPad → Codea**.
+3. Open **Codea** → tap **AnatomyBallistics** → **Play** (landscape).
+4. Drag to aim, double-tap to fire.
+
+Paste fallback: [AnatomyBallistics.lua](../dist/AnatomyBallistics.lua) is the same game in one buffer. New Codea project → replace Main → Play.
+
+Rebuild the zip after editing source:
+
+```bash
+python3 codea/pack_anatomy_ballistics.py
+```
 
 ## Controls
 
