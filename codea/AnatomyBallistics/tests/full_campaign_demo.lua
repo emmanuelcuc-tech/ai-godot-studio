@@ -164,16 +164,16 @@ local function simulateShot(maxSteps)
                 wallBroken = true
             end
             Ballistics.integrate(bullet, (1 / 60) * ts)
-            local hitIdx = Ballistics.hitNodeIndex(bullet, body.nodes, 0.28)
+            local hitIdx = Ballistics.hitNodeIndex(bullet, body.nodes, 0.42)
             if hitIdx then
                 local n = body.nodes[hitIdx]
                 local hitPos = Vec3.new(n.x, n.y, n.z)
                 local ke = (bullet.realFtlb / 140) * 0.012
-                local torn = SoftBody.applyBulletImpact(body, hitPos, bullet.vel, ke, 0.55, bullet.realFtlb)
+                local torn = SoftBody.applyBulletImpact(body, hitPos, bullet.vel, ke, 0.72, bullet.realFtlb)
                 local organName, odist = Organs.nearestOrgan(meta.organs, hitPos)
                 if organName then
                     Organs.applyHit(organState, organName, bullet.realFtlb,
-                        Organs.hitQualityFromDistance(odist, 0.35), n.kind == "bone")
+                        Organs.hitQualityFromDistance(odist, 0.55), n.kind == "bone")
                 end
                 Blood.ruptureNear(blood, body, torn, bullet.vel)
                 Blood.gushAt(blood, hitPos, bullet.vel, 14,
@@ -227,9 +227,17 @@ for _, want in ipairs(stagesToShoot) do
     Stages.refresh(stage)
     Camera.setAim(cam, SoftBody.center(body), stage.snap.rangeFeet)
     sample("stage_intro")
-    -- Aim slightly off-center for variety
-    local ax = W * (0.48 + (want % 3) * 0.02)
-    local ay = H * (0.50 + (want % 2) * 0.03)
+    -- Aim at projected torso/organ cluster so the model takes the hit every stage
+    local cx, cy = W * 0.5, H * 0.52
+    if meta.organs and meta.organs[2] then -- heart-ish
+        local o = meta.organs[2]
+        local sx, sy, _, vis = Camera.project(cam, Vec3.new(o.cx, o.cy, o.cz), W, H)
+        if vis then
+            cx, cy = sx, H - sy
+        end
+    end
+    local ax = cx + (want % 3 - 1) * 6
+    local ay = cy + (want % 2) * 8
     fireAt(ax, ay)
     simulateShot(340)
     print(string.format("  stage %d @ %sft wall=%s HR=%.0f brain=%.0f%% freeBlood=%d nodes=%d",
