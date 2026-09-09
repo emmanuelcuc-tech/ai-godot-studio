@@ -11,6 +11,8 @@ No Codea. No Python. No install.
 
 See `HOW_TO_PLAY_ON_IPAD.txt`. Zip: `browser/dist/OPEN_IN_SAFARI.html.zip`
 
+**Want the arcade version?** Play the Flash-style score attack at [`../AnatomyFlash/`](../AnatomyFlash/).
+
 ## Controls
 | Input | Action |
 |--------|--------|
