@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Buffer Order</key>
+	<array>
+		<string>Main</string>
+		<string>Vec3</string>
+		<string>Ballistics</string>
+		<string>SoftBody</string>
+		<string>Blood</string>
+		<string>Anatomy</string>
+		<string>Camera</string>
+	</array>
+	<key>Description</key>
+	<string>Sandbox anatomy soft-body target. Double-tap to fire with cinematic bullet cameras, fabric skin tear, muscle strain, bone crack, and circulating blood. Reset to rebuild.</string>
+	<key>Author</key>
+	<string>AI Godot Studio / Codea</string>
+</dict>
+</plist>
