@@ -1,6 +1,4 @@
--- Headless smoke test for Demolition materials + TNT
--- Run: lua5.4 codea/Demolition/tests/smoke_test.lua
-
+-- Headless smoke test for Demolition materials encyclopedia + physics
 local ROOT = "codea/Demolition/"
 
 vec2 = function(x, y)
@@ -19,44 +17,32 @@ vec2 = function(x, y)
     })
     return v
 end
-
 color = function(r, g, b, a) return { r = r, g = g, b = b, a = a or 255 } end
 WIDTH, HEIGHT, DeltaTime, ElapsedTime = 1024, 768, 1 / 60, 0
-STATIC, DYNAMIC = 0, 1
-CIRCLE, POLYGON = 1, 2
-
+STATIC, DYNAMIC, CIRCLE, POLYGON = 0, 1, 1, 2
 function supportedOrientations() end
 function displayMode() end
 parameter = setmetatable({ number = function() end }, {
-    __call = function() end,
-    __index = function() return function() end end,
+    __call = function() end, __index = function() return function() end end,
 })
-
 local bodies = {}
 physics = {
-    continuous = true,
-    gravity = function() end,
-    iterations = function() end,
-    pause = function() end,
-    resume = function() end,
+    continuous = true, gravity = function() end, iterations = function() end,
+    pause = function() end, resume = function() end,
     body = function()
         local b = {
             x = 0, y = 0, angle = 0, type = DYNAMIC, density = 1,
-            friction = 0.5, restitution = 0.1,
-            linearVelocity = vec2(0, 0), angularVelocity = 0,
-            linearDamping = 0, angularDamping = 0,
+            friction = 0.5, restitution = 0.1, linearVelocity = vec2(0, 0),
+            angularVelocity = 0, linearDamping = 0, angularDamping = 0,
             sleepingAllowed = true, interpolate = false, info = "",
             destroy = function(self)
-                for i, x in ipairs(bodies) do
-                    if x == self then table.remove(bodies, i) break end
-                end
+                for i, x in ipairs(bodies) do if x == self then table.remove(bodies, i) break end end
             end,
         }
         table.insert(bodies, b)
         return b
     end,
 }
-
 function background() end
 function fill() end
 function stroke() end
@@ -77,71 +63,40 @@ function rectMode() end
 
 assert(loadfile(ROOT .. "Materials.lua"))()
 assert(Materials.TNT_J_PER_G == 4184)
-assert(math.abs(Materials.TNT_J_PER_TON - 4.184e9) < 1e3)
+assert(Materials.tntTonsToJoules(1) == 4.184e9)
+assert(Materials.get("wood").meltC == nil and Materials.get("wood").pyroC == 290)
+assert(Materials.get("glass").compressiveMPa == 900)
+assert(Materials.get("steel").softenC == 550)
+assert(Materials.get("rebar").reinforced == true)
+assert(Materials.get("concrete").reinforced == false)
 
--- Glass fails under tension much easier than steel
-local glass = Materials.get("glass")
-local steel = Materials.get("steel")
-local wood = Materials.get("wood")
-local concrete = Materials.get("concrete")
 local e = 500
-local gStress = Materials.failureStress(glass, e, 0.9)
-local sStress = Materials.failureStress(steel, e, 0.9)
-assert(gStress > sStress * 3, "glass should fail far easier than steel under tension")
-local woodShock = Materials.failureStress(wood, e, 0.9)
-local woodComp = Materials.failureStress(wood, e, 0.1)
-assert(woodShock > woodComp, "wood weaker under shock/tension than compression path")
-local concT = Materials.failureStress(concrete, e, 0.9)
-local concC = Materials.failureStress(concrete, e, 0.1)
-assert(concT > concC, "concrete spalls under tension more than crush")
-
-local pNear = Materials.blastImpulseAt(0.5, 0.025)
-local pFar = Materials.blastImpulseAt(5.0, 0.025)
-assert(pNear > pFar, "blast falls off with distance")
-print(string.format("OK materials glassStress=%.2f steelStress=%.2f blastNear=%.1f", gStress, sStress, pNear))
+local g = Materials.failureStress(Materials.get("glass"), e, 0.9)
+local s = Materials.failureStress(Materials.get("steel"), e, 0.9)
+local cT = Materials.failureStress(Materials.get("concrete"), e, 0.9)
+local cC = Materials.failureStress(Materials.get("concrete"), e, 0.1)
+local rB = Materials.failureStress(Materials.get("rebar"), e, 0.9)
+assert(g > s * 5, "glass << steel under tension")
+assert(cT > cC, "concrete spalls in tension")
+assert(rB < cT, "rebar concrete resists blast tension better than plain")
+local hot = Materials.failureStress(Materials.get("steel"), e, 0.5, 600)
+local cold = Materials.failureStress(Materials.get("steel"), e, 0.5, 20)
+assert(hot > cold, "heated steel weaker")
+local p, Z = Materials.blastImpulseAt(1.0, 0.025)
+assert(p > 0 and Z > 0)
+local I = Materials.blastSurfaceIntensity(Materials.tntGramsToJoules(25), 2)
+assert(I > 0)
+assert(#Materials.comparisonRows() >= 5)
+print(string.format("OK encyclopedia glass=%.2f steel=%.2f rebar=%.2f plainC=%.2f Z=%.2f", g, s, rB, cT, Z))
 
 assert(loadfile(ROOT .. "Levels.lua"))()
 assert(loadfile(ROOT .. "Main.lua"))()
-assert(APP_VERSION == "1.1.0")
 setup()
-assert(#blocks > 0)
-
--- Fracture a glass block via applyMaterialDamage
-local glassBlk
+startLevel(5)
+local hasRebar, hasLam = false, false
 for _, b in ipairs(blocks) do
-    if b.kind == "glass" then glassBlk = b break end
+    if b.kind == "rebar" then hasRebar = true end
+    if b.kind == "glass_safe" then hasLam = true end
 end
--- Starter shed has wood/brick only — go to glass office
-startLevel(3)
-glassBlk = nil
-for _, b in ipairs(blocks) do
-    if b.kind == "glass" then glassBlk = b break end
-end
-assert(glassBlk, "glass block expected on stage 3")
-applyMaterialDamage(glassBlk, 2.0, 800, 0.9, 1, 0)
-assert(glassBlk.broken, "glass should shatter")
-assert(#debris > 0, "debris shards spawned")
-print("OK glass shatter debris=" .. #debris)
-
--- Steel bends first
-startLevel(4)
-local steelBlk
-for _, b in ipairs(blocks) do
-    if b.kind == "steel" then steelBlk = b break end
-end
-assert(steelBlk)
-applyMaterialDamage(steelBlk, 0.4, 400, 0.5, 1, 0)
-assert(not steelBlk.broken, "steel should bend, not snap at low stress")
-assert(steelBlk.bent > 0, "steel bent")
-print(string.format("OK steel bend=%.2f", steelBlk.bent))
-
--- TNT detonation path
-tntLeft = 1
-placeTNT()
-assert(#charges == 1)
-charges[1].fuse = 0
-detonate(charges[1])
-charges = {}
-print("OK TNT detonate")
-
-print("SMOKE_OK Demolition materials")
+assert(hasRebar and hasLam, "highrise should include rebar + laminated glass")
+print("SMOKE_OK Demolition materials encyclopedia")

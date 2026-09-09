@@ -49,6 +49,7 @@ function setup()
 
     parameter.integer("Level", 1, Levels.count(), 1)
     parameter.number("TNT_Grams", 5, 200, TNT_GRAMS)
+    parameter.boolean("ShowMaterialCard", true)
     parameter.action("Restart Stage", function()
         levelIndex = Level
         startLevel(levelIndex)
@@ -528,6 +529,9 @@ function draw()
     drawParticles()
     drawCracks()
     drawHUD()
+    if ShowMaterialCard then
+        drawMaterialCard()
+    end
 
     if messageTimer > 0 then
         messageTimer = messageTimer - dt
@@ -715,9 +719,16 @@ function drawBlocks()
                 strokeWidth(1)
                 line(-BLOCK * 0.35, 0, BLOCK * 0.35, 0)
                 noStroke()
-            elseif b.kind == "steel" then
+            elseif b.kind == "steel" or b.kind == "rebar" then
                 fill(220, 230, 240, 70 + b.bent * 40)
                 rect(0, 0, BLOCK * 0.7, 4)
+                if b.kind == "rebar" then
+                    stroke(80, 90, 100, 160)
+                    strokeWidth(2)
+                    line(-BLOCK * 0.3, -BLOCK * 0.25, BLOCK * 0.3, BLOCK * 0.25)
+                    line(-BLOCK * 0.3, BLOCK * 0.25, BLOCK * 0.3, -BLOCK * 0.25)
+                    noStroke()
+                end
             elseif b.kind == "wood" then
                 stroke(90, 60, 30, 120)
                 strokeWidth(1)
@@ -728,6 +739,13 @@ function drawBlocks()
                 fill(120, 120, 125, 60)
                 ellipse(-6, 4, 5)
                 ellipse(8, -5, 4)
+            elseif b.kind == "glass_safe" then
+                fill(255, 255, 255, 40)
+                rect(0, 0, BLOCK * 0.75, BLOCK * 0.75, 2)
+                stroke(80, 160, 180, 150)
+                strokeWidth(2)
+                rect(0, 0, BLOCK * 0.85, BLOCK * 0.85, 2)
+                noStroke()
             end
             popMatrix()
         end
@@ -890,6 +908,24 @@ function drawHUD()
     drawBtn(resetBtn, "RESET")
     drawBtn(tntBtn, "TNT")
     drawBtn(nextBtn, "NEXT")
+end
+
+function drawMaterialCard()
+    local rows = Materials.comparisonRows()
+    local h = 28 + #rows * 18
+    noStroke()
+    fill(8, 10, 16, 200)
+    rect(16, HEIGHT - 86 - h, 420, h, 10)
+    fontSize(12)
+    fill(255, 210, 120)
+    textMode(CORNER)
+    text("MATERIAL COMPARISON (blast / force)", 28, HEIGHT - 100)
+    fill(200, 210, 230)
+    local y = HEIGHT - 118
+    for _, row in ipairs(rows) do
+        text(row[1] .. "  ·  " .. row[4], 28, y)
+        y = y - 18
+    end
 end
 
 function drawBtn(btn, label)
