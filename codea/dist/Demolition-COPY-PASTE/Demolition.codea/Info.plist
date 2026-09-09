@@ -4,15 +4,16 @@
 <dict>
 	<key>Buffer Order</key>
 	<array>
+		<string>TNT</string>
 		<string>Materials</string>
 		<string>Levels</string>
 		<string>Main</string>
 	</array>
 	<key>Description</key>
-	<string>Wrecking-ball and TNT demolition with real material fracture: glass shatters, wood splits, concrete spalls, steel bends.</string>
+	<string>Demolition with standard TNT equivalence (4184 J/g, 4.184e9 J/ton), Kinney-Graham blast, and material fracture physics.</string>
 	<key>Author</key>
 	<string>AI Godot Studio / Codea</string>
 	<key>Version</key>
-	<string>1.1.0</string>
+	<string>1.2.0</string>
 </dict>
 </plist>

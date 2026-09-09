@@ -12,8 +12,10 @@
 Materials = {}
 
 Materials.ENERGY_SCALE = 0.00035
+-- Synced with TNT.lua (loaded first). Exact standard equivalence:
 Materials.TNT_J_PER_G = 4184
 Materials.TNT_J_PER_TON = 4.184e9
+
 
 --[[
   dens / friction / restitution — Codea body props
@@ -275,33 +277,30 @@ function Materials.failureStress(mat, energy, tensionFactor, ambientHeatC)
     return energy / math.max(1, resist)
 end
 
--- Kinney–Graham scaled distance Z = R / W^(1/3); W in kg TNT.
--- Returns peak overpressure estimate (kPa) for game impulses.
+-- Bridge Materials blast helpers to TNT module (single source of truth).
 function Materials.blastImpulseAt(distanceM, tntKg)
-    local W = math.max(0.001, tntKg)
-    local R = math.max(0.15, distanceM)
-    local Z = R / (W ^ (1 / 3))
-    local pKpa = 700 / (Z * Z + 0.4) + 40 / (Z + 0.15)
-    return pKpa, Z
+    return TNT.peakOverpressureKpa(distanceM, tntKg)
 end
 
--- Surface-blast intensity I = P / (4 π r²) with P in joules (alternate scaling).
 function Materials.blastSurfaceIntensity(yieldJ, radiusM)
-    local r = math.max(0.05, radiusM)
-    return yieldJ / (4 * math.pi * r * r)
+    return TNT.surfaceIntensity(yieldJ, radiusM)
 end
 
 function Materials.tntGramsToJoules(grams)
-    return grams * Materials.TNT_J_PER_G
+    return TNT.gramsToJoules(grams)
 end
 
 function Materials.tntTonsToJoules(tons)
-    return tons * Materials.TNT_J_PER_TON
+    return TNT.tonsToJoules(tons)
 end
 
 function Materials.tntGramsToGameJoules(grams)
-    return Materials.tntGramsToJoules(grams) * Materials.ENERGY_SCALE
+    return TNT.gramsToJoules(grams) * Materials.ENERGY_SCALE
 end
+
+-- Keep legacy constants equal to TNT module
+Materials.TNT_J_PER_G = TNT.J_PER_G
+Materials.TNT_J_PER_TON = TNT.J_PER_TON
 
 -- HUD / encyclopedia rows
 function Materials.comparisonRows()

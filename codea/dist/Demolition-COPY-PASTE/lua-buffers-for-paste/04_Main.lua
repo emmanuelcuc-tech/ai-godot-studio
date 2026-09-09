@@ -9,7 +9,7 @@
 --   RESET / NEXT
 
 DISPLAYED_NAME = "Demolition"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 SHOTS_PER_STAGE = 4
 BLOCK = 36
@@ -308,7 +308,7 @@ function placeTNT()
         fuse = 0.85,
         grams = grams,
     })
-    message = string.format("TNT armed · %.0fg (%.0f kJ)", grams, grams * 4.184)
+    message = "TNT armed · " .. TNT.formatYield(grams)
     messageTimer = 1.6
     if state == "aim" then
         state = "flying"
@@ -318,14 +318,13 @@ end
 
 function detonate(charge)
     local grams = charge.grams or TNT_GRAMS
-    local tntKg = grams / 1000
-    local yieldJ = grams * Materials.TNT_J_PER_G
+    local centerEval = TNT.evaluate(grams, 1.0)
     burst(charge.x, charge.y, color(255, 180, 60), 42)
     burst(charge.x, charge.y, color(255, 80, 40), 24)
-    message = string.format("BLAST · %.2f MJ", yieldJ / 1e6)
-    messageTimer = 1.4
+    message = string.format("BLAST · %s", TNT.formatYield(grams))
+    messageTimer = 1.6
+    lastBlast = centerEval
 
-    -- Flash shockwave ring (visual)
     table.insert(cracks, {
         x = charge.x, y = charge.y, ang = 0, life = 0.45,
         col = color(255, 220, 120), ring = true, r0 = 20,
@@ -337,19 +336,21 @@ function detonate(charge)
             local dy = b.body.y - charge.y
             local distPx = math.max(8, math.sqrt(dx * dx + dy * dy))
             local distM = distPx / 80 -- ~80 px ≈ 1 m game scale
-            local pKpa = Materials.blastImpulseAt(distM, tntKg)
+            local ev = TNT.evaluate(grams, distM)
+            local pKpa, Z = ev.pKpa, ev.Z
             local mat = b.mat
-            -- Blast creates rapid compression then tension (spall) — bias tensile
+            -- Overpressure (kPa) + surface intensity term (J/m² → game energy)
             local energy = pKpa * 12 * mat.blastWeak
+                + (ev.intensity * Materials.ENERGY_SCALE) * 0.002 * mat.blastWeak
             local stress = Materials.failureStress(mat, energy, 0.85)
-            -- Impulse shove
             local inv = distPx
             local nx, ny = dx / inv, dy / inv
             local push = pKpa * 2.2 / mat.dens
             local v = b.body.linearVelocity or vec2(0, 0)
             b.body.linearVelocity = vec2(v.x + nx * push, v.y + ny * push)
             b.body.angularVelocity = (b.body.angularVelocity or 0) + (math.random() - 0.5) * pKpa * 0.05
-
+            b.lastZ = Z
+            b.lastPKpa = pKpa
             applyMaterialDamage(b, stress, energy, 0.9, nx, ny)
         end
     end

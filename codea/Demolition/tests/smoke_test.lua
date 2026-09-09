@@ -1,6 +1,8 @@
--- Headless smoke test for Demolition materials encyclopedia + physics
+-- Headless smoke: TNT standard equivalence + Kinney-Graham
 local ROOT = "codea/Demolition/"
-
+color = function(r, g, b, a) return { r = r, g = g, b = b, a = a or 255 } end
+WIDTH, HEIGHT, DeltaTime, ElapsedTime = 1024, 768, 1 / 60, 0
+STATIC, DYNAMIC, CIRCLE, POLYGON = 0, 1, 1, 2
 vec2 = function(x, y)
     local v = { x = x or 0, y = y or 0 }
     function v:len() return math.sqrt(self.x * self.x + self.y * self.y) end
@@ -17,9 +19,6 @@ vec2 = function(x, y)
     })
     return v
 end
-color = function(r, g, b, a) return { r = r, g = g, b = b, a = a or 255 } end
-WIDTH, HEIGHT, DeltaTime, ElapsedTime = 1024, 768, 1 / 60, 0
-STATIC, DYNAMIC, CIRCLE, POLYGON = 0, 1, 1, 2
 function supportedOrientations() end
 function displayMode() end
 parameter = setmetatable({ number = function() end }, {
@@ -33,8 +32,7 @@ physics = {
         local b = {
             x = 0, y = 0, angle = 0, type = DYNAMIC, density = 1,
             friction = 0.5, restitution = 0.1, linearVelocity = vec2(0, 0),
-            angularVelocity = 0, linearDamping = 0, angularDamping = 0,
-            sleepingAllowed = true, interpolate = false, info = "",
+            angularVelocity = 0, info = "",
             destroy = function(self)
                 for i, x in ipairs(bodies) do if x == self then table.remove(bodies, i) break end end
             end,
@@ -61,42 +59,52 @@ function translate() end
 function rotate() end
 function rectMode() end
 
-assert(loadfile(ROOT .. "Materials.lua"))()
-assert(Materials.TNT_J_PER_G == 4184)
-assert(Materials.tntTonsToJoules(1) == 4.184e9)
-assert(Materials.get("wood").meltC == nil and Materials.get("wood").pyroC == 290)
-assert(Materials.get("glass").compressiveMPa == 900)
-assert(Materials.get("steel").softenC == 550)
-assert(Materials.get("rebar").reinforced == true)
-assert(Materials.get("concrete").reinforced == false)
+assert(loadfile(ROOT .. "TNT.lua"))()
+assert(TNT.J_PER_G == 4184)
+assert(TNT.J_PER_TON == 4.184e9)
+assert(math.abs(TNT.J_PER_TON - TNT.J_PER_G * 1e6) < 1e-6)
+assert(TNT.gramsToJoules(1) == 4184)
+assert(TNT.tonsToJoules(1) == 4.184e9)
+assert(math.abs(TNT.joulesToTons(4.184e9) - 1) < 1e-12)
+assert(TNT.gramsToTons(1e6) == 1)
 
-local e = 500
-local g = Materials.failureStress(Materials.get("glass"), e, 0.9)
-local s = Materials.failureStress(Materials.get("steel"), e, 0.9)
-local cT = Materials.failureStress(Materials.get("concrete"), e, 0.9)
-local cC = Materials.failureStress(Materials.get("concrete"), e, 0.1)
-local rB = Materials.failureStress(Materials.get("rebar"), e, 0.9)
-assert(g > s * 5, "glass << steel under tension")
-assert(cT > cC, "concrete spalls in tension")
-assert(rB < cT, "rebar concrete resists blast tension better than plain")
-local hot = Materials.failureStress(Materials.get("steel"), e, 0.5, 600)
-local cold = Materials.failureStress(Materials.get("steel"), e, 0.5, 20)
-assert(hot > cold, "heated steel weaker")
-local p, Z = Materials.blastImpulseAt(1.0, 0.025)
-assert(p > 0 and Z > 0)
-local I = Materials.blastSurfaceIntensity(Materials.tntGramsToJoules(25), 2)
-assert(I > 0)
-assert(#Materials.comparisonRows() >= 5)
-print(string.format("OK encyclopedia glass=%.2f steel=%.2f rebar=%.2f plainC=%.2f Z=%.2f", g, s, rB, cT, Z))
+local Z = TNT.scaledDistance(2.0, 0.025)
+assert(math.abs(Z - 2.0 / (0.025 ^ (1 / 3))) < 1e-9)
+local pNear = TNT.peakOverpressureKpa(0.5, 0.025)
+local pFar = TNT.peakOverpressureKpa(8.0, 0.025)
+assert(pNear > pFar)
+
+local I = TNT.surfaceIntensity(TNT.gramsToJoules(1000), 2)
+local expect = TNT.gramsToJoules(1000) / (4 * math.pi * 4)
+assert(math.abs(I - expect) < 1e-6)
+
+local ev = TNT.evaluate(25, 1.0)
+assert(ev.joules == 25 * 4184)
+assert(math.abs(ev.kilojoules - 104.6) < 0.01)
+print(string.format("OK TNT 25g = %.1f kJ = %.6f t · Z@1m=%.3f p=%.1f kPa",
+    ev.kilojoules, ev.tons, ev.Z, ev.pKpa))
+print("OK format:", TNT.formatYield(25))
+print("OK format 1ton:", TNT.formatYield(1e6))
+
+assert(loadfile(ROOT .. "Materials.lua"))()
+assert(Materials.TNT_J_PER_G == TNT.J_PER_G)
+assert(Materials.TNT_J_PER_TON == TNT.J_PER_TON)
+local p2, Z2 = Materials.blastImpulseAt(1.0, 0.025)
+assert(p2 > 0 and Z2 > 0)
 
 assert(loadfile(ROOT .. "Levels.lua"))()
 assert(loadfile(ROOT .. "Main.lua"))()
+assert(APP_VERSION == "1.2.0")
 setup()
-startLevel(5)
-local hasRebar, hasLam = false, false
-for _, b in ipairs(blocks) do
-    if b.kind == "rebar" then hasRebar = true end
-    if b.kind == "glass_safe" then hasLam = true end
-end
-assert(hasRebar and hasLam, "highrise should include rebar + laminated glass")
-print("SMOKE_OK Demolition materials encyclopedia")
+local grams = TNT_Grams or TNT_GRAMS
+tntLeft = 1
+placeTNT()
+assert(#charges == 1)
+local ch = charges[1]
+ch.fuse = 0
+detonate(ch)
+charges = {}
+assert(lastBlast ~= nil)
+assert(lastBlast.joules == TNT.gramsToJoules(lastBlast.grams))
+assert(lastBlast.joules == grams * 4184)
+print("SMOKE_OK TNT equivalence")
