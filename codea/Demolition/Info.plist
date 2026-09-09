@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Buffer Order</key>
+	<array>
+		<string>TNT</string>
+		<string>Materials</string>
+		<string>Levels</string>
+		<string>Main</string>
+	</array>
+	<key>Description</key>
+	<string>Demolition with standard TNT equivalence (4184 J/g, 4.184e9 J/ton), Kinney-Graham blast, and material fracture physics.</string>
+	<key>Author</key>
+	<string>AI Godot Studio / Codea</string>
+	<key>Version</key>
+	<string>1.2.0</string>
+</dict>
+</plist>

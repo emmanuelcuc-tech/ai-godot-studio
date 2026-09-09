@@ -1,0 +1,14 @@
+PLAY IN SAFARI (iPad) — Anatomy Ballistics
+
+1. Download PLAY_IN_SAFARI.html  (same as OPEN_IN_SAFARI.html)
+2. Save it in the Files app
+3. Tap the file
+4. Share → Open in Safari   (or “Copy to Safari”)
+5. Tap TAP TO PLAY
+6. Drag the red reticle to aim
+7. Tap the red FIRE button
+
+NEXT = next stage (closer / wall)
+RESET = start over
+
+No Swift Playgrounds needed. No Codea. Just Safari.

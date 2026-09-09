@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Demolition Lab 3D — Orbit · Blueprints · Sequenced TNT</title>
+<style>
+  :root {
+    --bg: #1a222c;
+    --panel: rgba(18, 24, 32, 0.88);
+    --text: #e8eef6;
+    --accent: #c45c3a;
+    --arm: #ff2218;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden;
+    font-family: "Segoe UI", "Helvetica Neue", sans-serif; color: var(--text); }
+  #c { display: block; width: 100%; height: 100%; touch-action: none; }
+  #hud {
+    position: absolute; left: 12px; top: 10px; max-width: min(360px, 92vw);
+    background: var(--panel); padding: 10px 12px; border-radius: 8px;
+    font-size: 13px; line-height: 1.45; pointer-events: none;
+    text-shadow: 0 1px 2px #000;
+  }
+  #msg {
+    position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
+    font-weight: 700; color: #ffe6b0; text-shadow: 0 1px 3px #000;
+    pointer-events: none; max-width: 90vw; text-align: center;
+  }
+  #controls {
+    position: absolute; right: 12px; bottom: 12px;
+    display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+  }
+  #controls button, #delayRow button, #bpRow button {
+    border: 0; border-radius: 10px; padding: 12px 14px;
+    background: #2a3344; color: #eee; font-weight: 700; font-size: 15px;
+    cursor: pointer; min-width: 118px;
+  }
+  #controls #boom { background: #b83228; font-size: 17px; }
+  #controls #arm {
+    display: none; width: 120px; height: 120px; border-radius: 50%;
+    background: var(--arm); align-self: center; font-size: 20px;
+    animation: pulse 0.45s steps(2) infinite;
+  }
+  #controls #arm.show { display: block; }
+  @keyframes pulse { 50% { background: #7a100c; } }
+  #delayRow, #bpRow {
+    position: absolute; left: 12px; bottom: 12px;
+    display: flex; flex-wrap: wrap; gap: 6px; max-width: 55vw;
+  }
+  #delayRow button, #bpRow button { min-width: 44px; padding: 10px 12px; font-size: 13px; }
+  #bpRow { bottom: 64px; }
+  #hint {
+    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    font-size: 12px; color: #8a94a8; pointer-events: none; text-align: center;
+  }
+  .flash { position: absolute; inset: 0; pointer-events: none; background: rgba(255,160,60,0);
+    transition: background 0.05s; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="flash" id="flash"></div>
+<div id="hud"></div>
+<div id="msg"></div>
+<div id="bpRow">
+  <button type="button" data-bp="0">Shed</button>
+  <button type="button" data-bp="1">Office</button>
+  <button type="button" data-bp="2">Highrise</button>
+  <button type="button" id="reset">Reset</button>
+</div>
+<div id="delayRow">
+  <button type="button" id="dMinus">Delay −</button>
+  <button type="button" id="dPlus">Delay +</button>
+  <button type="button" id="pattern">Pattern</button>
+  <button type="button" id="cascade">Floor cascade</button>
+</div>
+<div id="controls">
+  <button type="button" id="arm">ARM</button>
+  <button type="button" id="boom">BOOM</button>
+</div>
+<div id="hint">Drag orbit 360° · scroll/pinch zoom · double-tap place TNT · delay 0.0–0.9 s</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const TNT_J_PER_G = 4184;
+const DELAY_MIN = 0, DELAY_MAX = 0.9, DELAY_STEP = 0.1;
+
+const BLUEPRINTS = [
+  {
+    id: "shed", name: "Timber Shed",
+    cell: 0.55, storyHeight: 1.0,
+    floors: [
+      ["BBBBBB","BWWWWB","BWWWWB","BBBBBB"],
+      ["BBBBBB","BGGLLB","BWWWWB","BBBBBB"],
+      ["WWWWWW","W....W","W....W","WWWWWW"],
+    ],
+  },
+  {
+    id: "office", name: "Glass Office",
+    cell: 0.6, storyHeight: 1.1,
+    floors: [
+      ["CCCCCCCC","C......C","C......C","C......C","CCCCCCCC"],
+      ["CGGGGGGC","G......G","G......G","G......G","CGGGGGGC"],
+      ["CLLLLLLC","L......L","L......L","L......L","CLLLLLLC"],
+      ["CRRRRRRC","R......R","R......R","R......R","CRRRRRRC"],
+      ["CSSSSSSC","S......S","S......S","S......S","CSSSSSSC"],
+    ],
+  },
+  {
+    id: "highrise", name: "Brick Highrise",
+    cell: 0.5, storyHeight: 1.05,
+    floors: [
+      ["BBBBBBBB","BCCCCCCB","BC....CB","BC....CB","BCCCCCCB","BBBBBBBB"],
+      ["BBBBBBBB","BGGGGGGG","BG....GB","BG....GB","BGGGGGGG","BBBBBBBB"],
+      ["BBBBBBBB","BLLLLLLB","BL....LB","BL....LB","BLLLLLLB","BBBBBBBB"],
+      ["BRRRRRRB","RS....SR","RS....SR","RS....SR","RS....SR","BRRRRRRB"],
+      ["BBBBBBBB","BWWWWWWB","BW....WB","BW....WB","BWWWWWWB","BBBBBBBB"],
+      ["SSSSSSSS","S......S","S......S","S......S","S......S","SSSSSSSS"],
+    ],
+  },
+];
+
+const CHAR_KIND = {
+  B: "brick", C: "concrete", R: "rebar", W: "wood", S: "steel", G: "glass", L: "glass_safe",
+};
+
+const MAT = {
+  brick:      { dens: 1.2, color: 0xa84834, fracture: 320, blastWeak: 1.35, mode: "crumble" },
+  concrete:   { dens: 1.6, color: 0x96948c, fracture: 320, blastWeak: 1.15, mode: "spall" },
+  rebar:      { dens: 1.9, color: 0x8a909a, fracture: 900, blastWeak: 0.55, mode: "bend", reinforced: true },
+  wood:       { dens: 0.7, color: 0x8c5f30, fracture: 380, blastWeak: 1.45, mode: "split" },
+  steel:      { dens: 2.4, color: 0x788291, fracture: 1400, blastWeak: 0.35, mode: "bend", ductile: true },
+  glass:      { dens: 0.55, color: 0xa0cde1, fracture: 90, blastWeak: 2.2, mode: "shatter", opacity: 0.35 },
+  glass_safe: { dens: 0.7, color: 0x96c8dc, fracture: 220, blastWeak: 1.4, mode: "shatter", opacity: 0.45 },
+};
+
+const canvas = document.getElementById("c");
+const hud = document.getElementById("hud");
+const msgEl = document.getElementById("msg");
+const flashEl = document.getElementById("flash");
+const armBtn = document.getElementById("arm");
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+renderer.shadowMap.enabled = true;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87a0b8);
+scene.fog = new THREE.Fog(0x87a0b8, 28, 70);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.minDistance = 3;
+controls.maxDistance = 45;
+
+const hemi = new THREE.HemisphereLight(0xddeeff, 0x445566, 0.85);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2dd, 1.05);
+sun.position.set(12, 22, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+scene.add(sun);
+
+const ground = new THREE.Mesh(
+  new THREE.BoxGeometry(50, 0.25, 50),
+  new THREE.MeshStandardMaterial({ color: 0x3d4a38, roughness: 0.95 })
+);
+ground.position.y = -0.125;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const texLoader = new THREE.TextureLoader();
+const textures = {};
+function loadTex(name) {
+  return new Promise((resolve) => {
+    texLoader.load(`textures/${name}.png`, (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      textures[name] = t;
+      resolve(t);
+    }, undefined, () => resolve(null));
+  });
+}
+
+function matFor(kind) {
+  const m = MAT[kind] || MAT.brick;
+  const mapName = kind === "glass_safe" ? "glass" : kind === "rebar" ? "concrete" : kind;
+  const map = textures[mapName];
+  const mat = new THREE.MeshStandardMaterial({
+    color: map ? 0xffffff : m.color,
+    map: map || null,
+    roughness: kind.includes("glass") ? 0.15 : 0.85,
+    metalness: kind === "steel" ? 0.65 : 0.05,
+    transparent: !!m.opacity,
+    opacity: m.opacity || 1,
+  });
+  return mat;
+}
+
+let parts = [];
+let charges = [];
+let bounds = { w: 8, d: 8, h: 6 };
+let bpIndex = 0;
+let nextDelay = 0.0;
+let patternOn = false;
+let patternStep = 0.1;
+let mode = "idle"; // idle | boom_preview | firing | done
+let fireT = 0;
+let message = "", messageT = 0;
+let lastTap = 0, lastTapXY = { x: 0, y: 0 };
+let boomPulse = 0;
+const buildingGroup = new THREE.Group();
+scene.add(buildingGroup);
+const chargeGroup = new THREE.Group();
+scene.add(chargeGroup);
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const clock = new THREE.Clock();
+
+function toast(t, sec = 2.2) { message = t; messageT = sec; }
+
+function clearBuilding() {
+  for (const p of parts) {
+    buildingGroup.remove(p.mesh);
+    p.mesh.geometry.dispose();
+    p.mesh.material.dispose();
+  }
+  parts = [];
+}
+
+function clearCharges() {
+  for (const c of charges) {
+    chargeGroup.remove(c.mesh);
+    c.mesh.geometry.dispose();
+    c.mesh.material.dispose();
+  }
+  charges = [];
+  mode = "idle";
+  fireT = 0;
+  armBtn.classList.remove("show");
+}
+
+function spawnPart(kind, x, y, z, sx, sy, sz, floor) {
+  const geo = new THREE.BoxGeometry(sx, sy, sz);
+  const mesh = new THREE.Mesh(geo, matFor(kind));
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  buildingGroup.add(mesh);
+  const vol = sx * sy * sz;
+  const dens = (MAT[kind] || MAT.brick).dens;
+  const part = {
+    mesh, kind, sx, sy, sz, floor,
+    mass: Math.max(0.5, dens * vol * 2200),
+    broken: false,
+    vx: 0, vy: 0, vz: 0, wx: 0, wy: 0, wz: 0,
+  };
+  parts.push(part);
+  return part;
+}
+
+function buildBlueprint(i) {
+  clearBuilding();
+  clearCharges();
+  bpIndex = i;
+  const bp = BLUEPRINTS[i];
+  const cell = bp.cell, storyH = bp.storyHeight;
+  let maxRows = 1, maxCols = 1;
+  for (const plan of bp.floors) {
+    maxRows = Math.max(maxRows, plan.length);
+    maxCols = Math.max(maxCols, plan[0].length);
+  }
+  const ox = -(maxCols * cell) * 0.5;
+  const oz = -(maxRows * cell) * 0.5;
+
+  bp.floors.forEach((plan, fi) => {
+    const floor = fi + 1;
+    const y0 = fi * storyH;
+    for (let r = 0; r < plan.length; r++) {
+      for (let c = 0; c < plan[r].length; c++) {
+        const ch = plan[r][c];
+        if (ch === "." || ch === " ") continue;
+        const wx = ox + (c + 0.5) * cell;
+        const wz = oz + (r + 0.5) * cell;
+        spawnPart("concrete", wx, y0, wz, cell * 0.98, cell * 0.22, cell * 0.98, floor);
+        const kind = CHAR_KIND[ch] || "brick";
+        const wallH = storyH * 0.85;
+        if (kind === "glass" || kind === "glass_safe") {
+          spawnPart(kind, wx, y0 + cell * 0.22 + wallH * 0.5, wz, cell * 0.9, wallH * 0.88, cell * 0.07, floor);
+        } else {
+          const bh = wallH * 0.48;
+          spawnPart(kind, wx, y0 + cell * 0.22 + bh * 0.5, wz, cell * 0.95, bh, cell * 0.95, floor);
+          spawnPart(kind, wx, y0 + cell * 0.22 + bh * 1.55, wz, cell * 0.95, bh, cell * 0.95, floor);
+        }
+      }
+    }
+  });
+
+  bounds = { w: maxCols * cell, d: maxRows * cell, h: bp.floors.length * storyH };
+  controls.target.set(0, bounds.h * 0.4, 0);
+  camera.position.set(bounds.w * 1.6, bounds.h * 0.9, bounds.d * 1.8);
+  controls.update();
+  toast(`${bp.name} — ${parts.length} parts (brick-by-brick + glass)`, 3);
+}
+
+function surfaceIntensity(yieldJ, r) {
+  return yieldJ / (4 * Math.PI * Math.max(0.05, r) ** 2);
+}
+
+function peakOverpressure(distanceM, tntKg) {
+  const Z = distanceM / Math.max(1e-6, tntKg) ** (1 / 3);
+  // simplified Kinney–Graham-ish curve for game
+  const p = 670 / (Z ** 1.55 + 0.35);
+  return { pKpa: p, Z };
+}
+
+function evaluateBlast(kind, intensity, pKpa) {
+  const m = MAT[kind] || MAT.brick;
+  const energy = intensity * 0.00035 * 0.5 + pKpa * 8;
+  let resist = m.fracture;
+  if (m.reinforced) resist *= 2.2;
+  if (m.ductile) resist *= 1.8;
+  resist /= m.blastWeak;
+  const ratio = energy / Math.max(1, resist);
+  return { fail: ratio >= 1, ratio, shatter: m.mode === "shatter" && ratio >= 1, dent: m.ductile && ratio >= 0.55 && ratio < 1 };
+}
+
+function applyBlast(charge) {
+  const origin = charge.mesh.position;
+  const grams = charge.massKg * 1000;
+  const yieldJ = grams * TNT_J_PER_G;
+  let hits = 0;
+  for (const p of parts) {
+    if (p.broken) continue;
+    const dx = p.mesh.position.x - origin.x;
+    const dy = p.mesh.position.y - origin.y;
+    const dz = p.mesh.position.z - origin.z;
+    const R = Math.hypot(dx, dy, dz) || 0.05;
+    const { pKpa } = peakOverpressure(R, grams / 1000);
+    const intensity = surfaceIntensity(yieldJ, R);
+    const result = evaluateBlast(p.kind, intensity, pKpa);
+    if (result.fail) {
+      p.broken = true;
+      hits++;
+      const nx = dx / R, ny = dy / R, nz = dz / R;
+      const kick = Math.min(28, (pKpa / Math.max(1, p.mass)) * 12);
+      p.vx += nx * kick;
+      p.vy += (ny + 0.55) * kick;
+      p.vz += nz * kick;
+      p.wx = (Math.random() - 0.5) * 8;
+      p.wz = (Math.random() - 0.5) * 8;
+      if (result.shatter) {
+        p.mesh.material.opacity = 0.12;
+        p.mesh.material.transparent = true;
+      }
+    } else if (result.dent) {
+      p.mesh.material.color.setHex(0x5a6068);
+    }
+  }
+  return hits;
+}
+
+function placeCharge(point, floor) {
+  let delay = nextDelay;
+  if (patternOn) {
+    delay = (charges.length * patternStep) % (DELAY_MAX + DELAY_STEP);
+    delay = Math.round(delay / DELAY_STEP) * DELAY_STEP;
+  }
+  const geo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x28a050, roughness: 0.4 }));
+  mesh.position.copy(point);
+  chargeGroup.add(mesh);
+  const c = { mesh, delay, massKg: 0.5, floor, fired: false, id: charges.length + 1 };
+  charges.push(c);
+  toast(`Charge #${c.id} floor ${floor} delay ${delay.toFixed(1)}s`, 1.4);
+  buzz(0.02);
+  return c;
+}
+
+function pullExterior() {
+  controls.target.set(0, bounds.h * 0.45, 0);
+  camera.position.set(bounds.w * 2.1, bounds.h * 1.1, bounds.d * 2.3);
+  controls.update();
+}
+
+function beginBoom() {
+  if (!charges.length) { toast("Double-tap to place TNT first", 2); return; }
+  mode = "boom_preview";
+  pullExterior();
+  armBtn.classList.add("show");
+  toast("Outside view — tap flashing ARM", 3);
+}
+
+function armAndFire() {
+  if (mode !== "boom_preview") return;
+  charges.sort((a, b) => a.delay - b.delay || a.id - b.id);
+  mode = "firing";
+  fireT = 0;
+  armBtn.classList.remove("show");
+  toast("ARMED — sequenced detonation", 2);
+}
+
+function detonate(c) {
+  c.fired = true;
+  c.mesh.material.color.setHex(0xff5018);
+  const hits = applyBlast(c);
+  boomPulse = Math.min(1, 0.35 + c.massKg * 0.5);
+  playBoom(c.massKg);
+  buzz(0.08 + c.massKg * 0.05);
+  toast(`BOOM ${c.massKg.toFixed(2)} kg @ floor ${c.floor} → ${hits} parts`, 2);
+}
+
+function playBoom(massKg) {
+  try {
+    const ctx = playBoom.ctx || (playBoom.ctx = new (window.AudioContext || window.webkitAudioContext)());
+    const t0 = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(60 + massKg * 40, t0);
+    o.frequency.exponentialRampToValueAtTime(28, t0 + 0.35);
+    g.gain.setValueAtTime(Math.min(0.9, 0.35 + massKg * 0.4), t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.45);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t0); o.stop(t0 + 0.5);
+  } catch (_) {}
+}
+
+function buzz(sec) {
+  if (navigator.vibrate) navigator.vibrate(Math.round(sec * 1000));
+}
+
+function setDelay(v) {
+  nextDelay = Math.max(DELAY_MIN, Math.min(DELAY_MAX, Math.round(v / DELAY_STEP) * DELAY_STEP));
+}
+
+function floorCascade() {
+  if (!charges.length) return;
+  const floors = [...new Set(charges.map(c => c.floor))].sort((a, b) => a - b);
+  const rank = {};
+  floors.forEach((f, i) => { rank[f] = Math.min(DELAY_MAX, i * patternStep); });
+  for (const c of charges) c.delay = rank[c.floor] ?? 0;
+  toast(`Floor cascade 0.1s steps (${floors.length} floors)`, 2);
+}
+
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h);
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+
+function pointerFromEvent(e) {
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width;
+  const y = (e.clientY - r.top) / r.height;
+  pointer.x = x * 2 - 1;
+  pointer.y = -(y * 2 - 1);
+  return { x: e.clientX, y: e.clientY };
+}
+
+function tryPlace(e) {
+  if (mode === "firing" || mode === "boom_preview") return;
+  if (mode === "done") { mode = "idle"; }
+  pointerFromEvent(e);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(parts.filter(p => !p.broken).map(p => p.mesh), false);
+  let point, floor = 1;
+  if (hits.length) {
+    point = hits[0].point.clone();
+    point.add(hits[0].face.normal.clone().multiplyScalar(0.12));
+    const part = parts.find(p => p.mesh === hits[0].object);
+    floor = part ? part.floor : Math.max(1, Math.floor(point.y / BLUEPRINTS[bpIndex].storyHeight) + 1);
+  } else {
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const target = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, target);
+    if (!target) return;
+    point = target;
+    point.y = Math.max(0.4, controls.target.y);
+  }
+  placeCharge(point, floor);
+}
+
+let downAt = null;
+canvas.addEventListener("pointerdown", (e) => {
+  downAt = { t: performance.now(), x: e.clientX, y: e.clientY };
+});
+canvas.addEventListener("pointerup", (e) => {
+  if (!downAt) return;
+  const dt = performance.now() - downAt.t;
+  const dist = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
+  downAt = null;
+  if (dt > 280 || dist > 14) return;
+  const now = performance.now();
+  const isDouble = now - lastTap < 350 && Math.hypot(e.clientX - lastTapXY.x, e.clientY - lastTapXY.y) < 40;
+  lastTap = now; lastTapXY = { x: e.clientX, y: e.clientY };
+  if (isDouble) tryPlace(e);
+});
+
+document.getElementById("boom").onclick = beginBoom;
+armBtn.onclick = armAndFire;
+document.getElementById("dMinus").onclick = () => { setDelay(nextDelay - DELAY_STEP); toast(`Delay ${nextDelay.toFixed(1)}s`, 1); };
+document.getElementById("dPlus").onclick = () => { setDelay(nextDelay + DELAY_STEP); toast(`Delay ${nextDelay.toFixed(1)}s`, 1); };
+document.getElementById("pattern").onclick = () => {
+  patternOn = !patternOn;
+  toast(patternOn ? "Pattern ON — 0.1s apart" : "Pattern off — manual delay", 2);
+};
+document.getElementById("cascade").onclick = floorCascade;
+document.getElementById("reset").onclick = () => buildBlueprint(bpIndex);
+document.querySelectorAll("[data-bp]").forEach(btn => {
+  btn.onclick = () => buildBlueprint(+btn.dataset.bp);
+});
+
+function updatePhysics(dt) {
+  for (const p of parts) {
+    if (!p.broken) continue;
+    p.vy -= 18 * dt;
+    p.mesh.position.x += p.vx * dt;
+    p.mesh.position.y += p.vy * dt;
+    p.mesh.position.z += p.vz * dt;
+    p.mesh.rotation.x += p.wx * dt;
+    p.mesh.rotation.z += p.wz * dt;
+    p.vx *= 0.992; p.vz *= 0.992;
+    if (p.mesh.position.y < 0.1) {
+      p.mesh.position.y = 0.1;
+      p.vy *= -0.25;
+      p.vx *= 0.7; p.vz *= 0.7;
+    }
+  }
+}
+
+function updateFire(dt) {
+  if (mode !== "firing") return;
+  fireT += dt;
+  for (const c of charges) {
+    if (!c.fired && fireT >= c.delay) detonate(c);
+  }
+  if (charges.every(c => c.fired)) mode = "done";
+}
+
+function drawHud() {
+  const bp = BLUEPRINTS[bpIndex];
+  hud.innerHTML = `
+    <div><b>${bp.name}</b> · ${parts.length} parts · TNT ×${charges.length}</div>
+    <div>Delay <b>${nextDelay.toFixed(1)}s</b> · Pattern <b>${patternOn ? "ON" : "off"}</b></div>
+    <div>Mode: ${mode}${mode === "firing" ? ` t=${fireT.toFixed(2)}s` : ""}</div>
+    <div style="opacity:.75;margin-top:4px">Real blueprints · wood/concrete/brick/steel/glass textures · Kinney–Graham blast</div>
+  `;
+  msgEl.textContent = messageT > 0 ? message : "";
+  flashEl.style.background = boomPulse > 0 ? `rgba(255,160,60,${0.35 * boomPulse})` : "rgba(255,160,60,0)";
+}
+
+function frame() {
+  const dt = Math.min(0.05, clock.getDelta());
+  controls.update();
+  updatePhysics(dt);
+  updateFire(dt);
+  if (messageT > 0) messageT -= dt;
+  if (boomPulse > 0) boomPulse = Math.max(0, boomPulse - dt * 1.2);
+  drawHud();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+Promise.all(["brick","concrete","wood","steel","glass"].map(loadTex)).then(() => {
+  resize();
+  buildBlueprint(0);
+  frame();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+DEMOLITION v1.1 — Codea (iPad)
+
+Real material physics: glass shatters, wood splits, concrete spalls, steel bends.
+TNT: 4184 J per gram (standard TNT equivalent).
+
+1. Unzip Demolition-COPY-PASTE.zip
+2. Copy Demolition.codea into Files → On My iPad → Codea
+3. Open Codea → Demolition → Play
+
+Or paste buffers in order:
+  01_Materials.lua → 02_Levels.lua → 03_Main.lua
+
+Controls: drag wrecking ball, tap TNT, RESET / NEXT.
