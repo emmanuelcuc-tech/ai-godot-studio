@@ -1,0 +1,10 @@
+Metallic Labyrinth — one-file Codea game
+
+On iPad:
+1. Download MetallicLabyrinth.codea.zip
+2. Unzip it (tap the zip in Files)
+3. Copy the MetallicLabyrinth.codea folder into Files → On My iPad → Codea
+4. Open Codea → tap MetallicLabyrinth → Play
+5. Hold the iPad almost flat, then tilt to roll
+
+Tilt = move ball · green cup = win · red pits = lose a life
