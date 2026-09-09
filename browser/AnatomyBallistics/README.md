@@ -1,18 +1,21 @@
-# Anatomy Ballistics — Browser (free on iPad)
+# Anatomy Ballistics — Open in Safari (free)
 
-Open **`index.html`** in **Safari** (iPad), Chrome, or Edge — **no Codea, no Python app**.
+**Just play:** open `OPEN_IN_SAFARI.html` (or `index.html`) in **Safari** on iPad.
 
-## iPad (recommended)
-1. Unzip `AnatomyBallistics-BROWSER.zip` (or use the single `index.html`).
-2. Put `index.html` in the **Files** app.
-3. Open it in **Safari** → drag to aim, **double-tap** to fire.
-4. See `HOW_TO_PLAY_ON_IPAD.txt` for Free vs paid creation options.
+1. Save the file in **Files**
+2. Tap → open in **Safari**
+3. Tap **TAP TO PLAY**
+4. Drag aim · tap red **FIRE** · **NEXT** / **RESET**
+
+No Codea. No Python. No install.
+
+See `HOW_TO_PLAY_ON_IPAD.txt`. Zip: `browser/dist/OPEN_IN_SAFARI.html.zip`
 
 ## Controls
 | Input | Action |
 |--------|--------|
 | Drag | Move red aim reticle |
-| Double-click / double-tap | Fire .22 LR (3s cooldown) |
+| **FIRE** / double-tap | Fire .22 LR (3s cooldown) |
 | **RESET** / R | Rebuild body; restart at 40 ft |
 | **NEXT** / N | Advance range stage |
 | Space / Tab | Fire (desktop) |
@@ -20,7 +23,3 @@ Open **`index.html`** in **Safari** (iPad), Chrome, or Edge — **no Codea, no P
 ## Stages
 1–6: **40 → 15 ft** (5 ft steps)  
 7: **House wall** (drywall + wood stud, −270 fps)
-
-Same organ vitals + soft-body + ballistics tables as the Codea project.
-
-**You do not need Python to play this.** HTML/Safari is the free path on iPad.
