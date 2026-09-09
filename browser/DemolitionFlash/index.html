@@ -102,8 +102,9 @@
   <canvas id="c"></canvas>
   <div id="hiChip"><span id="hiLabel">HI 0</span></div>
   <div id="msg"></div>
-  <div id="hint" class="hidden">Drag wrecking ball · release to fling · or plant TNT</div>
+  <div id="hint" class="hidden">Drag ball or tap FLING · TNT plant · BOOM</div>
   <div id="btns" class="hidden">
+    <button class="flash-btn gold" id="btnFling" type="button">FLING</button>
     <button class="flash-btn tnt" id="btnTnt" type="button">TNT</button>
     <button class="flash-btn boom" id="btnBoom" type="button">BOOM</button>
     <button class="flash-btn" id="btnSkip" type="button">SKIP</button>
@@ -625,36 +626,80 @@
     return { x: t.clientX - r.left, y: t.clientY - r.top };
   }
 
-  canvas.addEventListener("pointerdown", e => {
+  function inSlingGrab(p) {
+    if (!ball || state !== "aim") return false;
+    // Large grab zone around ball + sling posts
+    if (Math.hypot(p.x - ball.x, p.y - ball.y) < 140) return true;
+    return p.x > 40 && p.x < 220 && p.y > floorY - 160 && p.y < floorY - 20;
+  }
+
+  function releaseFling(fromDrag) {
+    if (screen !== "play" || state !== "aim" || !ball) return false;
+    let tx, ty;
+    if (fromDrag && drag) { tx = drag.x; ty = drag.y; }
+    else {
+      // Auto FLING: pull back-left from home
+      tx = ball.homeX - 95;
+      ty = ball.homeY + 55;
+    }
+    const px = ball.homeX - tx, py = ball.homeY - ty;
+    const len = Math.hypot(px, py) || 1;
+    const power = Math.min(980, Math.max(420, len * 3.4));
+    ball.stuck = false; ball.x = tx; ball.y = ty;
+    ball.vx = (px / len) * power; ball.vy = (py / len) * power;
+    shots--; state = "flying"; settle = 0; drag = null;
+    toast("IMPACT!", 0.7);
+    sfxFling();
+    burst(ball.x, ball.y, [220, 230, 255], 10);
+    return true;
+  }
+
+  function onDown(e) {
     if (screen !== "play") return;
+    e.preventDefault();
     const p = pointer(e);
     if (plantMode) {
       placeCharge(p.x, p.y);
       return;
     }
-    if (state === "aim" && ball && Math.hypot(p.x - ball.x, p.y - ball.y) < 90) {
+    if (inSlingGrab(p)) {
       drag = { x: p.x, y: p.y };
-      canvas.setPointerCapture(e.pointerId);
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
     }
-  });
-  canvas.addEventListener("pointermove", e => {
-    if (drag) drag = { x: pointer(e).x, y: pointer(e).y };
-  });
-  canvas.addEventListener("pointerup", e => {
+  }
+  function onMove(e) {
+    if (!drag) return;
+    e.preventDefault();
+    const p = pointer(e);
+    // clamp pull
+    drag = {
+      x: Math.max(20, Math.min(ball.homeX + 40, p.x)),
+      y: Math.max(40, Math.min(floorY - 10, p.y)),
+    };
+  }
+  function onUp(e) {
     if (!drag || screen !== "play") return;
-    const p = pointer(e); drag = { x: p.x, y: p.y };
-    const px = ball.homeX - drag.x, py = ball.homeY - drag.y;
-    const len = Math.hypot(px, py);
-    const power = Math.min(980, len * 3.4);
-    if (power < 120) { toast("Pull farther", 1); drag = null; return; }
-    ball.stuck = false; ball.x = drag.x; ball.y = drag.y;
-    ball.vx = (px / len) * power; ball.vy = (py / len) * power;
-    shots--; state = "flying"; settle = 0;
-    toast("IMPACT!", 0.7);
-    sfxFling();
-    burst(ball.x, ball.y, [220, 230, 255], 10);
-    drag = null;
-  });
+    e.preventDefault();
+    const p = pointer(e);
+    drag = {
+      x: Math.max(20, Math.min(ball.homeX + 40, p.x)),
+      y: Math.max(40, Math.min(floorY - 10, p.y)),
+    };
+    const len = Math.hypot(ball.homeX - drag.x, ball.homeY - drag.y);
+    if (len < 35) { toast("Pull farther", 1); drag = null; return; }
+    releaseFling(true);
+  }
+
+  canvas.addEventListener("pointerdown", onDown, { passive: false });
+  canvas.addEventListener("pointermove", onMove, { passive: false });
+  canvas.addEventListener("pointerup", onUp, { passive: false });
+  canvas.addEventListener("pointercancel", () => { drag = null; });
+  canvas.addEventListener("mousedown", onDown);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+  canvas.addEventListener("touchstart", onDown, { passive: false });
+  canvas.addEventListener("touchmove", onMove, { passive: false });
+  canvas.addEventListener("touchend", onUp, { passive: false });
 
   document.getElementById("btnPlay").onclick = () => startRun();
   document.getElementById("btnHowto").onclick = () => setScreen("howto");
@@ -664,6 +709,11 @@
   document.getElementById("btnMenu").onclick = () => setScreen("title");
   document.getElementById("btnMenu2").onclick = () => setScreen("title");
   document.getElementById("btnQuit").onclick = () => failRun("ABORTED");
+  document.getElementById("btnFling").onclick = () => {
+    if (screen !== "play") return;
+    if (state !== "aim") { toast("Wait for next shot", 1); return; }
+    releaseFling(false);
+  };
   document.getElementById("btnSkip").onclick = () => {
     if (screen !== "play") return;
     if (level >= LEVELS.length - 1) clearCampaign();
@@ -687,6 +737,7 @@
   window.addEventListener("keydown", e => {
     if (screen === "title" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); startRun(); }
     if (screen !== "play") return;
+    if (e.key === " " || e.key === "f" || e.key === "F") { e.preventDefault(); releaseFling(false); }
     if (e.key === "t" || e.key === "T") btnTnt.click();
     if (e.key === "b" || e.key === "B") document.getElementById("btnBoom").click();
     if (e.key === "m" || e.key === "M") document.getElementById("btnMute").click();
