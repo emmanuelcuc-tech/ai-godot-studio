@@ -343,8 +343,10 @@
       const d = Math.hypot(b.x - x, b.y - y);
       if (d < bd) { bd = d; best = b; }
     }
-    const px = best && bd < 80 ? best.x : x;
-    const py = best && bd < 80 ? best.y : y;
+    // Always snap to nearest standing block when planting (arcade feel)
+    if (!best) { toast("Nothing left to charge", 1); return; }
+    const px = best.x;
+    const py = best.y;
     const delay = charges.length * 0.1;
     charges.push({ x: px, y: py, delay, fired: false, massKg: 0.4 });
     toast(`Charge #${charges.length} · delay ${delay.toFixed(1)}s`, 1.2);
