@@ -29,13 +29,20 @@ function Ballistics.tickCooldown(cooldownLeft, dt)
 end
 
 -- Spawn a bullet from eye toward aim direction.
-function Ballistics.spawn(origin, direction, speed)
+-- opts: { realFps, realFtlb, grain, caliber, throughWall, stageLabel }
+function Ballistics.spawn(origin, direction, speed, opts)
+    opts = opts or {}
     speed = speed or Ballistics.MUZZLE_SPEED
     local dir = Vec3.normalize(direction)
+    local mass = Ballistics.MASS
+    if opts.grain then
+        -- Keep sim mass stable; real grain used for damage tables only
+        mass = Ballistics.MASS
+    end
     return {
         pos = Vec3.copy(origin),
         vel = Vec3.scale(dir, speed),
-        mass = Ballistics.MASS,
+        mass = mass,
         radius = Ballistics.RADIUS,
         alive = true,
         age = 0,
@@ -43,6 +50,13 @@ function Ballistics.spawn(origin, direction, speed)
         hit = false,
         hitPos = nil,
         hitNormal = nil,
+        realFps = opts.realFps,
+        realFtlb = opts.realFtlb,
+        grain = opts.grain or 40,
+        caliber = opts.caliber or ".22 LR",
+        throughWall = opts.throughWall or false,
+        stageLabel = opts.stageLabel,
+        wallHit = false,
     }
 end
 

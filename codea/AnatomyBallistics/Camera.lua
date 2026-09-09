@@ -54,9 +54,12 @@ function Camera.lookRay(cam, screenX, screenY, width, height)
     return cam.eye, dir
 end
 
-function Camera.setAim(cam, bodyCenter)
+function Camera.setAim(cam, bodyCenter, rangeFeet)
     cam.mode = "aim"
-    cam.eye = Vec3.new(0.15, 0.55, 7.8)
+    local dist = TwentyTwo and TwentyTwo.cameraDistanceForFeet(rangeFeet or cam.rangeFeet or 40)
+        or 7.8
+    cam.rangeFeet = rangeFeet or cam.rangeFeet or 40
+    cam.eye = Vec3.new(0.15, 0.55, dist)
     cam.target = Vec3.copy(bodyCenter or Vec3.new(0, 0.2, 0))
     cam.fov = 48
     cam.hold = 0
@@ -109,7 +112,7 @@ end
 function Camera.updateCinematic(cam, bullet, bodyCenter, impactDone, dt)
     cam.cine = cam.cine or {}
     if cam.impactComplete and impactDone then
-        Camera.setAim(cam, bodyCenter)
+        Camera.setAim(cam, bodyCenter, cam.rangeFeet)
         return "aim", 1
     end
     local phase = Ballistics.cinematicPhase(bullet, bodyCenter, impactDone, cam.cine, dt)
@@ -117,7 +120,7 @@ function Camera.updateCinematic(cam, bullet, bodyCenter, impactDone, dt)
         cam.hold = cam.hold - (dt or 0)
         if cam.hold <= 0 then
             cam.impactComplete = true
-            Camera.setAim(cam, bodyCenter)
+            Camera.setAim(cam, bodyCenter, cam.rangeFeet)
             cam.cine = {}
             return "aim", 1
         end
@@ -139,7 +142,7 @@ function Camera.updateCinematic(cam, bullet, bodyCenter, impactDone, dt)
         cam.cine = {}
     else
         cam.up = Vec3.new(0, 1, 0)
-        Camera.setAim(cam, bodyCenter)
+        Camera.setAim(cam, bodyCenter, cam.rangeFeet)
         cam.cine = {}
     end
     return phase, Ballistics.timeScaleForPhase(phase)

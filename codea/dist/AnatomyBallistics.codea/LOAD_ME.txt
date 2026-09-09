@@ -1,6 +1,4 @@
-Anatomy Ballistics 1.0.0
+Anatomy Ballistics 1.1.0
 
-1. Copy this whole AnatomyBallistics.codea folder into On My iPad → Codea
-2. Open Codea → tap the project → Play
-
-Or unzip AnatomyBallistics.codea.zip first, then copy the folder.
+Copy this AnatomyBallistics.codea folder into On My iPad → Codea
+Stages: 40→15 ft .22 LR, then drywall+wood wall.

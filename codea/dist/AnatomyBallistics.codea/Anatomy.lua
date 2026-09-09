@@ -36,35 +36,38 @@ local function connectRings(body, a, b, kind, stiff)
     end
 end
 
-local function boneChain(body, points, breakStrain)
+local function boneChain(body, points, boneType)
+    boneType = boneType or "long"
     local ids = {}
+    local br = Bones.breakStrainFor(boneType)
     for i, p in ipairs(points) do
         ids[i] = SoftBody.addNode(body, p.x, p.y, p.z, {
             kind = "bone",
-            mass = 1.4,
+            mass = 0.9 + (Bones.TYPES[boneType].density or 1.5) * 0.35,
             pinned = p.pinned,
         })
+        Bones.applyToNode(body.nodes[ids[i]], boneType)
     end
     for i = 1, #ids - 1 do
         SoftBody.addSpring(body, ids[i], ids[i + 1], {
             kind = "bone",
             stiffness = 0.95,
-            breakStrain = breakStrain or 1.2,
+            breakStrain = br,
         })
     end
-    -- Keep somewhat rigid with skip springs
     for i = 1, #ids - 2 do
         SoftBody.addSpring(body, ids[i], ids[i + 2], {
             kind = "bone",
             stiffness = 0.8,
-            breakStrain = (breakStrain or 1.2) * 1.05,
+            breakStrain = br * 1.05,
         })
     end
     return ids
 end
 
-local function organCluster(body, cx, cy, cz, name, colorHint, scale)
+local function organCluster(body, cx, cy, cz, name, scale)
     scale = scale or 0.18
+    local def = Organs.DEFS[name] or { rgb = { 0.7, 0.3, 0.3 }, fluid = "blood" }
     local ids = {}
     local offsets = {
         { 0, 0, 0 },
@@ -75,6 +78,7 @@ local function organCluster(body, cx, cy, cz, name, colorHint, scale)
         ids[#ids + 1] = SoftBody.addNode(body, cx + o[1] * scale, cy + o[2] * scale, cz + o[3] * scale, {
             kind = "organ",
             organ = name,
+            fluid = def.fluid or "blood",
             mass = 0.9,
         })
     end
@@ -87,7 +91,7 @@ local function organCluster(body, cx, cy, cz, name, colorHint, scale)
             })
         end
     end
-    return ids, colorHint
+    return ids, { x = cx, y = cy, z = cz }, def.rgb or { 0.7, 0.3, 0.3 }
 end
 
 function Anatomy.build()
@@ -107,26 +111,34 @@ function Anatomy.build()
         { x = 0, y = 0.25, z = 0.02 },
         { x = 0, y = 0.55, z = 0 },
         { x = 0, y = 0.78, z = 0 }, -- neck
-    }, 1.18)
+    }, "vertebra")
     meta.boneIds.spine = spine
+    Bones.applyToNode(body.nodes[spine[1]], "pelvis")
 
     local skull = boneChain(body, {
         { x = 0, y = 0.88, z = 0 },
         { x = 0, y = 1.05, z = 0.02 },
         { x = 0, y = 1.18, z = 0 },
-    }, 1.15)
-    SoftBody.addSpring(body, spine[#spine], skull[1], { kind = "bone", stiffness = 0.9, breakStrain = 1.15 })
+    }, "skull")
+    SoftBody.addSpring(body, spine[#spine], skull[1], {
+        kind = "bone",
+        stiffness = 0.9,
+        breakStrain = Bones.breakStrainFor("skull"),
+    })
     meta.boneIds.skull = skull
 
     -- Ribs (simple pairs)
     local ribs = {}
     for i = 1, 4 do
         local y = 0.45 - (i - 1) * 0.14
-        local left = SoftBody.addNode(body, -0.28 - i * 0.02, y, 0.05, { kind = "bone", mass = 1.1 })
-        local right = SoftBody.addNode(body, 0.28 + i * 0.02, y, 0.05, { kind = "bone", mass = 1.1 })
-        SoftBody.addSpring(body, spine[5 - math.min(i, 3)], left, { kind = "bone", stiffness = 0.88, breakStrain = 1.16 })
-        SoftBody.addSpring(body, spine[5 - math.min(i, 3)], right, { kind = "bone", stiffness = 0.88, breakStrain = 1.16 })
-        SoftBody.addSpring(body, left, right, { kind = "bone", stiffness = 0.75, breakStrain = 1.2 })
+        local left = SoftBody.addNode(body, -0.28 - i * 0.02, y, 0.05, { kind = "bone", mass = 1.0 })
+        local right = SoftBody.addNode(body, 0.28 + i * 0.02, y, 0.05, { kind = "bone", mass = 1.0 })
+        Bones.applyToNode(body.nodes[left], "rib")
+        Bones.applyToNode(body.nodes[right], "rib")
+        local br = Bones.breakStrainFor("rib")
+        SoftBody.addSpring(body, spine[5 - math.min(i, 3)], left, { kind = "bone", stiffness = 0.88, breakStrain = br })
+        SoftBody.addSpring(body, spine[5 - math.min(i, 3)], right, { kind = "bone", stiffness = 0.88, breakStrain = br })
+        SoftBody.addSpring(body, left, right, { kind = "bone", stiffness = 0.75, breakStrain = br })
         ribs[#ribs + 1] = { left, right }
     end
     meta.boneIds.ribs = ribs
@@ -135,13 +147,18 @@ function Anatomy.build()
     local function limbBones(side)
         local s = side
         local shoulder = SoftBody.addNode(body, 0.32 * s, 0.48, 0, { kind = "bone", mass = 1.2 })
-        SoftBody.addSpring(body, spine[5], shoulder, { kind = "bone", stiffness = 0.9, breakStrain = 1.17 })
+        Bones.applyToNode(body.nodes[shoulder], "long")
+        SoftBody.addSpring(body, spine[5], shoulder, {
+            kind = "bone", stiffness = 0.9, breakStrain = Bones.breakStrainFor("long"),
+        })
         local chain = boneChain(body, {
             { x = 0.38 * s, y = 0.25, z = 0.02 },
             { x = 0.42 * s, y = -0.05, z = 0.04 },
             { x = 0.45 * s, y = -0.35, z = 0.02 },
-        }, 1.18)
-        SoftBody.addSpring(body, shoulder, chain[1], { kind = "bone", stiffness = 0.9, breakStrain = 1.17 })
+        }, "long")
+        SoftBody.addSpring(body, shoulder, chain[1], {
+            kind = "bone", stiffness = 0.9, breakStrain = Bones.breakStrainFor("long"),
+        })
         return { shoulder, chain[1], chain[2], chain[3] }
     end
     meta.boneIds.leftArm = limbBones(-1)
@@ -151,36 +168,53 @@ function Anatomy.build()
     local function legBones(side)
         local s = side
         local hip = SoftBody.addNode(body, 0.14 * s, -0.95, 0, { kind = "bone", mass = 1.3, pinned = true })
-        SoftBody.addSpring(body, spine[1], hip, { kind = "bone", stiffness = 0.95, breakStrain = 1.14 })
+        Bones.applyToNode(body.nodes[hip], "pelvis")
+        SoftBody.addSpring(body, spine[1], hip, {
+            kind = "bone", stiffness = 0.95, breakStrain = Bones.breakStrainFor("pelvis"),
+        })
         local chain = boneChain(body, {
             { x = 0.16 * s, y = -1.35, z = 0.02 },
             { x = 0.15 * s, y = -1.75, z = 0.04 },
             { x = 0.15 * s, y = -2.05, z = 0.06, pinned = true },
-        }, 1.16)
-        SoftBody.addSpring(body, hip, chain[1], { kind = "bone", stiffness = 0.92, breakStrain = 1.15 })
+        }, "long")
+        SoftBody.addSpring(body, hip, chain[1], {
+            kind = "bone", stiffness = 0.92, breakStrain = Bones.breakStrainFor("long"),
+        })
         meta.feet[#meta.feet + 1] = chain[#chain]
         return { hip, chain[1], chain[2], chain[3] }
     end
     meta.boneIds.leftLeg = legBones(-1)
     meta.boneIds.rightLeg = legBones(1)
 
-    -- === Organs ===
-    local heartIds = organCluster(body, -0.06, 0.28, 0.06, "heart", { 0.75, 0.12, 0.18 }, 0.12)
-    local lungL = organCluster(body, -0.2, 0.32, -0.02, "lung", { 0.85, 0.55, 0.55 }, 0.16)
-    local lungR = organCluster(body, 0.2, 0.32, -0.02, "lung", { 0.85, 0.55, 0.55 }, 0.16)
-    local liver = organCluster(body, 0.12, -0.05, 0.04, "liver", { 0.55, 0.2, 0.15 }, 0.17)
-    local stomach = organCluster(body, -0.08, -0.12, 0.05, "stomach", { 0.7, 0.45, 0.35 }, 0.14)
-    meta.organs = {
-        { ids = heartIds, name = "heart", rgb = { 0.75, 0.12, 0.18 } },
-        { ids = lungL, name = "lungL", rgb = { 0.85, 0.55, 0.55 } },
-        { ids = lungR, name = "lungR", rgb = { 0.85, 0.55, 0.55 } },
-        { ids = liver, name = "liver", rgb = { 0.55, 0.2, 0.15 } },
-        { ids = stomach, name = "stomach", rgb = { 0.7, 0.45, 0.35 } },
-    }
+    -- === Organs (functional + fluids) ===
+    local function addOrgan(name, x, y, z, scale)
+        local ids, center, rgb = organCluster(body, x, y, z, name, scale)
+        meta.organs[#meta.organs + 1] = {
+            ids = ids,
+            name = name,
+            rgb = rgb,
+            cx = center.x, cy = center.y, cz = center.z,
+            fluid = (Organs.DEFS[name] and Organs.DEFS[name].fluid) or "blood",
+        }
+        return ids
+    end
+    meta.organs = {}
+    addOrgan("brain", 0, 1.05, 0.02, 0.14)
+    addOrgan("heart", -0.06, 0.28, 0.06, 0.12)
+    addOrgan("lungL", -0.2, 0.32, -0.02, 0.16)
+    addOrgan("lungR", 0.2, 0.32, -0.02, 0.16)
+    addOrgan("liver", 0.12, -0.05, 0.04, 0.17)
+    addOrgan("gallbladder", 0.18, -0.12, 0.06, 0.07)
+    addOrgan("stomach", -0.08, -0.12, 0.05, 0.14)
+    addOrgan("kidneyL", -0.14, -0.25, -0.06, 0.09)
+    addOrgan("kidneyR", 0.14, -0.25, -0.06, 0.09)
+    addOrgan("spleen", -0.22, -0.02, 0.02, 0.1)
+
     -- Muscle bind organs to spine
     for _, org in ipairs(meta.organs) do
+        local bind = (org.name == "brain") and spine[#spine] or spine[3]
         for _, id in ipairs(org.ids) do
-            SoftBody.addSpring(body, id, spine[3], { kind = "muscle", stiffness = 0.55, breakStrain = 1.9 })
+            SoftBody.addSpring(body, id, bind, { kind = "muscle", stiffness = 0.55, breakStrain = 1.9 })
             SoftBody.addSpring(body, id, spine[4], { kind = "muscle", stiffness = 0.5, breakStrain = 1.9 })
         end
     end

@@ -28,10 +28,11 @@ function Blood.addParticle(sys, x, y, z, opts)
         vy = opts.vy or 0,
         vz = opts.vz or 0,
         free = opts.free or false,
-        vessel = opts.vessel, -- vessel index when circulating
-        t = opts.t or 0, -- param along vessel 0..1
+        vessel = opts.vessel,
+        t = opts.t or 0,
         life = opts.life or 1,
         r = opts.r or (0.04 + math.random() * 0.03),
+        fluid = opts.fluid or "blood", -- blood | bile | gastric
     }
     sys.particles[#sys.particles + 1] = p
     return #sys.particles
@@ -134,8 +135,9 @@ function Blood.ruptureNear(sys, softBody, tornList, gushDir)
     return gushed
 end
 
-function Blood.gushAt(sys, pos, dir, count)
+function Blood.gushAt(sys, pos, dir, count, fluid)
     count = count or 18
+    fluid = fluid or "blood"
     dir = Vec3.normalize(dir or Vec3.new(0, 0.2, -1))
     for _ = 1, count do
         if #sys.particles >= Blood.MAX_PARTICLES then
@@ -144,6 +146,7 @@ function Blood.gushAt(sys, pos, dir, count)
         local s = Blood.GUSH_SPEED * (0.7 + math.random() * 1.1)
         Blood.addParticle(sys, pos.x, pos.y, pos.z, {
             free = true,
+            fluid = fluid,
             vx = dir.x * s + (math.random() - 0.5) * 2.5,
             vy = dir.y * s + math.random() * 2.2,
             vz = dir.z * s + (math.random() - 0.5) * 2.5,

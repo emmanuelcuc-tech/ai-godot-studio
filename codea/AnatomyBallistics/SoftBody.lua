@@ -156,12 +156,15 @@ function SoftBody.step(body, dt, timeScale)
 end
 
 -- Apply bullet impulse + tear nearby springs (fabric pull / rip).
-function SoftBody.applyBulletImpact(body, hitPos, velocity, ke, radius)
+-- impactFtlb: real .22 ft·lbf for bone fracture thresholds.
+function SoftBody.applyBulletImpact(body, hitPos, velocity, ke, radius, impactFtlb)
     radius = radius or 0.45
+    impactFtlb = impactFtlb or (ke * 80) -- fallback scale
     local torn = {}
     local speed = Vec3.length(velocity)
     local dir = Vec3.normalize(velocity)
     local impulseScale = 0.015 + ke * 8
+    local fracturedBones = {}
 
     for _, n in ipairs(body.nodes) do
         if n.alive ~= false and not n.pinned then
@@ -171,19 +174,24 @@ function SoftBody.applyBulletImpact(body, hitPos, velocity, ke, radius)
                 local w = (1 - d / radius)
                 w = w * w
                 local push = impulseScale * w * n.invMass
-                -- Pull/stretch along shot + slight radial rip
                 n.x = n.x + (dir.x * push + dx * 0.35 * w)
                 n.y = n.y + (dir.y * push + dy * 0.35 * w)
                 n.z = n.z + (dir.z * push + dz * 0.35 * w)
                 n.wet = math.min(1, n.wet + w * 0.8)
-                if n.kind == "bone" and ke > 0.004 then
-                    n.crack = math.min(1, n.crack + w)
+                if n.kind == "bone" then
+                    local btype = n.boneType or "long"
+                    local localE = impactFtlb * w
+                    if Bones and Bones.canFracture(btype, localE) then
+                        n.crack = 1
+                        fracturedBones[#fracturedBones + 1] = { type = btype, energy = localE }
+                    else
+                        n.crack = math.min(1, n.crack + w * 0.5)
+                    end
                 end
             end
         end
     end
 
-    -- Instantly over-strain springs near the channel (ripping fabric / muscle)
     for si, s in ipairs(body.springs) do
         if s.alive then
             local a, b = body.nodes[s.i], body.nodes[s.j]
@@ -197,7 +205,8 @@ function SoftBody.applyBulletImpact(body, hitPos, velocity, ke, radius)
                 local chance = (1 - d / tearR)
                 local need = 0.25
                 if s.kind == "bone" then
-                    need = 0.55
+                    local btype = a.boneType or b.boneType or "long"
+                    need = Bones and (Bones.canFracture(btype, impactFtlb * chance) and 0.35 or 0.75) or 0.55
                 elseif s.kind == "skin" then
                     need = 0.18
                 end
@@ -209,13 +218,12 @@ function SoftBody.applyBulletImpact(body, hitPos, velocity, ke, radius)
                         b.crack = 1
                     end
                 else
-                    -- Stretch toward break without fully tearing
                     s.rest = s.rest * (1 + 0.08 * chance)
                 end
             end
         end
     end
-    return torn, speed
+    return torn, speed, fracturedBones
 end
 
 function SoftBody.center(body)

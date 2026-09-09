@@ -1,74 +1,57 @@
-# Anatomy Ballistics (Codea / iPad)
+# Anatomy Ballistics (Codea / iPad) — **1.1.0**
 
-Sandbox: a **soft-body human anatomy** figure you shoot with **real bullet velocity**, **fabric-like skin tear**, **elastic muscle**, **cracking bones**, and **circulating / gushing blood**. Cinematic cameras track each round from **side trail** → **overhead contact** → **slow-mo follow** into impact. **RESET** rebuilds the body.
+Sandbox soft-body **human anatomy** shot with real **.22 LR** ballistics tables. Ranges start at **40 ft** and step closer by **5 ft** to **15 ft**, then a **house-wall** stage (½″ drywall + pine stud + ½″ drywall). Organs run with heartbeat, brain activity, blood / bile / gastric fluids; bones use density-based fracture thresholds.
 
-## Install in Codea
+## Install
 
-1. Open **Codea** on your iPad.
-2. Tap **+** → **New Project** → name it `AnatomyBallistics`.
-3. Create buffers and paste from this folder:
+1. Download [`codea/dist/AnatomyBallistics.codea.zip`](../dist/AnatomyBallistics.codea.zip)
+2. Unzip → copy `AnatomyBallistics.codea` into **On My iPad → Codea**
+3. Open Codea → Play (landscape)
 
-| File | Buffer name |
-|------|-------------|
-| `Main.lua` | **Main** |
-| `Vec3.lua` | **Vec3** |
-| `Ballistics.lua` | **Ballistics** |
-| `SoftBody.lua` | **SoftBody** |
-| `Blood.lua` | **Blood** |
-| `Anatomy.lua` | **Anatomy** |
-| `Camera.lua` | **Camera** |
-
-4. Project **Info** buffer order: **Main**, **Vec3**, **Ballistics**, **SoftBody**, **Blood**, **Anatomy**, **Camera** (or use the included `Info.plist`).
-5. Tap **Play** (landscape).
-
-### Files app shortcut
-
-Copy the whole `AnatomyBallistics` folder (or a renamed `AnatomyBallistics.codea` package) into Codea’s Documents via the Files app / Working Copy.
+Or paste buffers from `codea/AnatomyBallistics/` (see `Info.plist` buffer order).
 
 ## Controls
 
 | Input | Action |
 |--------|--------|
-| **Drag finger** | Move the **red semi-opaque aim dot** |
-| **Double-tap** | Fire one bullet from your view (**3 second** discharge cooldown) |
-| **RESET** button / **R** | Rebuild anatomy + blood circulation |
-| **Space** / **Tab** (keyboard Viewer) | Fire at current aim |
-| Sidebar **Fire Test Shot** | Fire without double-tap |
-| Sidebar **ShowBones / ShowOrgans / ShowBlood** | Layer toggles |
-| Sidebar **GoreIntensity** | Tear radius / blood spray scale |
+| **Drag** | Red semi-opaque aim reticle |
+| **Double-tap** | Fire .22 LR (3s cooldown) |
+| **RESET** / **R** | Rebuild body; restart at 40 ft |
+| **NEXT** / **N** | Advance range stage manually |
+| Sidebar **AutoAdvance** | After impact, step 5 ft closer (default on) |
 
-## What you get
+## Stages (.22 LR HV 40 gr reference)
 
-- **3D perspective** aim camera with touch reticle
-- **Bullet physics**: velocity, mild gravity, drag, kinetic energy on hit
-- **One shot every 3 seconds**
-- **Cinematic sequence** on each shot:
-  1. **Side trail** — 2D-ish view with **red trajectory line**
-  2. **Overhead** — contact approach
-  3. **Slow-mo follow** — camera behind the round into impact
-- **Skin** as tight fabric springs that stretch and rip
-- **Muscle** as strong elastic binds holding tissue / organs
-- **Bones** that crack and break under high strain / KE
-- **Organs** (heart, lungs, liver, stomach) as soft clusters
-- **Blood** particles circulating in vessels; ruptured vessels **gush** red liquid with cohesion / viscosity
-- Sandbox loop: shoot until **RESET**
+Open air (Thunderbolt-class ~1255 fps / 140 ft·lbf muzzle, interpolated):
 
-## Requirements
+| Stage | Range | Typical impact |
+|-------|-------|----------------|
+| 1–6 | 40 → 15 ft (step 5) | ~1220–1250 fps · ~133–140 ft·lbf |
+| 7 | Wall @ 12 ft | Barrier **−270 fps** (2×45 drywall + 180 stud) → ~975 fps |
 
-- Codea classic API (`setup` / `draw` / `touched`, `ellipse`, `line`, `triangle`, `parameter.*`)
-- Landscape orientation recommended
+**Sources (engineering tables in `TwentyTwo.lua`):**
+- ShootersCalculator G1 BC 0.122 standard-velocity 40 gr chart
+- Remington Thunderbolt-class HV 40 gr (~1255 fps / 140 ft·lbf)
+- Haag-scale drywall loss ≈ 12–15 m/s (≈39–49 fps) per ½″ sheet
+
+## Systems
+
+- **Organs:** brain, heart, lungs, liver, gallbladder, stomach, kidneys, spleen — integrity drives HR, BP, SpO₂, bile flow, renal/filtration
+- **Bones:** skull / rib / vertebra / long / pelvis density & fracture energy (`.22` crush wounding; minimal temporary cavity)
+- **Fluids:** circulating blood; bile / gastric gush when those organs tear
+- **Cameras:** side trail → overhead → slow-mo follow → impact
 
 ## Files
 
-- `Main.lua` — input, sim loop, drawing, HUD
-- `Vec3.lua` — 3D math
-- `Ballistics.lua` — bullet, cooldown, double-tap, cinematic phases
-- `SoftBody.lua` — Verlet fabric / muscle / bone tearing
-- `Blood.lua` — circulation + liquid gush
-- `Anatomy.lua` — figure construction
-- `Camera.lua` — perspective + shot cameras
-- `tests/smoke_test.lua` — headless physics checks
+| Buffer | Role |
+|--------|------|
+| `Main` | Input, stages, vitals HUD, wall FX |
+| `TwentyTwo` | Real .22 LR tables + wall Δv |
+| `Bones` / `Organs` / `Stages` | Anatomy physiology + progression |
+| `Ballistics` / `SoftBody` / `Blood` / `Anatomy` / `Camera` | Sim core |
 
-## Note on fidelity
+## Tests
 
-This is a **real-time mobile approximation** (Verlet soft body + particle liquid), not offline VFX film sim. It is tuned to stay playable on iPad while still showing stretch, tear, crack, and blood flow.
+```bash
+lua5.4 codea/AnatomyBallistics/tests/smoke_test.lua
+```
