@@ -1,0 +1,28 @@
+SWIFT + SAFARI — Anatomy Ballistics (iPad)
+
+Two ways to play the SAME game. Pick one.
+
+═══════════════════════════════════════
+OPTION A — Swift Playgrounds (Swift app)
+═══════════════════════════════════════
+1. Install free “Swift Playgrounds” from the App Store.
+2. Open folder:  1_SwiftPlaygrounds / AnatomyBallistics.swiftpm
+3. Tap → Open in Swift Playgrounds (or Share → Swift Playgrounds).
+4. Press Run (▷) if needed.
+5. Tap TAP TO PLAY → drag aim → tap FIRE.
+
+═══════════════════════════════════════
+OPTION B — Safari (just open the file)
+═══════════════════════════════════════
+1. Open folder:  2_Safari
+2. Tap OPEN_IN_SAFARI.html
+3. Open in Safari.
+4. Tap TAP TO PLAY → drag aim → tap FIRE.
+
+CONTROLS
+• Drag   = aim (red reticle)
+• FIRE   = shoot .22 LR (3 second cooldown)
+• NEXT   = next distance / wall stage
+• RESET  = rebuild body, restart at 40 ft
+
+STAGES: 40 ft → 15 ft, then house wall.

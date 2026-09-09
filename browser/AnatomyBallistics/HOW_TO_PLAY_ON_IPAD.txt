@@ -1,0 +1,14 @@
+Anatomy Ballistics — OPEN IN SAFARI (just play)
+
+1. Save OPEN_IN_SAFARI.html (or index.html) to the Files app on your iPad.
+2. Tap the file → Open in Safari (or Share → Safari).
+3. Tap TAP TO PLAY.
+4. Drag the red reticle to aim.
+5. Tap the red FIRE button (or double-tap the screen).
+6. Use NEXT for closer ranges / wall stage. RESET to restart.
+
+No Codea. No Python. No App Store purchase. Safari only.
+
+If the file opens as text instead of the game:
+- Long-press the file in Files → Share → Copy to Safari
+- Or AirDrop the .html to your iPad and choose Safari
