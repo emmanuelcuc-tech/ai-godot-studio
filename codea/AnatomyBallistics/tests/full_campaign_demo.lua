@@ -48,13 +48,25 @@ end
 local function sample(tag)
     local snap = stage.snap
     local pts = {}
-    for i = 1, #body.nodes, 2 do
+    -- Sample every node so the anatomy model fills the frame in demos
+    for i = 1, #body.nodes do
         local n = body.nodes[i]
         local sx, sy, d, vis = Camera.project(cam, n, W, H)
         if vis then
             pts[#pts + 1] = {
                 x = sx, y = H - sy, kind = n.kind, wet = n.wet or 0,
                 crack = n.crack or 0, organ = n.organ,
+            }
+        end
+    end
+    local organs = {}
+    for _, org in ipairs(meta.organs) do
+        local sx, sy, _, vis = Camera.project(cam, Vec3.new(org.cx, org.cy, org.cz), W, H)
+        if vis then
+            organs[#organs + 1] = {
+                x = sx, y = H - sy, name = org.name,
+                r = org.rgb[1], g = org.rgb[2], b = org.rgb[3],
+                integrity = organState.integrity[org.name] or 1,
             }
         end
     end
@@ -66,7 +78,7 @@ local function sample(tag)
         end
     end
     local bloodPts = {}
-    for i = 1, math.min(#blood.particles, 220) do
+    for i = 1, math.min(#blood.particles, 280) do
         local p = blood.particles[i]
         local sx, sy, _, vis = Camera.project(cam, p, W, H)
         if vis then
@@ -105,9 +117,11 @@ local function sample(tag)
         preWallFps = snap.preWallFps,
         wallDelta = snap.wallDeltaFps or 0,
         nodes = pts,
+        organs = organs,
         trail = trail,
         blood = bloodPts,
-        bullet = bx and { x = bx, y = by } or nil,
+        -- Larger bullet marker for demo visibility
+        bullet = bx and { x = bx, y = by, r = 7 } or nil,
         wall = wall,
         hr = organState.vitals.heartRate,
         brain = organState.vitals.brainActivity,
@@ -117,6 +131,7 @@ local function sample(tag)
         tornSkin = SoftBody.countAliveSprings(body, "skin"),
         freeBlood = Blood.freeCount(blood),
         timeScale = Ballistics.timeScaleForPhase(cam.mode),
+        nodeCount = #body.nodes,
     }
 end
 
@@ -193,9 +208,18 @@ local function simulateShot(maxSteps)
     end
 end
 
--- Campaign: shoot at 40, 30, 20, 15, then wall
-local stagesToShoot = { 1, 3, 5, 6, 7 } -- indices
-print("Campaign demo start")
+-- Campaign: every stage so the anatomy model is shown at each range
+-- 40 → 35 → 30 → 25 → 20 → 15 → wall
+local stagesToShoot = { 1, 2, 3, 4, 5, 6, 7 }
+print("Campaign demo start (full model showcase)")
+-- Opening orbit: hold aim cam on the denser anatomy model before first shot
+Camera.setAim(cam, SoftBody.center(body), stage.snap.rangeFeet)
+for _ = 1, 18 do
+    SoftBody.step(body, 1 / 60, 1)
+    Blood.step(blood, 1 / 60, 1, body.nodes)
+    Organs.step(organState, 1 / 60)
+    sample("model_intro")
+end
 for _, want in ipairs(stagesToShoot) do
     while stage.index < want do
         Stages.advance(stage)
@@ -208,12 +232,13 @@ for _, want in ipairs(stagesToShoot) do
     local ay = H * (0.50 + (want % 2) * 0.03)
     fireAt(ax, ay)
     simulateShot(340)
-    print(string.format("  stage %d @ %sft wall=%s HR=%.0f brain=%.0f%% freeBlood=%d",
+    print(string.format("  stage %d @ %sft wall=%s HR=%.0f brain=%.0f%% freeBlood=%d nodes=%d",
         stage.snap.index, tostring(stage.snap.rangeFeet),
         tostring(stage.snap.throughWall),
         organState.vitals.heartRate,
         organState.vitals.brainActivity * 100,
-        Blood.freeCount(blood)))
+        Blood.freeCount(blood),
+        #body.nodes))
     if stage.index < 7 then
         Stages.advance(stage)
     end

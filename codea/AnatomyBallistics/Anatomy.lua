@@ -252,19 +252,20 @@ function Anatomy.build()
         return ringsSkin, ringsMuscle
     end
 
-    torsoCage(-0.85, 0.55, 7, 0.34, 8)
+    -- Denser cage for demo silhouette (readable limbs + torso on camera)
+    torsoCage(-0.85, 0.55, 9, 0.36, 12)
 
     -- Head skin
     local headRings = {}
-    for li = 1, 4 do
-        local t = (li - 1) / 3
-        local y = 0.9 + t * 0.32
-        local r = 0.16 * math.sin(math.pi * (0.25 + t * 0.7)) + 0.08
-        headRings[li] = ring(body, 0, y, 0, r, 6, true, { kind = "skin", mass = 0.45 })
+    for li = 1, 5 do
+        local t = (li - 1) / 4
+        local y = 0.9 + t * 0.34
+        local r = 0.17 * math.sin(math.pi * (0.25 + t * 0.7)) + 0.09
+        headRings[li] = ring(body, 0, y, 0, r, 8, true, { kind = "skin", mass = 0.45 })
         if li > 1 then
             connectRings(body, headRings[li - 1], headRings[li], "skin", 0.6)
         end
-        for i = 1, 6 do
+        for i = 1, 8 do
             SoftBody.addSpring(body, headRings[li][i], skull[math.min(#skull, 1 + math.floor(t * 2))], {
                 kind = "muscle",
                 stiffness = 0.55,
@@ -288,10 +289,10 @@ function Anatomy.build()
             prev = skin
         end
     end
-    sleeve(meta.boneIds.leftArm, 0.09, 5)
-    sleeve(meta.boneIds.rightArm, 0.09, 5)
-    sleeve(meta.boneIds.leftLeg, 0.12, 6)
-    sleeve(meta.boneIds.rightLeg, 0.12, 6)
+    sleeve(meta.boneIds.leftArm, 0.10, 7)
+    sleeve(meta.boneIds.rightArm, 0.10, 7)
+    sleeve(meta.boneIds.leftLeg, 0.13, 8)
+    sleeve(meta.boneIds.rightLeg, 0.13, 8)
 
     -- Blood vessels (paths in world space sampled from anatomy)
     local blood = Blood.new()

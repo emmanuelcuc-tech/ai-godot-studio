@@ -50,8 +50,16 @@ Open air (Thunderbolt-class ~1255 fps / 140 ft·lbf muzzle, interpolated):
 | `Bones` / `Organs` / `Stages` | Anatomy physiology + progression |
 | `Ballistics` / `SoftBody` / `Blood` / `Anatomy` / `Camera` | Sim core |
 
-## Tests
+## Anatomy model (demo)
+
+Soft-body humanoid (skin / muscle / bone / organs / vessels). Demo builds use a **denser cage** so the figure reads clearly on camera.
+
+## Tests / campaign demo
 
 ```bash
-lua5.4 codea/AnatomyBallistics/tests/smoke_test.lua
+lua codea/AnatomyBallistics/tests/smoke_test.lua
+lua codea/AnatomyBallistics/tests/full_campaign_demo.lua
+python3 codea/AnatomyBallistics/tests/render_model_demo.py
 ```
+
+Full campaign runs **all** stages (40 → 35 → 30 → 25 → 20 → 15 → wall) with a short model intro, bright bullet marker, and organ labels.
