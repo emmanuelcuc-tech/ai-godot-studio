@@ -1,0 +1,46 @@
+Anatomy Ballistics — copy & paste / drop into Codea
+==================================================
+
+EASIEST (recommended)
+---------------------
+1. Unzip this archive.
+2. Open the Files app on your iPad.
+3. Copy the folder named:
+
+      AnatomyBallistics.codea
+
+   into:
+
+      On My iPad → Codea
+
+4. Open the Codea app.
+5. Tap AnatomyBallistics → Play (landscape).
+
+
+MANUAL PASTE (if drop does not work)
+------------------------------------
+1. Open Codea → + → New Project → name it AnatomyBallistics
+2. Open each file in lua-buffers-for-paste/ in order:
+
+   01_Main.lua        → paste into buffer Main
+   02_Vec3.lua        → add buffer Vec3, paste
+   03_TwentyTwo.lua   → add buffer TwentyTwo, paste
+   04_Bones.lua       → add buffer Bones, paste
+   05_Organs.lua      → add buffer Organs, paste
+   06_Stages.lua      → add buffer Stages, paste
+   07_Ballistics.lua  → add buffer Ballistics, paste
+   08_SoftBody.lua    → add buffer SoftBody, paste
+   09_Blood.lua       → add buffer Blood, paste
+   10_Anatomy.lua     → add buffer Anatomy, paste
+   11_Camera.lua      → add buffer Camera, paste
+
+3. Project Info → Buffer Order must match the list above
+   (or copy Info.plist from AnatomyBallistics.codea).
+
+4. Play.
+
+
+CONTROLS
+--------
+Drag = aim   Double-tap = fire (.22 LR, 3s cooldown)
+RESET = rebuild body   NEXT = closer range / wall stage

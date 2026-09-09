@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#1a1008" />
+<title>Anatomy Ballistics — FLASH GAME</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=VT323&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+    --wood: #3a2414;
+    --panel: #1c120c;
+    --gold: #ffd24a;
+    --orange: #ff7a18;
+    --blood: #c8102e;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; height: 100dvh; overflow: hidden;
+    background:
+      radial-gradient(ellipse at 50% 0%, #4a2818 0%, transparent 55%),
+      repeating-linear-gradient(90deg, #24160e 0 3px, #1a1008 3px 6px);
+    font-family: "VT323", "Courier New", monospace;
+    color: #f5e6c8;
+  }
+  #stage {
+    position: absolute; inset: 12px;
+    border: 4px solid #c9a227;
+    box-shadow: 0 0 0 3px #5a3a10, inset 0 0 40px rgba(0,0,0,0.45);
+    background: #0e0d12;
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+  .hidden { display: none !important; }
+  #playHud {
+    position: absolute; left: 12px; top: calc(96px + var(--safe-t)); right: 12px;
+    pointer-events: none; text-shadow: 0 2px 0 #000;
+    font-size: 15px; line-height: 1.3;
+  }
+  #playHud .big { font-family: "Bangers", Impact, sans-serif; font-size: 18px; letter-spacing: 0.04em; color: var(--gold); }
+  #playHud .sub { color: #d8b896; }
+  #msg {
+    position: absolute; left: 50%; top: calc(18px + var(--safe-t)); transform: translateX(-50%);
+    font-family: "Bangers", Impact, sans-serif; font-size: clamp(18px, 4vw, 28px);
+    color: #fff2a8; text-shadow: 0 3px 0 #000, 0 0 12px #ff660088;
+    pointer-events: none; text-align: center; max-width: 80%;
+  }
+  #ready {
+    position: absolute; left: 14px; bottom: calc(14px + var(--safe-b));
+    background: linear-gradient(#2e5a22, #1a3514); border: 2px solid #7dff6a;
+    padding: 8px 14px; color: #b8ff9a; font-family: "Bangers", Impact, sans-serif;
+    font-size: 18px; pointer-events: none;
+  }
+  #ready.busy { border-color: #ff6666; color: #ffaaaa; background: linear-gradient(#5a2222, #351414); }
+  #btns {
+    position: absolute; right: 12px; bottom: calc(12px + var(--safe-b));
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .flash-btn {
+    font-family: "Bangers", Impact, sans-serif; letter-spacing: 0.06em;
+    border: 3px solid #2a1808; border-radius: 0; cursor: pointer;
+    background: linear-gradient(#6a6a78, #3a3a48); color: #fff;
+    box-shadow: inset 0 2px 0 #aaa, inset 0 -3px 0 #222, 3px 3px 0 #000;
+    padding: 12px 16px; font-size: 18px; min-width: 118px;
+  }
+  .flash-btn:active { transform: translate(1px, 1px); box-shadow: inset 0 2px 0 #222, 1px 1px 0 #000; }
+  .flash-btn.fire {
+    background: linear-gradient(#ff3a3a, #a01018); border-color: #5a0000;
+    font-size: 22px; padding: 16px 18px; color: #fff8e0;
+  }
+  .flash-btn.fire.busy { background: linear-gradient(#664040, #3a2020); color: #caa; }
+  .flash-btn.gold { background: linear-gradient(#ffd24a, #c47a10); color: #2a1400; }
+  .panel {
+    position: absolute; inset: 0; z-index: 30;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 24px;
+    background:
+      radial-gradient(circle at 50% 30%, rgba(180,40,20,0.35), transparent 55%),
+      linear-gradient(180deg, rgba(20,10,6,0.82), rgba(8,6,10,0.92));
+    text-align: center;
+  }
+  .panel h1 {
+    margin: 0; font-family: "Bangers", Impact, sans-serif;
+    font-size: clamp(42px, 10vw, 72px); line-height: 0.95;
+    color: var(--gold); text-shadow: 4px 4px 0 #000, 0 0 18px #ff660066;
+    letter-spacing: 0.03em;
+  }
+  .panel .tag {
+    font-family: "Bangers", Impact, sans-serif; color: var(--orange);
+    font-size: 22px; letter-spacing: 0.2em; margin-top: -6px;
+  }
+  .panel p { max-width: 28rem; margin: 0; font-size: 20px; color: #e8d2b0; line-height: 1.35; }
+  .panel .scoreline { font-family: "Bangers", Impact, sans-serif; font-size: 28px; color: #fff; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 8px; }
+  #brand {
+    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+    font-size: 14px; color: #8a7050; pointer-events: none; z-index: 40;
+  }
+  #hiChip {
+    position: absolute; right: 14px; top: calc(14px + var(--safe-t));
+    font-family: "Bangers", Impact, sans-serif; color: var(--gold);
+    background: #000a; border: 2px solid #c9a227; padding: 6px 10px; z-index: 25;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hiChip"><span id="hiLabel">HI 0</span></div>
+  <div id="playHud" class="hidden">
+    <div id="hud"></div>
+  </div>
+  <div id="msg"></div>
+  <div id="ready" class="hidden">READY</div>
+  <div id="btns" class="hidden">
+    <button class="flash-btn fire" id="btnFire" type="button">FIRE</button>
+    <button class="flash-btn" id="btnNext" type="button">NEXT</button>
+    <button class="flash-btn" id="btnReset" type="button">QUIT</button>
+    <button class="flash-btn" id="btnMute" type="button">MUTE</button>
+  </div>
+
+  <div class="panel" id="panelTitle">
+    <div class="tag">★ FLASH ARCADE ★</div>
+    <h1>ANATOMY<br/>BALLISTICS</h1>
+    <p>Classic browser shooter energy. Soft-body anatomy. Real .22&nbsp;LR tables. Stages from 40&nbsp;ft to the house wall. 3 rounds per stage — make them count.</p>
+    <div class="scoreline">HIGH SCORE <span id="titleHi">0</span></div>
+    <div class="row">
+      <button class="flash-btn gold" id="btnPlay" type="button">PLAY</button>
+      <button class="flash-btn" id="btnHowto" type="button">HOW TO</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="panelHowto">
+    <h1 style="font-size:42px">HOW TO PLAY</h1>
+    <p>Drag to aim the red reticle. Tap <b>FIRE</b> or double-tap / press Space.<br/>
+    Hit organs for big points · combo multiplies score.<br/>
+    3 ammo per stage · miss and you’re empty → game over.<br/>
+    Survive all ranges including the drywall+stud wall.</p>
+    <button class="flash-btn gold" id="btnBackTitle" type="button">BACK</button>
+  </div>
+
+  <div class="panel hidden" id="panelClear">
+    <div class="tag">MISSION COMPLETE</div>
+    <h1>CLEAR!</h1>
+    <div class="scoreline" id="clearBonus">+0</div>
+    <div class="scoreline">SCORE <span id="clearScore">0</span></div>
+    <div class="scoreline">HI <span id="clearHi">0</span></div>
+    <div class="row">
+      <button class="flash-btn gold" id="btnAgain" type="button">PLAY AGAIN</button>
+      <button class="flash-btn" id="btnMenu" type="button">MENU</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="panelGameOver">
+    <div class="tag" id="overReason">OUT OF AMMO</div>
+    <h1>GAME OVER</h1>
+    <div class="scoreline">SCORE <span id="overScore">0</span></div>
+    <div class="scoreline">HI <span id="overHi">0</span></div>
+    <div class="row">
+      <button class="flash-btn gold" id="btnAgain2" type="button">RETRY</button>
+      <button class="flash-btn" id="btnMenu2" type="button">MENU</button>
+    </div>
+  </div>
+</div>
+<div id="brand">ANATOMY BALLISTICS · HTML5 FLASH-STYLE · NO PLUGIN</div>
+<script>
+/* Anatomy Ballistics — open in Safari on iPad (or any browser). No install. */
+
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  const hudEl = document.getElementById("hud");
+  const msgEl = document.getElementById("msg");
+  const readyEl = document.getElementById("ready");
+
+  // ---------- .22 LR data (same tables as Codea TwentyTwo.lua) ----------
+  const TT = {
+    GRAIN: 40,
+    RANGE_FEET: [40, 35, 30, 25, 20, 15],
+    WALL_DV: 2 * 45 + 180, // drywall×2 + pine stud
+    hvTable: [ // yards, fps, ftlb
+      [0, 1255, 140], [8.33, 1234, 135], [16.67, 1212, 131], [25, 1192, 126], [50, 1133, 114],
+    ],
+    interp(feet) {
+      const yd = feet / 3;
+      const tab = this.hvTable;
+      if (yd <= tab[0][0]) return { fps: tab[0][1], ftlb: tab[0][2] };
+      for (let i = 0; i < tab.length - 1; i++) {
+        const a = tab[i], b = tab[i + 1];
+        if (yd <= b[0]) {
+          const t = (yd - a[0]) / (b[0] - a[0]);
+          return { fps: a[1] + (b[1] - a[1]) * t, ftlb: a[2] + (b[2] - a[2]) * t };
+        }
+      }
+      const L = tab[tab.length - 1];
+      return { fps: L[1], ftlb: L[2] };
+    },
+    stage(index) {
+      const max = this.RANGE_FEET.length + 1;
+      index = Math.max(1, Math.min(max, index | 0));
+      let rangeFeet, throughWall;
+      if (index <= this.RANGE_FEET.length) {
+        rangeFeet = this.RANGE_FEET[index - 1];
+        throughWall = false;
+      } else {
+        rangeFeet = 12;
+        throughWall = true;
+      }
+      let { fps, ftlb } = this.interp(rangeFeet);
+      const pre = { fps, ftlb };
+      if (throughWall) {
+        fps = Math.max(0, fps - this.WALL_DV);
+        // recompute energy ~ proportional to v^2
+        ftlb = pre.ftlb * (fps / pre.fps) ** 2;
+      }
+      return {
+        index, maxIndex: max, rangeFeet, throughWall,
+        impactFps: fps, impactFtlb: ftlb,
+        preWallFps: pre.fps, wallDelta: throughWall ? this.WALL_DV : 0,
+        label: throughWall ? `WALL @ ${rangeFeet}ft` : `OPEN @ ${rangeFeet}ft`,
+      };
+    },
+    camDist(feet) { return 1.8 + feet * 0.215; },
+  };
+
+  // ---------- math ----------
+  const V = {
+    add: (a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }),
+    sub: (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }),
+    scale: (a, s) => ({ x: a.x * s, y: a.y * s, z: a.z * s }),
+    dot: (a, b) => a.x * b.x + a.y * b.y + a.z * b.z,
+    cross: (a, b) => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x }),
+    len: (a) => Math.hypot(a.x, a.y, a.z),
+    norm: (a) => { const L = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / L, y: a.y / L, z: a.z / L }; },
+    dist: (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z),
+    copy: (a) => ({ x: a.x, y: a.y, z: a.z }),
+  };
+
+  // ---------- organs ----------
+  const ORGANS = {
+    brain: { label: "Brain", vul: 1.85, fluid: "blood", rgb: [0.75, 0.55, 0.65] },
+    heart: { label: "Heart", vul: 1.65, fluid: "blood", rgb: [0.75, 0.12, 0.18] },
+    lungL: { label: "Left lung", vul: 1.05, fluid: "blood", rgb: [0.85, 0.55, 0.55] },
+    lungR: { label: "Right lung", vul: 1.05, fluid: "blood", rgb: [0.85, 0.55, 0.55] },
+    liver: { label: "Liver", vul: 1.55, fluid: "blood", rgb: [0.55, 0.2, 0.15] },
+    gallbladder: { label: "Gallbladder", vul: 1.4, fluid: "bile", rgb: [0.55, 0.7, 0.25] },
+    stomach: { label: "Stomach", vul: 1.15, fluid: "gastric", rgb: [0.7, 0.45, 0.35] },
+    kidneyL: { label: "Left kidney", vul: 1.35, fluid: "blood", rgb: [0.65, 0.25, 0.3] },
+    kidneyR: { label: "Right kidney", vul: 1.35, fluid: "blood", rgb: [0.65, 0.25, 0.3] },
+    spleen: { label: "Spleen", vul: 1.5, fluid: "blood", rgb: [0.5, 0.15, 0.2] },
+  };
+
+  function newOrganState() {
+    const integrity = {}, leak = {};
+    for (const k of Object.keys(ORGANS)) { integrity[k] = 1; leak[k] = 0; }
+    return {
+      integrity, leak,
+      vitals: { hr: 72, sys: 118, dia: 76, co: 1, brain: 1, spo2: 0.98, bile: 1, pulse: 0 },
+    };
+  }
+
+  function applyOrganHit(st, name, ftlb, quality) {
+    const def = ORGANS[name]; if (!def) return 0;
+    const dmg = Math.min(1, Math.max(0, (ftlb / 140) * def.vul * (0.35 + 0.65 * quality) * 0.55));
+    st.integrity[name] = Math.max(0, st.integrity[name] - dmg);
+    st.leak[name] = Math.min(1, st.leak[name] + dmg * 0.9);
+    return dmg;
+  }
+
+  function stepOrgans(st, dt) {
+    const v = st.vitals, I = st.integrity;
+    let bleed = 0;
+    for (const k of Object.keys(st.leak)) bleed += st.leak[k] * 0.2;
+    bleed = Math.min(1.5, bleed);
+    let targetHR = 72 + bleed * 55 + (1 - I.heart) * 40;
+    if (I.heart < 0.25) targetHR *= I.heart * 2;
+    if (I.brain < 0.2) targetHR *= 0.5;
+    v.hr += (targetHR - v.hr) * Math.min(1, dt * 2);
+    v.co = Math.max(0, I.heart * (1 - bleed * 0.35));
+    v.sys = 118 * v.co * (0.7 + 0.3 * I.brain);
+    v.dia = 76 * v.co;
+    const lung = (I.lungL + I.lungR) * 0.5;
+    v.spo2 = Math.max(0.5, 0.55 + 0.45 * lung) * (0.6 + 0.4 * v.co);
+    v.brain = Math.max(0, I.brain * (0.4 + 0.6 * v.spo2));
+    v.bile = Math.max(0, I.gallbladder * (0.5 + 0.5 * I.liver));
+    v.pulse = (v.pulse + dt * (Math.max(20, v.hr) / 60) * Math.PI * 2) % (Math.PI * 2);
+  }
+
+  // ---------- soft body ----------
+  function addNode(body, x, y, z, opts = {}) {
+    const n = {
+      x, y, z, px: x, py: y, pz: z, ox: x, oy: y, oz: z,
+      mass: opts.mass || 1, pinned: !!opts.pinned, kind: opts.kind || "flesh",
+      organ: opts.organ, wet: 0, crack: 0, alive: true,
+    };
+    n.inv = n.pinned ? 0 : 1 / n.mass;
+    body.nodes.push(n);
+    return body.nodes.length - 1;
+  }
+  function addSpring(body, i, j, opts = {}) {
+    const a = body.nodes[i], b = body.nodes[j];
+    const rest = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) || 0.01;
+    const kind = opts.kind || "muscle";
+    let breakStrain = opts.breakStrain || 1.85, stiff = opts.stiffness || 0.35;
+    if (kind === "bone") { breakStrain = opts.breakStrain || 1.16; stiff = opts.stiffness || 0.92; }
+    if (kind === "skin") { breakStrain = opts.breakStrain || 1.55; stiff = opts.stiffness || 0.55; }
+    body.springs.push({ i, j, rest, stiff, breakStrain, kind, alive: true });
+  }
+  function ring(body, cx, cy, cz, r, count, opts) {
+    const ids = [];
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      ids.push(addNode(body, cx + Math.cos(a) * r, cy, cz + Math.sin(a) * r, opts));
+    }
+    return ids;
+  }
+  function connectRings(body, A, B, kind, stiff) {
+    const n = A.length;
+    for (let i = 0; i < n; i++) {
+      addSpring(body, A[i], B[i], { kind, stiffness: stiff });
+      addSpring(body, A[i], B[(i + 1) % n], { kind, stiffness: stiff * 0.85 });
+      addSpring(body, A[i], A[(i + 1) % n], { kind, stiffness: stiff });
+      addSpring(body, B[i], B[(i + 1) % n], { kind, stiffness: stiff });
+    }
+  }
+  function organCluster(body, cx, cy, cz, name, scale = 0.14) {
+    const offs = [[0,0,0],[1,.2,.3],[-1,.1,.2],[.4,-.8,.1],[-.3,.7,-.4],[.6,.3,-.6]];
+    const ids = offs.map(o => addNode(body, cx + o[0]*scale, cy + o[1]*scale, cz + o[2]*scale, {
+      kind: "organ", organ: name, mass: 0.9,
+    }));
+    for (let i = 0; i < ids.length; i++)
+      for (let j = i + 1; j < ids.length; j++)
+        addSpring(body, ids[i], ids[j], { kind: "muscle", stiffness: 0.7, breakStrain: 1.7 });
+    return { ids, cx, cy, cz, name };
+  }
+
+  function buildAnatomy() {
+    const body = { nodes: [], springs: [] };
+    const meta = { organs: [], feet: [] };
+    // spine
+    const spineYs = [-0.95, -0.55, -0.15, 0.25, 0.55, 0.78];
+    const spine = spineYs.map((y, i) => addNode(body, 0, y, i * 0.01, {
+      kind: "bone", mass: 1.3, pinned: i === 0,
+    }));
+    for (let i = 0; i < spine.length - 1; i++)
+      addSpring(body, spine[i], spine[i + 1], { kind: "bone", breakStrain: 1.16 });
+    // skull
+    const skull = [0.88, 1.05, 1.18].map(y => addNode(body, 0, y, 0, { kind: "bone", mass: 1.2 }));
+    addSpring(body, spine[5], skull[0], { kind: "bone", breakStrain: 1.12 });
+    for (let i = 0; i < 2; i++) addSpring(body, skull[i], skull[i + 1], { kind: "bone", breakStrain: 1.12 });
+    // ribs
+    for (let i = 0; i < 4; i++) {
+      const y = 0.45 - i * 0.14;
+      const L = addNode(body, -0.28 - i * 0.02, y, 0.05, { kind: "bone", mass: 1 });
+      const R = addNode(body, 0.28 + i * 0.02, y, 0.05, { kind: "bone", mass: 1 });
+      const s = spine[Math.max(2, 4 - Math.min(i, 2))];
+      addSpring(body, s, L, { kind: "bone", breakStrain: 1.18 });
+      addSpring(body, s, R, { kind: "bone", breakStrain: 1.18 });
+      addSpring(body, L, R, { kind: "bone", breakStrain: 1.2 });
+    }
+    // legs
+    for (const side of [-1, 1]) {
+      const hip = addNode(body, 0.14 * side, -0.95, 0, { kind: "bone", mass: 1.3, pinned: true });
+      addSpring(body, spine[0], hip, { kind: "bone" });
+      const chain = [-1.35, -1.75, -2.05].map((y, i) => addNode(body, 0.15 * side, y, 0.02 + i * 0.02, {
+        kind: "bone", mass: 1.2, pinned: i === 2,
+      }));
+      addSpring(body, hip, chain[0], { kind: "bone" });
+      addSpring(body, chain[0], chain[1], { kind: "bone" });
+      addSpring(body, chain[1], chain[2], { kind: "bone" });
+    }
+    // arms
+    for (const side of [-1, 1]) {
+      const sh = addNode(body, 0.32 * side, 0.48, 0, { kind: "bone", mass: 1.2 });
+      addSpring(body, spine[4], sh, { kind: "bone" });
+      const chain = [0.25, -0.05, -0.35].map((y, i) => addNode(body, (0.38 + i * 0.03) * side, y, 0.02, {
+        kind: "bone", mass: 1.1,
+      }));
+      addSpring(body, sh, chain[0], { kind: "bone" });
+      addSpring(body, chain[0], chain[1], { kind: "bone" });
+      addSpring(body, chain[1], chain[2], { kind: "bone" });
+    }
+    // torso skin/muscle cages
+    let prevS, prevM;
+    for (let li = 0; li < 7; li++) {
+      const t = li / 6;
+      const y = -0.85 + (0.55 - -0.85) * t;
+      const r = 0.34 * (0.85 + 0.2 * Math.sin(t * Math.PI));
+      const skin = ring(body, 0, y, 0, r, 8, { kind: "skin", mass: 0.55 });
+      const muscle = ring(body, 0, y, 0, r * 0.78, 8, { kind: "flesh", mass: 0.8 });
+      for (let i = 0; i < 8; i++) {
+        addSpring(body, skin[i], muscle[i], { kind: "skin", stiffness: 0.62 });
+        addSpring(body, muscle[i], spine[Math.min(5, 1 + (t * 3) | 0)], { kind: "muscle", stiffness: 0.48 });
+      }
+      if (prevS) { connectRings(body, prevS, skin, "skin", 0.58); connectRings(body, prevM, muscle, "muscle", 0.5); }
+      prevS = skin; prevM = muscle;
+    }
+    // organs
+    const places = [
+      ["brain", 0, 1.05, 0.02, 0.12],
+      ["heart", -0.06, 0.28, 0.06, 0.11],
+      ["lungL", -0.2, 0.32, -0.02, 0.14],
+      ["lungR", 0.2, 0.32, -0.02, 0.14],
+      ["liver", 0.12, -0.05, 0.04, 0.15],
+      ["gallbladder", 0.18, -0.12, 0.06, 0.07],
+      ["stomach", -0.08, -0.12, 0.05, 0.12],
+      ["kidneyL", -0.14, -0.25, -0.06, 0.08],
+      ["kidneyR", 0.14, -0.25, -0.06, 0.08],
+      ["spleen", -0.22, -0.02, 0.02, 0.09],
+    ];
+    for (const [name, x, y, z, s] of places) {
+      const o = organCluster(body, x, y, z, name, s);
+      meta.organs.push(o);
+      const bind = name === "brain" ? spine[5] : spine[2];
+      for (const id of o.ids) {
+        addSpring(body, id, bind, { kind: "muscle", stiffness: 0.55 });
+        addSpring(body, id, spine[3], { kind: "muscle", stiffness: 0.5 });
+      }
+    }
+    meta.bodyCenter = { x: 0, y: 0.05, z: 0 };
+    return { body, meta };
+  }
+
+  function softStep(body, dt) {
+    const G = -6.5, ground = -2.15;
+    for (const n of body.nodes) {
+      if (!n.alive || n.pinned || n.inv <= 0) continue;
+      const vx = (n.x - n.px) * 0.994;
+      const vy = (n.y - n.py) * 0.994;
+      const vz = (n.z - n.pz) * 0.994;
+      n.px = n.x; n.py = n.y; n.pz = n.z;
+      n.x += vx; n.y += vy + G * dt * dt; n.z += vz;
+      if (n.y < ground) { n.y = ground; n.py = n.y - vy * 0.2; }
+    }
+    const tore = [];
+    for (let it = 0; it < 3; it++) {
+      for (const s of body.springs) {
+        if (!s.alive) continue;
+        const a = body.nodes[s.i], b = body.nodes[s.j];
+        let dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+        const len = Math.hypot(dx, dy, dz) || 1e-8;
+        if (len / s.rest > s.breakStrain) {
+          s.alive = false; tore.push(s);
+          if (s.kind === "bone") { a.crack = 1; b.crack = 1; }
+          continue;
+        }
+        const inv = a.inv + b.inv; if (inv <= 0) continue;
+        const corr = ((len - s.rest) / len) * s.stiff;
+        const cx = dx * corr, cy = dy * corr, cz = dz * corr;
+        const wA = a.inv / inv, wB = b.inv / inv;
+        a.x += cx * wA; a.y += cy * wA; a.z += cz * wA;
+        b.x -= cx * wB; b.y -= cy * wB; b.z -= cz * wB;
+      }
+    }
+    return tore;
+  }
+
+  function applyImpact(body, hit, vel, ftlb, radius = 0.5) {
+    const dir = V.norm(vel);
+    const ke = (ftlb / 140) * 0.012;
+    const impulse = 0.015 + ke * 8;
+    for (const n of body.nodes) {
+      if (n.pinned || n.inv <= 0) continue;
+      const d = V.dist(n, hit);
+      if (d >= radius) continue;
+      const w = (1 - d / radius) ** 2;
+      const push = impulse * w * n.inv;
+      n.x += dir.x * push + (n.x - hit.x) * 0.35 * w;
+      n.y += dir.y * push + (n.y - hit.y) * 0.35 * w;
+      n.z += dir.z * push + (n.z - hit.z) * 0.35 * w;
+      n.wet = Math.min(1, n.wet + w * 0.8);
+      if (n.kind === "bone" && ftlb * w > 35) n.crack = 1;
+    }
+    for (const s of body.springs) {
+      if (!s.alive) continue;
+      const a = body.nodes[s.i], b = body.nodes[s.j];
+      const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 };
+      const d = V.dist(m, hit);
+      const tearR = radius * (s.kind === "skin" ? 1.15 : s.kind === "bone" ? 0.55 : 0.9);
+      if (d >= tearR) continue;
+      const chance = 1 - d / tearR;
+      let need = s.kind === "bone" ? 0.55 : s.kind === "skin" ? 0.18 : 0.25;
+      if (chance > need) {
+        s.alive = false;
+        if (s.kind === "bone") { a.crack = 1; b.crack = 1; }
+      }
+    }
+  }
+
+  // ---------- blood ----------
+  function newBlood() {
+    const vessels = [
+      [[0,-0.9,0.05],[0,-0.4,0.06],[0,0.1,0.07],[-0.05,0.28,0.08],[0,0.5,0.04],[0,0.75,0.02]],
+      [[-0.05,0.28,0.08],[-0.22,0.35,0.02],[-0.35,0.2,0.02],[-0.42,-0.1,0.03]],
+      [[-0.05,0.28,0.08],[0.22,0.35,0.02],[0.35,0.2,0.02],[0.42,-0.1,0.03]],
+    ].map(pts => ({ points: pts.map(p => ({ x: p[0], y: p[1], z: p[2] })), torn: false }));
+    const particles = [];
+    for (let vi = 0; vi < vessels.length; vi++) {
+      for (let k = 0; k < 10; k++) {
+        const t = (k + 0.5) / 10;
+        const p = vesselPoint(vessels[vi], t);
+        particles.push({ ...p, vx: 0, vy: 0, vz: 0, free: false, vessel: vi, t, life: 1, r: 0.04, fluid: "blood" });
+      }
+    }
+    return { vessels, particles, pumpT: 0 };
+  }
+  function vesselPoint(v, t) {
+    const pts = v.points; const n = pts.length;
+    t = Math.max(0, Math.min(0.999, t));
+    const f = t * (n - 1), i = f | 0, u = f - i;
+    const a = pts[i], b = pts[Math.min(n - 1, i + 1)];
+    return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, z: a.z + (b.z - a.z) * u };
+  }
+  function gush(blood, pos, dir, count, fluid = "blood") {
+    const d = V.norm(dir);
+    for (let i = 0; i < count && blood.particles.length < 420; i++) {
+      const s = 3.8 * (0.7 + Math.random());
+      blood.particles.push({
+        x: pos.x, y: pos.y, z: pos.z,
+        vx: d.x * s + (Math.random() - 0.5) * 2.5,
+        vy: d.y * s + Math.random() * 2.2,
+        vz: d.z * s + (Math.random() - 0.5) * 2.5,
+        free: true, life: 1, r: 0.035 + Math.random() * 0.04, fluid,
+      });
+    }
+  }
+  function bloodStep(blood, dt, co = 1) {
+    blood.pumpT += dt;
+    for (const p of blood.particles) {
+      if (!p.free && p.vessel != null && !blood.vessels[p.vessel].torn) {
+        p.t = (p.t + dt * 0.22 * co) % 1;
+        Object.assign(p, vesselPoint(blood.vessels[p.vessel], p.t));
+      } else if (p.free) {
+        p.vy -= 9.2 * dt;
+        p.vx *= 0.995; p.vy *= 0.995; p.vz *= 0.995;
+        p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+        if (p.y < -2.13) { p.y = -2.13; p.vy *= -0.15; p.vx *= 0.7; p.vz *= 0.7; }
+        p.life -= dt * 0.02;
+      }
+    }
+  }
+
+  // ---------- camera ----------
+  function camBasis(cam) {
+    const forward = V.norm(V.sub(cam.target, cam.eye));
+    let right = V.cross(forward, cam.up);
+    if (V.len(right) < 1e-6) right = { x: 1, y: 0, z: 0 };
+    right = V.norm(right);
+    const up = V.norm(V.cross(right, forward));
+    return { forward, right, up };
+  }
+  function project(cam, w, h, p) {
+    const { forward, right, up } = camBasis(cam);
+    const rel = V.sub(p, cam.eye);
+    const z = V.dot(rel, forward);
+    if (z < 0.05) return null;
+    const x = V.dot(rel, right), y = V.dot(rel, up);
+    const focal = (h * 0.5) / Math.tan((cam.fov * Math.PI / 180) * 0.5);
+    return { x: w * 0.5 + x * focal / z, y: h * 0.5 - y * focal / z, z };
+  }
+  function lookRay(cam, sx, sy, w, h) {
+    const { forward, right, up } = camBasis(cam);
+    const focal = (h * 0.5) / Math.tan((cam.fov * Math.PI / 180) * 0.5);
+    const nx = (sx - w * 0.5) / focal;
+    const ny = -(sy - h * 0.5) / focal;
+    return {
+      origin: V.copy(cam.eye),
+      dir: V.norm(V.add(V.add(forward, V.scale(right, nx)), V.scale(up, ny))),
+    };
+  }
+  function setAim(cam, center, feet) {
+    cam.mode = "aim";
+    cam.rangeFeet = feet;
+    cam.eye = { x: 0.15, y: 0.55, z: TT.camDist(feet) };
+    cam.target = V.copy(center);
+    cam.up = { x: 0, y: 1, z: 0 };
+    cam.fov = 48;
+    cam.hold = 0;
+    cam.cine = {};
+    cam.impactComplete = false;
+  }
+
+  // ---------- Flash game state ----------
+  let W = 0, H = 0;
+  let body, meta, blood, organs, stageIndex = 1, snap;
+  let cam = { eye: { x: 0, y: 0, z: 8 }, target: { x: 0, y: 0, z: 0 }, up: { x: 0, y: 1, z: 0 }, fov: 48, mode: "aim" };
+  let bullet = null, cooldown = 0, impactDone = false, pendingAdvance = false;
+  let aim = { x: 0, y: 0 }, lastTap = null, message = "", messageT = 0;
+  let wallBroken = false, wallDebris = [], timeScale = 1;
+  const WALL_Z = 1.85;
+  const COOLDOWN = 2.2;
+  const AMMO_PER_STAGE = 3;
+  let screen = "title"; // title | howto | play | clear | gameover
+  let score = 0, combo = 0, bestCombo = 0, ammo = AMMO_PER_STAGE, shotsFired = 0;
+  let floaters = [];
+  let muted = false;
+  let highScore = +localStorage.getItem("anatomyFlashHi") || 0;
+  let audioCtx = null;
+
+  function ensureAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
+    }
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  }
+  function blip(freq, dur, type="square", vol=0.08) {
+    if (muted || !audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function sfxFire() { blip(90, 0.08, "sawtooth", 0.1); blip(40, 0.18, "square", 0.06); }
+  function sfxHit(bonus) { blip(220 + bonus * 40, 0.12, "square", 0.09); blip(440, 0.08, "triangle", 0.05); }
+  function sfxMiss() { blip(120, 0.15, "triangle", 0.05); blip(70, 0.2, "sine", 0.04); }
+  function sfxClear() { blip(330, 0.1); setTimeout(() => blip(440, 0.1), 80); setTimeout(() => blip(660, 0.15), 160); }
+  function sfxGameOver() { blip(180, 0.2); setTimeout(() => blip(110, 0.25), 120); setTimeout(() => blip(70, 0.35), 260); }
+  function addFloater(text, x, y, color) {
+    floaters.push({ text, x, y, life: 1.2, color: color || "#ffe066" });
+  }
+  function organPoints(name) {
+    const table = { brain: 1500, heart: 1200, lungL: 700, lungR: 700, liver: 900, gallbladder: 800, stomach: 550, kidneyL: 750, kidneyR: 750, spleen: 850 };
+    return table[name] || 400;
+  }
+  function setScreen(name) {
+    screen = name;
+    document.querySelectorAll(".panel").forEach(el => el.classList.add("hidden"));
+    const map = { title: "panelTitle", howto: "panelHowto", clear: "panelClear", gameover: "panelGameOver" };
+    if (map[name]) document.getElementById(map[name]).classList.remove("hidden");
+    const playing = name === "play";
+    document.getElementById("playHud").classList.toggle("hidden", !playing);
+    document.getElementById("btns").classList.toggle("hidden", !playing);
+    document.getElementById("ready").classList.toggle("hidden", !playing);
+    document.getElementById("hiChip").classList.toggle("hidden", playing);
+  }
+  function saveHigh() {
+    if (score > highScore) {
+      highScore = score;
+      localStorage.setItem("anatomyFlashHi", String(highScore));
+    }
+  }
+  function startRun() {
+    ensureAudio();
+    score = 0; combo = 0; bestCombo = 0; shotsFired = 0; floaters = [];
+    resetAll(true);
+    setScreen("play");
+    blip(520, 0.1); blip(780, 0.12);
+  }
+
+
+  function resize() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = (W * dpr) | 0; canvas.height = (H * dpr) | 0;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!aim.x) { aim.x = W * 0.5; aim.y = H * 0.55; }
+  }
+  window.addEventListener("resize", resize);
+
+  function resetAll(keepScore) {
+    const built = buildAnatomy();
+    body = built.body; meta = built.meta;
+    blood = newBlood();
+    organs = newOrganState();
+    if (!keepScore) { stageIndex = 1; score = 0; combo = 0; }
+    snap = TT.stage(stageIndex);
+    setAim(cam, meta.bodyCenter, snap.rangeFeet);
+    bullet = null; cooldown = 0; impactDone = false; pendingAdvance = false;
+    wallBroken = false; wallDebris = [];
+    ammo = AMMO_PER_STAGE;
+    message = `STAGE ${snap.index} — ${snap.label}`;
+    messageT = 3;
+  }
+
+  function advanceStage() {
+    if (stageIndex >= snap.maxIndex) {
+      // campaign clear
+      const clearBonus = 5000 + bestCombo * 100;
+      score += clearBonus;
+      saveHigh();
+      document.getElementById("clearScore").textContent = score.toLocaleString();
+      document.getElementById("clearHi").textContent = highScore.toLocaleString();
+      document.getElementById("clearBonus").textContent = "+" + clearBonus.toLocaleString() + " CLEAR BONUS";
+      setScreen("clear");
+      sfxClear();
+      return;
+    }
+    stageIndex++;
+    snap = TT.stage(stageIndex);
+    setAim(cam, meta.bodyCenter || { x: 0, y: 0.05, z: 0 }, snap.rangeFeet);
+    wallBroken = false; wallDebris = [];
+    ammo = AMMO_PER_STAGE;
+    combo = 0;
+    message = `STAGE ${snap.index} — ${snap.label} · ${AMMO_PER_STAGE} rounds`;
+    messageT = 2.5;
+    pendingAdvance = false;
+    blip(400, 0.08); blip(600, 0.1);
+  }
+
+  function failRun(reason) {
+    saveHigh();
+    document.getElementById("overReason").textContent = reason || "OUT OF AMMO";
+    document.getElementById("overScore").textContent = score.toLocaleString();
+    document.getElementById("overHi").textContent = highScore.toLocaleString();
+    setScreen("gameover");
+    sfxGameOver();
+  }
+
+  function tryFire() {
+    if (screen !== "play") return;
+    if (cooldown > 0) {
+      message = `Chambering… ${cooldown.toFixed(1)}s`;
+      messageT = 1;
+      return;
+    }
+    if (ammo <= 0) {
+      message = "No rounds left!";
+      messageT = 1.2;
+      return;
+    }
+    if (cam.mode !== "aim" && cam.hold > 0) return;
+    setAim(cam, meta.bodyCenter, snap.rangeFeet);
+    const { origin, dir } = lookRay(cam, aim.x, aim.y, W, H);
+    const spawn = V.add(origin, V.scale(dir, 0.35));
+    const cine = 8 + (snap.impactFps / 1255) * 10;
+    bullet = {
+      pos: V.copy(spawn), vel: V.scale(dir, cine), alive: true, age: 0,
+      trail: [V.copy(spawn)], hit: false, hitPos: null,
+      realFps: snap.impactFps, realFtlb: snap.impactFtlb,
+      throughWall: snap.throughWall, wallHit: false,
+    };
+    ammo -= 1;
+    shotsFired += 1;
+    cooldown = COOLDOWN; impactDone = false; pendingAdvance = false;
+    cam.cine = {}; cam.impactComplete = false;
+    sfxFire();
+    message = `BANG!  ${ammo} left · ${snap.impactFps|0} fps`;
+    messageT = 1.2;
+  }
+
+  function cinematicUpdate(dt) {
+    if (!bullet) { timeScale = 1; return; }
+    if (cam.impactComplete && impactDone) {
+      setAim(cam, meta.bodyCenter, snap.rangeFeet);
+      timeScale = 1;
+      return;
+    }
+    if (cam.mode === "impact" && cam.hold > 0) {
+      cam.hold -= dt;
+      timeScale = 0.18;
+      if (cam.hold <= 0) {
+        cam.impactComplete = true;
+        setAim(cam, meta.bodyCenter, snap.rangeFeet);
+        if (pendingAdvance) {
+          // Auto-advance only after a scoring hit; spend remaining ammo freely until empty or player skips
+          pendingAdvance = false;
+          // Stage clears when heart/brain critically damaged OR player presses NEXT — keep auto after hit:
+          advanceStage();
+        } else if (ammo <= 0) {
+          failRun("OUT OF AMMO");
+        }
+      }
+      return;
+    }
+    if (!bullet.alive && impactDone) return;
+    const d = V.dist(bullet.pos, meta.bodyCenter);
+    let desired = d > 3.6 ? "side_trail" : d > 1.35 ? "overhead" : "follow_slow";
+    if (impactDone || bullet.hit) desired = "impact";
+    cam.cine = cam.cine || {};
+    cam.cine.phase = cam.cine.phase || desired;
+    cam.cine.age = (cam.cine.age || 0) + dt;
+    const order = { side_trail: 1, overhead: 2, follow_slow: 3, impact: 4 };
+    const dwell = { side_trail: 0.22, overhead: 0.3, follow_slow: 0.18 };
+    if (order[desired] > order[cam.cine.phase] && cam.cine.age < (dwell[cam.cine.phase] || 0)) {
+      desired = cam.cine.phase;
+    } else if (desired !== cam.cine.phase && order[desired] >= order[cam.cine.phase]) {
+      cam.cine.phase = desired; cam.cine.age = 0;
+    } else desired = cam.cine.phase;
+
+    if (desired === "side_trail") {
+      cam.mode = "side_trail"; cam.up = { x: 0, y: 1, z: 0 };
+      cam.eye = { x: bullet.pos.x + 4.8, y: bullet.pos.y + 0.3, z: bullet.pos.z };
+      cam.target = { x: bullet.pos.x, y: bullet.pos.y, z: meta.bodyCenter.z };
+      timeScale = 0.7;
+    } else if (desired === "overhead") {
+      cam.mode = "overhead"; cam.up = { x: 0, y: 0, z: -1 };
+      const mid = {
+        x: bullet.pos.x * 0.55 + meta.bodyCenter.x * 0.45,
+        y: meta.bodyCenter.y, z: bullet.pos.z * 0.55 + meta.bodyCenter.z * 0.45,
+      };
+      cam.eye = { x: mid.x, y: mid.y + 6.2, z: mid.z + 0.15 };
+      cam.target = mid; timeScale = 0.45;
+    } else if (desired === "follow_slow") {
+      cam.mode = "follow_slow"; cam.up = { x: 0, y: 1, z: 0 };
+      const back = V.norm(bullet.vel);
+      cam.eye = V.sub(bullet.pos, V.scale(back, 1.35)); cam.eye.y += 0.25;
+      cam.target = V.add(bullet.pos, V.scale(back, 2.5));
+      timeScale = 0.18;
+    } else if (desired === "impact") {
+      cam.mode = "impact"; cam.hold = 1.4; cam.up = { x: 0, y: 1, z: 0 };
+      const p = bullet.hitPos || meta.bodyCenter;
+      cam.eye = { x: p.x - 0.4, y: p.y + 0.9, z: p.z + 2.2 };
+      cam.target = V.copy(p); timeScale = 0.18;
+    }
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    let dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (screen !== "play") {
+      // idle sway on title
+      if (body) softStep(body, dt * 0.35);
+      if (organs) stepOrgans(organs, dt * 0.35);
+      draw();
+      requestAnimationFrame(frame);
+      return;
+    }
+    cooldown = Math.max(0, cooldown - dt);
+    if (messageT > 0) messageT -= dt;
+
+    // heart pulse on heart nodes
+    const hb = 1 + 0.08 * Math.max(0, Math.sin(organs.vitals.pulse)) ** 3 * organs.integrity.heart;
+    stepOrgans(organs, dt * timeScale);
+
+    cinematicUpdate(dt);
+
+    if (bullet && (bullet.alive || !impactDone)) {
+      if (bullet.alive) {
+        if (bullet.throughWall && !bullet.wallHit && bullet.pos.z <= WALL_Z) {
+          bullet.wallHit = true; wallBroken = true;
+          for (let i = 0; i < 16; i++) {
+            wallDebris.push({
+              x: bullet.pos.x + (Math.random() - 0.5) * 0.4,
+              y: bullet.pos.y + (Math.random() - 0.5) * 0.5,
+              z: WALL_Z, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 1.5,
+              vz: -1 - Math.random(), life: 0.8 + Math.random() * 0.4,
+              wood: Math.random() > 0.45,
+            });
+          }
+        }
+        // integrate
+        const sdt = dt * timeScale;
+        bullet.vel.y += -1.6 * sdt;
+        const damp = Math.max(0, 1 - 0.06 * sdt);
+        bullet.vel.x *= damp; bullet.vel.y *= damp; bullet.vel.z *= damp;
+        bullet.pos.x += bullet.vel.x * sdt;
+        bullet.pos.y += bullet.vel.y * sdt;
+        bullet.pos.z += bullet.vel.z * sdt;
+        bullet.age += sdt;
+        const tr = bullet.trail;
+        if (!tr.length || V.dist(tr[tr.length - 1], bullet.pos) > 0.12) {
+          tr.push(V.copy(bullet.pos));
+          if (tr.length > 180) tr.shift();
+        }
+        // hit test
+        let best = -1, bestD = (0.08 + 0.22) ** 2;
+        for (let i = 0; i < body.nodes.length; i++) {
+          const n = body.nodes[i];
+          const d2 = (n.x - bullet.pos.x) ** 2 + (n.y - bullet.pos.y) ** 2 + (n.z - bullet.pos.z) ** 2;
+          if (d2 < bestD) { bestD = d2; best = i; }
+        }
+        if (best >= 0) {
+          const n = body.nodes[best];
+          const hit = { x: n.x, y: n.y, z: n.z };
+          applyImpact(body, hit, bullet.vel, bullet.realFtlb, 0.5);
+          // nearest organ
+          let oBest = null, oD = 1e9;
+          for (const o of meta.organs) {
+            const d = V.dist(hit, { x: o.cx, y: o.cy, z: o.cz });
+            if (d < oD) { oD = d; oBest = o; }
+          }
+          let fluid = "blood";
+          let gained = 200 + Math.round(bullet.realFtlb * 2);
+          let label = "HIT";
+          if (oBest && oD < 0.32) {
+            const q = (1 - oD / 0.32) ** 2;
+            applyOrganHit(organs, oBest.name, bullet.realFtlb, q);
+            fluid = ORGANS[oBest.name].fluid;
+            const pts = Math.round(organPoints(oBest.name) * (0.65 + 0.7 * q) * (1 + combo * 0.15));
+            gained = pts;
+            label = ORGANS[oBest.name].label.toUpperCase();
+            combo += 1;
+            bestCombo = Math.max(bestCombo, combo);
+            message = `${label}! +${pts}  COMBO x${combo}`;
+          } else {
+            combo = Math.max(0, combo - 1);
+            message = `Flesh hit +${gained}`;
+          }
+          score += gained;
+          const hp = project(cam, W, H, hit);
+          if (hp) addFloater("+" + gained + " " + label, hp.x, hp.y, "#ffee66");
+          messageT = 2.4;
+          sfxHit(combo);
+          gush(blood, hit, bullet.vel, 12 + (bullet.realFtlb / 12) | 0, fluid);
+          if (fluid !== "blood") gush(blood, hit, bullet.vel, 6, "blood");
+          bullet.alive = false; bullet.hit = true; bullet.hitPos = hit;
+          impactDone = true; pendingAdvance = true;
+          cam.mode = "impact"; cam.hold = 1.15;
+          cam.eye = { x: hit.x - 0.4, y: hit.y + 0.9, z: hit.z + 2.2 };
+          cam.target = V.copy(hit); cam.up = { x: 0, y: 1, z: 0 };
+        } else if (bullet.age > 8 || bullet.pos.y < -3) {
+          bullet.alive = false; impactDone = true;
+          setAim(cam, meta.bodyCenter, snap.rangeFeet);
+          combo = 0;
+          sfxMiss();
+          addFloater("MISS", aim.x, aim.y - 40, "#ff6666");
+          message = "MISS!"; messageT = 1.5;
+          if (ammo <= 0) {
+            // delay fail slightly so player sees miss
+            setTimeout(() => { if (screen === "play" && ammo <= 0 && !pendingAdvance) failRun("OUT OF AMMO"); }, 900);
+          }
+        }
+      }
+    }
+
+    softStep(body, dt * timeScale);
+    bloodStep(blood, dt * timeScale, organs.vitals.co);
+    for (const f of floaters) f.life -= dt;
+
+    for (let i = wallDebris.length - 1; i >= 0; i--) {
+      const s = wallDebris[i];
+      s.life -= dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt; s.vy -= 8 * dt;
+      if (s.life <= 0) wallDebris.splice(i, 1);
+    }
+
+    // gentle heart pulse visual
+    for (const o of meta.organs) {
+      if (o.name !== "heart") continue;
+      for (const id of o.ids) {
+        const n = body.nodes[id];
+        n.y = n.oy + (hb - 1) * 0.03;
+      }
+    }
+
+    draw();
+    updateDOM();
+    requestAnimationFrame(frame);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // floor grid
+    ctx.strokeStyle = "rgba(60,55,70,0.5)";
+    ctx.lineWidth = 1;
+    for (let g = -3; g <= 3; g++) {
+      const a = project(cam, W, H, { x: g * 0.7, y: -2.15, z: -2 });
+      const b = project(cam, W, H, { x: g * 0.7, y: -2.15, z: 2 });
+      if (a && b) { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+    }
+
+    // wall
+    if (snap.throughWall) {
+      const corners = [[-1.2,-0.4],[1.2,-0.4],[1.2,1.6],[-1.2,1.6]].map(([x,y]) =>
+        project(cam, W, H, { x, y, z: WALL_Z }));
+      if (corners.every(Boolean)) {
+        ctx.fillStyle = wallBroken ? "rgba(210,205,195,0.25)" : "rgba(210,205,195,0.45)";
+        ctx.beginPath();
+        ctx.moveTo(corners[0].x, corners[0].y);
+        for (let i = 1; i < 4; i++) ctx.lineTo(corners[i].x, corners[i].y);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = "rgba(110,75,40,0.7)"; ctx.lineWidth = 3;
+        for (let sx = -0.8; sx <= 0.8; sx += 0.4) {
+          const a = project(cam, W, H, { x: sx, y: -0.3, z: WALL_Z });
+          const b = project(cam, W, H, { x: sx, y: 1.5, z: WALL_Z });
+          if (a && b) { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+        }
+      }
+    }
+
+    // springs
+    for (const s of body.springs) {
+      if (!s.alive && s.kind !== "skin") continue;
+      const a = body.nodes[s.i], b = body.nodes[s.j];
+      const pa = project(cam, W, H, a), pb = project(cam, W, H, b);
+      if (!pa || !pb) continue;
+      if (!s.alive) {
+        ctx.strokeStyle = "rgba(120,30,35,0.35)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo((pa.x+pb.x)/2, (pa.y+pb.y)/2); ctx.stroke();
+        continue;
+      }
+      if (s.kind === "skin") { ctx.strokeStyle = "rgba(210,140,120,0.35)"; ctx.lineWidth = 1; }
+      else if (s.kind === "muscle") { ctx.strokeStyle = "rgba(150,45,55,0.4)"; ctx.lineWidth = 1.4; }
+      else if (s.kind === "bone") {
+        const cr = Math.max(a.crack, b.crack);
+        ctx.strokeStyle = `rgba(${230 - cr*80},${220 - cr*100},${200 - cr*120},0.75)`;
+        ctx.lineWidth = 2.2;
+      } else continue;
+      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+    }
+
+    // nodes / organs
+    const order = [];
+    for (let i = 0; i < body.nodes.length; i++) {
+      const p = project(cam, W, H, body.nodes[i]);
+      if (p) order.push({ i, p });
+    }
+    order.sort((a, b) => b.p.z - a.p.z);
+    for (const { i, p } of order) {
+      const n = body.nodes[i];
+      let r = 3 + 20 / p.z, col;
+      if (n.kind === "bone") {
+        col = n.crack > 0.4 ? "rgba(255,230,180,0.9)" : "rgba(235,225,210,0.65)";
+        r = 4 + 22 / p.z;
+      } else if (n.kind === "organ") {
+        const def = ORGANS[n.organ] || { rgb: [0.7, 0.3, 0.3] };
+        const integ = organs.integrity[n.organ] ?? 1;
+        const [cr, cg, cb] = def.rgb;
+        col = `rgba(${(cr*255)|0},${(cg*255)|0},${(cb*255)|0},${0.4 + integ * 0.45})`;
+        if (n.organ === "heart") r *= 1 + 0.08 * Math.max(0, Math.sin(organs.vitals.pulse)) ** 3;
+      } else if (n.wet > 0.3) {
+        col = "rgba(160,40,50,0.7)";
+      } else {
+        col = "rgba(200,140,120,0.45)";
+      }
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // blood
+    for (const p of blood.particles) {
+      const sp = project(cam, W, H, p);
+      if (!sp) continue;
+      const r = (p.r || 0.04) * (180 / Math.max(0.4, sp.z));
+      let col = "rgba(170,10,22,0.7)";
+      if (p.fluid === "bile") col = "rgba(180,200,40,0.75)";
+      if (p.fluid === "gastric") col = "rgba(200,190,140,0.65)";
+      if (!p.free) col = col.replace(/[\d.]+\)$/, "0.45)");
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, Math.max(1.5, r), 0, Math.PI * 2); ctx.fill();
+    }
+
+    // debris
+    for (const s of wallDebris) {
+      const p = project(cam, W, H, s); if (!p) continue;
+      ctx.fillStyle = s.wood ? `rgba(120,85,45,${s.life})` : `rgba(220,220,210,${s.life})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // trail + bullet
+    if (bullet) {
+      const tr = bullet.trail;
+      ctx.lineWidth = cam.mode === "side_trail" ? 3 : 2;
+      for (let i = 1; i < tr.length; i++) {
+        const a = project(cam, W, H, tr[i - 1]), b = project(cam, W, H, tr[i]);
+        if (!a || !b) continue;
+        const t = i / tr.length;
+        ctx.strokeStyle = `rgba(255,${40 + 40 * t | 0},40,${0.35 + 0.55 * t})`;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      const bp = bullet.alive ? bullet.pos : bullet.hitPos;
+      if (bp) {
+        const p = project(cam, W, H, bp);
+        if (p) {
+          ctx.fillStyle = "rgb(240,220,80)";
+          ctx.beginPath(); ctx.arc(p.x, p.y, 5 + 25 / Math.max(0.5, p.z), 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
+    // aim reticle
+    if (cam.mode === "aim" || !bullet || impactDone) {
+      const { x: ax, y: ay } = aim;
+      ctx.strokeStyle = "rgba(255,40,40,0.55)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(ax, ay, 14, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "rgba(255,45,45,0.55)";
+      ctx.beginPath(); ctx.arc(ax, ay, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(ax - 22, ay); ctx.lineTo(ax - 10, ay);
+      ctx.moveTo(ax + 10, ay); ctx.lineTo(ax + 22, ay);
+      ctx.moveTo(ax, ay - 22); ctx.lineTo(ax, ay - 10);
+      ctx.moveTo(ax, ay + 10); ctx.lineTo(ax, ay + 22);
+      ctx.stroke();
+    }
+
+    // Flash arcade chrome on canvas
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(10, 10, 210, 74);
+    ctx.strokeStyle = "#c9a227"; ctx.lineWidth = 2;
+    ctx.strokeRect(10, 10, 210, 74);
+    ctx.fillStyle = "#ffe066";
+    ctx.font = 'bold 18px "Bangers", Impact, sans-serif';
+    ctx.fillText("SCORE  " + score.toLocaleString(), 22, 36);
+    ctx.fillStyle = "#ffd0a8";
+    ctx.font = '14px "Bangers", Impact, sans-serif';
+    ctx.fillText("STAGE " + snap.index + "/" + snap.maxIndex + "   AMMO " + ammo, 22, 56);
+    ctx.fillText("COMBO x" + combo + "   HI " + highScore.toLocaleString(), 22, 74);
+
+    // floaters
+    for (let i = floaters.length - 1; i >= 0; i--) {
+      const f = floaters[i];
+      f.y -= 0.9;
+      if (f.life <= 0) { floaters.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.min(1, f.life * 1.4);
+      ctx.fillStyle = f.color;
+      ctx.font = 'bold 22px "Bangers", Impact, sans-serif';
+      ctx.textAlign = "center";
+      ctx.fillText(f.text, f.x, f.y);
+      ctx.textAlign = "left";
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.fillStyle = "rgba(20,10,0,0.8)";
+    ctx.fillRect(W - 168, H - 38, 156, 26);
+    ctx.fillStyle = "#ffcc44";
+    ctx.font = "12px monospace";
+    ctx.fillText((cam.mode || "aim").toUpperCase() + " x" + timeScale.toFixed(2), W - 158, H - 20);
+  }
+
+  function updateDOM() {
+    if (screen !== "play") return;
+    const v = organs.vitals;
+    hudEl.innerHTML = `<div class="big">.22 LR ${snap.impactFps|0} fps / ${snap.impactFtlb|0} ft·lbf · ${snap.label}</div>
+      <div class="sub">HR ${v.hr|0} · BP ${v.sys|0}/${v.dia|0} · Brain ${(v.brain*100)|0}% · Heart ${(organs.integrity.heart*100)|0}%</div>`;
+    msgEl.textContent = messageT > 0 ? message : "";
+    const fireBtn = document.getElementById("btnFire");
+    const readyEl = document.getElementById("ready");
+    if (cooldown <= 0 && ammo > 0) {
+      readyEl.textContent = "READY"; readyEl.className = "";
+      if (fireBtn) { fireBtn.disabled = false; fireBtn.className = "flash-btn fire"; fireBtn.textContent = "FIRE"; }
+    } else if (ammo <= 0) {
+      readyEl.textContent = "EMPTY"; readyEl.className = "busy";
+      if (fireBtn) { fireBtn.disabled = true; fireBtn.className = "flash-btn fire busy"; fireBtn.textContent = "EMPTY"; }
+    } else {
+      readyEl.textContent = cooldown.toFixed(1) + "s"; readyEl.className = "busy";
+      if (fireBtn) { fireBtn.disabled = true; fireBtn.className = "flash-btn fire busy"; fireBtn.textContent = cooldown.toFixed(1) + "s"; }
+    }
+    document.getElementById("hiLabel").textContent = "HI " + highScore.toLocaleString();
+  }
+
+  // input
+  function pointerPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  let dragging = false;
+  function onDown(e) {
+    if (screen !== "play") return;
+    e.preventDefault();
+    dragging = true;
+    const p = pointerPos(e);
+    aim.x = p.x; aim.y = p.y;
+  }
+  function onMove(e) {
+    if (screen !== "play") return;
+    if (!dragging && !(e.touches && e.touches.length)) return;
+    e.preventDefault();
+    const p = pointerPos(e.touches && e.touches[0] ? e : e);
+    if (cam.mode === "aim" || !bullet) {
+      aim.x = Math.max(20, Math.min(W - 20, p.x));
+      aim.y = Math.max(20, Math.min(H - 20, p.y));
+    }
+  }
+  function onUp(e) {
+    if (screen !== "play") return;
+    e.preventDefault();
+    dragging = false;
+    const now = performance.now() / 1000;
+    const p = e.changedTouches ? (() => {
+      const r = canvas.getBoundingClientRect();
+      const t = e.changedTouches[0];
+      return { x: t.clientX - r.left, y: t.clientY - r.top };
+    })() : pointerPos(e);
+    if (lastTap && now - lastTap.t < 0.32 && Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < 56) {
+      tryFire();
+      lastTap = null;
+    } else {
+      lastTap = { t: now, x: p.x, y: p.y };
+    }
+  }
+  canvas.addEventListener("mousedown", onDown);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+  canvas.addEventListener("touchstart", onDown, { passive: false });
+  canvas.addEventListener("touchmove", onMove, { passive: false });
+  canvas.addEventListener("touchend", onUp, { passive: false });
+  document.addEventListener("gesturestart", (e) => e.preventDefault());
+  window.addEventListener("keydown", (e) => {
+    if (screen !== "play") {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (screen === "title") startRun(); }
+      return;
+    }
+    if (e.key === "r" || e.key === "R") { resetAll(true); }
+    if (e.key === "n" || e.key === "N") advanceStage();
+    if (e.key === " " || e.key === "Tab") { e.preventDefault(); tryFire(); }
+    if (e.key === "m" || e.key === "M") { muted = !muted; document.getElementById("btnMute").textContent = muted ? "UNMUTE" : "MUTE"; }
+  });
+  document.getElementById("btnReset").onclick = () => { if (screen === "play") failRun("ABORTED"); };
+  document.getElementById("btnNext").onclick = () => { if (screen === "play") advanceStage(); };
+  document.getElementById("btnFire").onclick = () => tryFire();
+  document.getElementById("btnPlay").onclick = () => startRun();
+  document.getElementById("btnHowto").onclick = () => setScreen("howto");
+  document.getElementById("btnBackTitle").onclick = () => setScreen("title");
+  document.getElementById("btnAgain").onclick = () => startRun();
+  document.getElementById("btnAgain2").onclick = () => startRun();
+  document.getElementById("btnMenu").onclick = () => setScreen("title");
+  document.getElementById("btnMenu2").onclick = () => setScreen("title");
+  document.getElementById("btnMute").onclick = () => {
+    muted = !muted;
+    document.getElementById("btnMute").textContent = muted ? "UNMUTE" : "MUTE";
+    ensureAudio();
+  };
+
+  // After impact hold, if out of ammo and stage not advancing to clear path — fail
+  const _cinematicUpdate = cinematicUpdate;
+  // hook miss/out-of-ammo after impact completes without pendingAdvance already handled
+
+  resize();
+  resetAll(true);
+  setScreen("title");
+  document.getElementById("titleHi").textContent = highScore.toLocaleString();
+  requestAnimationFrame(frame);
+})();
+
+</script>
+</body>
+</html>
