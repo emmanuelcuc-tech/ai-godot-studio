@@ -1,0 +1,17 @@
+DEMOLITION — Codea install (iPad)
+
+1. Buy/install Codea from the App Store (paid).
+2. Unzip this package.
+3. Copy the folder Demolition.codea into:
+      Files → On My iPad → Codea
+4. Open Codea → tap Demolition → Play.
+
+Controls:
+  Drag the wrecking ball back, release to fling.
+  Knock down 62% of the building to clear the stage.
+  RESET rebuilds. NEXT skips ahead.
+
+Paste option:
+  Create a new project named Demolition.
+  Make two buffers: Main, Levels (order in Info.plist).
+  Paste from lua-buffers-for-paste/01_Main.lua and 02_Levels.lua.
