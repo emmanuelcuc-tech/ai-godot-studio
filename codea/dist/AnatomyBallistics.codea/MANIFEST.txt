@@ -1,19 +1,18 @@
-Anatomy Ballistics 1.1.0 — complete Codea project manifest
-Generated: 2026-09-09T00:39Z
+Anatomy Ballistics 1.1.0 complete Codea package
+Saved: 2026-09-09T00:44Z
 
-FILE                  BYTES  MD5
-----------------------------------------------------------------
-Info.plist              888  d53b38de7d78e60c3cd1b9cd9656ed2d
-LOAD_ME.txt             801  c24ce5b207533fc6bc337863d3ab1e4b
-README.md              2408  0d3dce44d21696ddf0cfa6e0c953f711
-Main.lua              26109  b11ec81c2521d0bf1c2562940c317c08
-Vec3.lua               1429  f1f268b1828528b7815770e3d19d92e7
-TwentyTwo.lua          6364  c160ba7c77d21a58657ed441390b780c
-Bones.lua              1938  e20bf5f46527860ee33d89ff611f31ed
-Organs.lua             8286  9fe3fa5b54191b2655caf53fd7146937
-Stages.lua             1762  599802fbc68d1cf912ac417ab9ad2764
-Ballistics.lua         5968  355dcfbbe1436991f4f76d0adc93b0a1
-SoftBody.lua           8692  8e5a9c9076c89cc9d784ca121e1666c6
-Blood.lua              9257  9e0952151e950e13969ec69262abf85f
-Anatomy.lua           12907  4936ba4d3c47a97f6a1f7e65b16e2590
-Camera.lua             5206  c13ed3253804f8778ff9ddf3de2573b1
+Anatomy.lua         12907 bytes  4936ba4d3c47a97f6a1f7e65b16e2590
+Ballistics.lua       5968 bytes  355dcfbbe1436991f4f76d0adc93b0a1
+Blood.lua            9257 bytes  9e0952151e950e13969ec69262abf85f
+Bones.lua            1938 bytes  e20bf5f46527860ee33d89ff611f31ed
+Camera.lua           5206 bytes  c13ed3253804f8778ff9ddf3de2573b1
+Info.plist            888 bytes  d53b38de7d78e60c3cd1b9cd9656ed2d
+LOAD_ME.txt           362 bytes  7393c3572f4289a3a2f7869846f0f321
+Main.lua            26109 bytes  b11ec81c2521d0bf1c2562940c317c08
+MANIFEST.txt          602 bytes  ceaa6c9e122cc727717be6375f6923ed
+Organs.lua           8286 bytes  9fe3fa5b54191b2655caf53fd7146937
+README.md            2408 bytes  0d3dce44d21696ddf0cfa6e0c953f711
+SoftBody.lua         8692 bytes  8e5a9c9076c89cc9d784ca121e1666c6
+Stages.lua           1762 bytes  599802fbc68d1cf912ac417ab9ad2764
+TwentyTwo.lua        6364 bytes  c160ba7c77d21a58657ed441390b780c
+Vec3.lua             1429 bytes  f1f268b1828528b7815770e3d19d92e7
