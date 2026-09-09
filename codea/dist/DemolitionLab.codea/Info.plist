@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Buffer Order</key>
+	<array>
+		<string>TNT</string>
+		<string>Materials</string>
+		<string>Blueprints</string>
+		<string>CameraOrbit</string>
+		<string>Building</string>
+		<string>Charges</string>
+		<string>Main</string>
+	</array>
+	<key>Description</key>
+	<string>Demolition Lab 3D (Craft): brick-by-brick buildings from blueprints, photo materials, 360 orbit camera, unlimited TNT with 0.0–0.9s delay sequencing, BOOM/ARM detonation.</string>
+	<key>Author</key>
+	<string>AI Godot Studio / Codea</string>
+	<key>Version</key>
+	<string>1.0.0</string>
+</dict>
+</plist>
