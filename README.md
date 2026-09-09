@@ -69,6 +69,12 @@ If a compiler is detected, Create may start this build in the background. First 
 
 Output games: `generated_games/`
 
+## Play on iPad (no PC)
+
+Download **[codea/dist/MetallicLabyrinth.codea.zip](codea/dist/MetallicLabyrinth.codea.zip)**. On the iPad: unzip → copy `MetallicLabyrinth.codea` into **Files → On My iPad → Codea** → open Codea → Play. Tilt to roll the ball.
+
+Paste fallback: [codea/dist/MetallicLabyrinth.lua](codea/dist/MetallicLabyrinth.lua) is the same game in one file.
+
 ## Legal
 
 Spiritual recreations / style matches only — original or CC0 art. No commercial ROMs, WADs, or ripped game assets.

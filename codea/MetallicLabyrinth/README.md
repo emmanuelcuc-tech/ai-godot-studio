@@ -2,20 +2,22 @@
 
 Tilt your **iPad** to roll a **metallic ball** through a labyrinth. The **green goal** sits next to **red trap pits** — lean carefully.
 
-## Install in Codea
+## One-file download (iPad, no PC)
 
-1. Open **Codea** on your iPad.
-2. Tap **+** → **New Project** → name it `MetallicLabyrinth`.
-3. Delete the default `Main` buffer contents.
-4. Copy these files from this folder into the project:
-   - `Main.lua` → buffer **Main**
-   - `Levels.lua` → add a new buffer named **Levels** (sidebar **+**) and paste
-5. In project **Info** (or keep the included `Info.plist`), set buffer order: **Main**, then **Levels**.
-6. Tap **Play** (triangle). Hold the iPad flat-ish, then tilt to roll.
+Download **[MetallicLabyrinth.codea.zip](../dist/MetallicLabyrinth.codea.zip)** — that is the only file you need.
 
-### AirDrop / Files app shortcut
+1. On the iPad, tap the zip in Safari / Files to unzip it.
+2. Copy `MetallicLabyrinth.codea` into **Files → On My iPad → Codea**.
+3. Open **Codea** → tap **MetallicLabyrinth** → **Play**.
+4. Hold the iPad almost flat, then tilt to roll.
 
-You can also copy the whole `MetallicLabyrinth` folder into Codea’s Documents via the Files app / Working Copy if you sync projects that way. Codea expects a project folder with `Info.plist` and `.lua` buffers.
+Paste fallback: [MetallicLabyrinth.lua](../dist/MetallicLabyrinth.lua) is the same game in one buffer. New Codea project → replace Main → Play.
+
+Rebuild the zip after editing source:
+
+```bash
+python3 codea/pack_metallic_labyrinth.py
+```
 
 ## Controls
 
@@ -39,8 +41,9 @@ You can also copy the whole `MetallicLabyrinth` folder into Codea’s Documents 
 - Codea with classic 2D `physics` API (`physics.body`, `Gravity`, `CIRCLE`, `POLYGON`)
 - Landscape orientation recommended
 
-## Files
+## Source files
 
 - `Main.lua` — tilt physics, metallic drawing, HUD, win/lose
 - `Levels.lua` — maze maps (`#` wall, `S` start, `G` goal, `T` trap, `B` bumper)
 - `Info.plist` — Codea project metadata / buffer order
+- `../dist/MetallicLabyrinth.codea.zip` — packed one-file install
