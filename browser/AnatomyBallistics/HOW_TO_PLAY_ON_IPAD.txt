@@ -1,29 +1,14 @@
-Anatomy Ballistics — play FREE on iPad (no Codea, no Python app)
+Anatomy Ballistics — OPEN IN SAFARI (just play)
 
-BEST WAY (Safari — free)
-1. Get the file "index.html" (or unzip AnatomyBallistics-BROWSER.zip).
-2. Save it in the Files app (On My iPad or iCloud Drive).
-3. Tap the file → Share → Open in Safari
-   OR open the Files app, tap index.html, choose Safari if asked.
-4. Drag to aim. Double-tap to fire. Use RESET / NEXT buttons.
+1. Save OPEN_IN_SAFARI.html (or index.html) to the Files app on your iPad.
+2. Tap the file → Open in Safari (or Share → Safari).
+3. Tap TAP TO PLAY.
+4. Drag the red reticle to aim.
+5. Tap the red FIRE button (or double-tap the screen).
+6. Use NEXT for closer ranges / wall stage. RESET to restart.
 
-If Safari downloads instead of playing:
-- Long-press index.html in Files → Share → Copy to Safari
-- Or use any free HTML viewer / "Open as HTML" shortcut.
+No Codea. No Python. No App Store purchase. Safari only.
 
-CONTROLS
-- Drag          aim (red reticle)
-- Double-tap    fire .22 LR (3s cooldown)
-- RESET         rebuild body, back to 40 ft
-- NEXT          next range stage (35, 30, … then wall)
-
-FREE ways to MAKE / EDIT games on iPad
-1. HTML + JavaScript (this project) — edit index.html in a free text
-   editor (e.g. Textastic trial, Kodex, or GitHub web editor), reopen in Safari.
-2. Swift Playgrounds (Apple, free) — build apps in Swift; different language
-   than this HTML game.
-3. Python on iPad — free options (a-Shell, Carnets) are weak for this kind of
-   realtime 3D game. Pythonista is paid. Prefer HTML/Safari for this sandbox.
-4. Codea (Lua) — paid App Store app; we also have a Codea project zip if you buy it.
-
-You do NOT need Python to play this game.
+If the file opens as text instead of the game:
+- Long-press the file in Files → Share → Copy to Safari
+- Or AirDrop the .html to your iPad and choose Safari
