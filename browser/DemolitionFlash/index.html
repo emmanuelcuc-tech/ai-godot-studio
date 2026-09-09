@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#12151a" />
+<title>DEMOLITION — FLASH GAME</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=VT323&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+    --gold: #ffd24a;
+    --warn: #ffb000;
+    --steel: #8a95a5;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; height: 100dvh; overflow: hidden;
+    background:
+      repeating-linear-gradient(-45deg, #1a1d22 0 12px, #14171c 12px 24px);
+    font-family: "VT323", "Courier New", monospace;
+    color: #e8edf4;
+  }
+  #stage {
+    position: absolute; inset: 10px;
+    border: 4px solid #ffb000;
+    box-shadow: 0 0 0 3px #3a2e10, inset 0 0 50px rgba(0,0,0,0.5);
+    background: #0f1218;
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  .hidden { display: none !important; }
+  #msg {
+    position: absolute; left: 50%; top: calc(14px + var(--safe-t)); transform: translateX(-50%);
+    font-family: "Bangers", Impact, sans-serif; font-size: clamp(18px, 4vw, 30px);
+    color: #fff2a8; text-shadow: 0 3px 0 #000, 0 0 14px #ff880066;
+    pointer-events: none; text-align: center; max-width: 85%; z-index: 5;
+  }
+  #hiChip {
+    position: absolute; right: 12px; top: calc(12px + var(--safe-t));
+    font-family: "Bangers", Impact, sans-serif; color: var(--gold);
+    background: #000a; border: 2px solid #ffb000; padding: 6px 10px; z-index: 25;
+  }
+  #btns {
+    position: absolute; right: 10px; bottom: calc(10px + var(--safe-b));
+    display: flex; flex-direction: column; gap: 8px; z-index: 8;
+  }
+  .flash-btn {
+    font-family: "Bangers", Impact, sans-serif; letter-spacing: 0.05em;
+    border: 3px solid #1a1408; border-radius: 0; cursor: pointer;
+    background: linear-gradient(#6a7180, #3a404c); color: #fff;
+    box-shadow: inset 0 2px 0 #bbb, inset 0 -3px 0 #222, 3px 3px 0 #000;
+    padding: 12px 14px; font-size: 17px; min-width: 112px;
+  }
+  .flash-btn:active { transform: translate(1px,1px); }
+  .flash-btn.gold { background: linear-gradient(#ffd24a, #c47a10); color: #1a1200; }
+  .flash-btn.tnt {
+    background: linear-gradient(#2ec45a, #0f6a2e); color: #e8ffe8;
+    border-color: #063a18; font-size: 20px;
+  }
+  .flash-btn.tnt.on { box-shadow: 0 0 0 3px #7dff9a, 3px 3px 0 #000; }
+  .flash-btn.boom {
+    background: linear-gradient(#ff4a2a, #9a1010); color: #fff8e8; font-size: 20px;
+  }
+  .panel {
+    position: absolute; inset: 0; z-index: 30;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 22px; text-align: center;
+    background:
+      radial-gradient(circle at 50% 28%, rgba(255,140,20,0.28), transparent 55%),
+      linear-gradient(180deg, rgba(12,14,18,0.88), rgba(8,10,14,0.94));
+  }
+  .panel h1 {
+    margin: 0; font-family: "Bangers", Impact, sans-serif;
+    font-size: clamp(44px, 11vw, 78px); line-height: 0.92;
+    color: var(--gold); text-shadow: 4px 4px 0 #000, 0 0 18px #ff660055;
+  }
+  .panel .tag {
+    font-family: "Bangers", Impact, sans-serif; color: var(--warn);
+    font-size: 20px; letter-spacing: 0.22em; margin-top: -4px;
+  }
+  .panel p { max-width: 30rem; margin: 0; font-size: 20px; color: #d5deea; line-height: 1.35; }
+  .panel .scoreline { font-family: "Bangers", Impact, sans-serif; font-size: 28px; color: #fff; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 6px; }
+  #brand {
+    position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+    font-size: 13px; color: #6a7380; pointer-events: none; z-index: 40;
+  }
+  #hint {
+    position: absolute; left: 12px; bottom: calc(12px + var(--safe-b));
+    color: #9aa6b8; font-size: 15px; pointer-events: none; max-width: 48%;
+    text-shadow: 0 1px 2px #000; z-index: 5;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hiChip"><span id="hiLabel">HI 0</span></div>
+  <div id="msg"></div>
+  <div id="hint" class="hidden">Drag wrecking ball · release to fling · or plant TNT</div>
+  <div id="btns" class="hidden">
+    <button class="flash-btn tnt" id="btnTnt" type="button">TNT</button>
+    <button class="flash-btn boom" id="btnBoom" type="button">BOOM</button>
+    <button class="flash-btn" id="btnSkip" type="button">SKIP</button>
+    <button class="flash-btn" id="btnQuit" type="button">QUIT</button>
+    <button class="flash-btn" id="btnMute" type="button">MUTE</button>
+  </div>
+
+  <div class="panel" id="panelTitle">
+    <div class="tag">★ FLASH ARCADE ★</div>
+    <h1>DEMOLITION</h1>
+    <p>Wrecking-ball slingshot + delay TNT. Brick, wood, glass, concrete, steel. Clear 62% of each structure to advance. Beat all 5 stages.</p>
+    <div class="scoreline">HIGH SCORE <span id="titleHi">0</span></div>
+    <div class="row">
+      <button class="flash-btn gold" id="btnPlay" type="button">PLAY</button>
+      <button class="flash-btn" id="btnHowto" type="button">HOW TO</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="panelHowto">
+    <h1 style="font-size:40px">HOW TO PLAY</h1>
+    <p>Pull the wrecking ball back and release to fling.<br/>
+    Tap <b>TNT</b> then tap the building to plant charges (unlimited).<br/>
+    Tap <b>BOOM</b> to fire charges 0.1s apart.<br/>
+    Score points for fallen blocks · glass pays more · steel resists.</p>
+    <button class="flash-btn gold" id="btnBack" type="button">BACK</button>
+  </div>
+
+  <div class="panel hidden" id="panelClear">
+    <div class="tag">MISSION COMPLETE</div>
+    <h1>CITY RAZED!</h1>
+    <div class="scoreline" id="clearBonus">+0</div>
+    <div class="scoreline">SCORE <span id="clearScore">0</span></div>
+    <div class="scoreline">HI <span id="clearHi">0</span></div>
+    <div class="row">
+      <button class="flash-btn gold" id="btnAgain" type="button">PLAY AGAIN</button>
+      <button class="flash-btn" id="btnMenu" type="button">MENU</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="panelOver">
+    <div class="tag" id="overReason">STILL STANDING</div>
+    <h1>GAME OVER</h1>
+    <div class="scoreline">SCORE <span id="overScore">0</span></div>
+    <div class="scoreline">HI <span id="overHi">0</span></div>
+    <div class="row">
+      <button class="flash-btn gold" id="btnRetry" type="button">RETRY</button>
+      <button class="flash-btn" id="btnMenu2" type="button">MENU</button>
+    </div>
+  </div>
+</div>
+<div id="brand">DEMOLITION · HTML5 FLASH-STYLE · NO PLUGIN</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  const msgEl = document.getElementById("msg");
+  const hintEl = document.getElementById("hint");
+  const btnTnt = document.getElementById("btnTnt");
+
+  const BLOCK = 34, BALL_R = 20, WIN = 0.62;
+  const LEVELS = [
+    { name: "Starter Shed", shots: 3, map: [".BBBB.", ".BWWB.", ".BWWB.", ".BBBB."] },
+    { name: "Brick Stack", shots: 4, map: ["..BBBB..", ".BBBBBB.", ".BBBBBB.", ".BBCCBB.", ".BBBBBB."] },
+    { name: "Glass Office", shots: 4, map: [".CCCCCCC.", ".CGGGGGC.", ".CGGGGGC.", ".CWWWWWC.", ".CCCCCCC.", ".CCCCCCC."] },
+    { name: "Steel Spine", shots: 5, map: ["..BBBBB..", ".BBSBSBB.", ".BBSSSSB.", ".BBSBSBB.", ".BBBBBBB.", ".WWCCCWW."] },
+    { name: "Highrise Razing", shots: 5, map: ["...GGG...", "..CGGGC..", ".CCSSSCC.", ".CBBBBBC.", ".CGGGGGC.", ".CSSSSSC.", ".CBBBBBC.", ".CCCCCCC.", ".WWWWWWW."] },
+  ];
+  const KIND = {
+    B: { dens: 1.2, col: [190, 85, 55], pts: 55, label: "BRICK" },
+    C: { dens: 1.6, col: [160, 165, 175], pts: 40, label: "CONCRETE" },
+    G: { dens: 0.55, col: [140, 210, 230], pts: 90, label: "GLASS" },
+    S: { dens: 2.4, col: [120, 130, 145], pts: 35, label: "STEEL" },
+    W: { dens: 0.7, col: [150, 105, 55], pts: 50, label: "WOOD" },
+  };
+
+  let W = 0, H = 0, floorY = 0;
+  let level = 0, shots = 0, score = 0, runScore = 0;
+  let state = "aim"; // aim | flying | settled | won | lost
+  let screen = "title";
+  let message = "", messageT = 0;
+  let blocks = [], ball = null, particles = [], charges = [], floaters = [];
+  let drag = null, settle = 0, initial = 0;
+  let plantMode = false, boomArmed = false, boomT = 0, nextCharge = 0;
+  let muted = false, audioCtx = null;
+  let highScore = +localStorage.getItem("demolitionFlashHi") || 0;
+  let dust = [];
+
+  function ensureAudio() {
+    if (!audioCtx) try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  }
+  function blip(freq, dur, type = "square", vol = 0.07) {
+    if (muted || !audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function sfxFling() { blip(80, 0.12, "sawtooth", 0.08); }
+  function sfxHit() { blip(140, 0.08, "square", 0.07); blip(60, 0.15, "triangle", 0.05); }
+  function sfxBoom() { blip(50, 0.25, "sawtooth", 0.12); blip(28, 0.35, "sine", 0.08); }
+  function sfxWin() { blip(330, 0.1); setTimeout(() => blip(440, 0.1), 90); setTimeout(() => blip(660, 0.15), 180); }
+  function sfxLose() { blip(160, 0.2); setTimeout(() => blip(90, 0.3), 120); }
+
+  function setScreen(name) {
+    screen = name;
+    document.querySelectorAll(".panel").forEach(el => el.classList.add("hidden"));
+    const map = { title: "panelTitle", howto: "panelHowto", clear: "panelClear", over: "panelOver" };
+    if (map[name]) document.getElementById(map[name]).classList.remove("hidden");
+    const playing = name === "play";
+    document.getElementById("btns").classList.toggle("hidden", !playing);
+    hintEl.classList.toggle("hidden", !playing);
+    document.getElementById("hiChip").classList.toggle("hidden", playing);
+  }
+
+  function toast(t, sec = 1.8) { message = t; messageT = sec; }
+  function addFloater(text, x, y, color) {
+    floaters.push({ text, x, y, life: 1.1, color: color || "#ffe066" });
+  }
+  function saveHi() {
+    if (runScore > highScore) {
+      highScore = runScore;
+      localStorage.setItem("demolitionFlashHi", String(highScore));
+    }
+  }
+
+  function resize() {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = (W * dpr) | 0; canvas.height = (H * dpr) | 0;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    floorY = H - 70;
+  }
+  window.addEventListener("resize", resize);
+
+  function burst(x, y, col, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = 60 + Math.random() * 280;
+      particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.4 + Math.random() * 0.5, r: 2 + Math.random() * 3, col });
+    }
+  }
+
+  function buildLevel(i, keepRunScore) {
+    level = Math.max(0, Math.min(LEVELS.length - 1, i));
+    const L = LEVELS[level];
+    shots = L.shots;
+    if (!keepRunScore) runScore = 0;
+    score = 0;
+    state = "aim";
+    blocks = []; particles = []; charges = []; floaters = []; dust = [];
+    drag = null; settle = 0; plantMode = false; boomArmed = false;
+    btnTnt.classList.remove("on");
+    floorY = H - 70;
+    const map = L.map, rows = map.length, cols = map[0].length;
+    const baseX = W * 0.62;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const ch = map[r][c];
+        if (ch === "." || ch === " ") continue;
+        const k = KIND[ch] || KIND.B;
+        const x = baseX + (c - (cols - 1) / 2) * BLOCK;
+        const y = floorY - BLOCK * 0.5 - 2 - (rows - 1 - r) * BLOCK;
+        blocks.push({
+          x, y, vx: 0, vy: 0, w: 0, ang: 0,
+          dens: k.dens, col: k.col, pts: k.pts, label: k.label,
+          scored: false, half: BLOCK * 0.46, ch,
+        });
+      }
+    }
+    initial = blocks.length;
+    spawnBall();
+    toast(`STAGE ${level + 1} — ${L.name}`, 2.4);
+  }
+
+  function spawnBall() {
+    ball = {
+      x: 130, y: floorY - BALL_R - 8, vx: 0, vy: 0, w: 0, r: BALL_R,
+      stuck: true, homeX: 130, homeY: floorY - BALL_R - 8,
+    };
+    state = "aim";
+  }
+
+  function startRun() {
+    ensureAudio();
+    runScore = 0;
+    buildLevel(0, false);
+    setScreen("play");
+    blip(400, 0.08); blip(560, 0.1);
+  }
+
+  function failRun(reason) {
+    saveHi();
+    document.getElementById("overReason").textContent = reason || "STILL STANDING";
+    document.getElementById("overScore").textContent = runScore.toLocaleString();
+    document.getElementById("overHi").textContent = highScore.toLocaleString();
+    setScreen("over");
+    sfxLose();
+  }
+
+  function clearCampaign() {
+    const bonus = 8000 + level * 500;
+    runScore += bonus;
+    saveHi();
+    document.getElementById("clearBonus").textContent = "+" + bonus.toLocaleString() + " CITY BONUS";
+    document.getElementById("clearScore").textContent = runScore.toLocaleString();
+    document.getElementById("clearHi").textContent = highScore.toLocaleString();
+    setScreen("clear");
+    sfxWin();
+  }
+
+  function winStage() {
+    const stageBonus = 1000 + shots * 200 + Math.round(score * 0.25);
+    runScore += score + stageBonus;
+    saveHi();
+    toast(`CLEARED! +${stageBonus} bonus`, 2);
+    sfxWin();
+    if (level >= LEVELS.length - 1) {
+      setTimeout(() => { if (screen === "play") clearCampaign(); }, 1200);
+    } else {
+      setTimeout(() => {
+        if (screen !== "play") return;
+        buildLevel(level + 1, true);
+      }, 1400);
+    }
+  }
+
+  function placeCharge(x, y) {
+    // snap near nearest block
+    let best = null, bd = 1e9;
+    for (const b of blocks) {
+      if (b.scored) continue;
+      const d = Math.hypot(b.x - x, b.y - y);
+      if (d < bd) { bd = d; best = b; }
+    }
+    const px = best && bd < 80 ? best.x : x;
+    const py = best && bd < 80 ? best.y : y;
+    const delay = charges.length * 0.1;
+    charges.push({ x: px, y: py, delay, fired: false, massKg: 0.4 });
+    toast(`Charge #${charges.length} · delay ${delay.toFixed(1)}s`, 1.2);
+    blip(520, 0.06);
+  }
+
+  function beginBoom() {
+    if (!charges.length) { toast("Plant TNT first", 1.5); return; }
+    boomArmed = true; boomT = 0; nextCharge = 0;
+    charges.sort((a, b) => a.delay - b.delay);
+    for (const c of charges) c.fired = false;
+    toast("DETONATING…", 1.2);
+  }
+
+  function detonate(c) {
+    c.fired = true;
+    sfxBoom();
+    burst(c.x, c.y, [255, 160, 40], 28);
+    // blast impulse on nearby blocks
+    for (const b of blocks) {
+      if (b.scored) continue;
+      const dx = b.x - c.x, dy = b.y - c.y;
+      const R = Math.hypot(dx, dy) || 0.1;
+      const force = Math.min(900, (1800 * c.massKg) / (R * 0.08 + 0.35));
+      // steel resists; glass weak
+      let mul = 1;
+      if (b.ch === "S") mul = 0.45;
+      if (b.ch === "G") mul = 1.6;
+      if (b.ch === "W") mul = 1.25;
+      if (b.ch === "C") mul = 0.75;
+      b.vx += (dx / R) * force * mul * 0.02;
+      b.vy += (dy / R) * force * mul * 0.02 - 40;
+      b.w += (Math.random() - 0.5) * 6;
+      if (force * mul > 220 && !b.scored) {
+        // chance to score shatter
+        if (b.ch === "G" || force * mul > 420) {
+          // will fall via physics
+        }
+      }
+    }
+  }
+
+  function scoreBlock(b) {
+    if (b.scored) return;
+    b.scored = true;
+    const pts = b.pts;
+    score += pts;
+    runScore += pts;
+    burst(b.x, b.y, b.col, 10);
+    addFloater("+" + pts + " " + b.label, b.x, b.y, "#ffe066");
+    sfxHit();
+  }
+
+  function step(dt) {
+    if (screen !== "play") return;
+    if (messageT > 0) messageT -= dt;
+    for (const f of floaters) { f.life -= dt; f.y -= 28 * dt; }
+    floaters = floaters.filter(f => f.life > 0);
+
+    particles = particles.filter(p => {
+      p.vy += 600 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+      return p.life > 0;
+    });
+
+    if (boomArmed) {
+      boomT += dt;
+      for (const c of charges) {
+        if (!c.fired && boomT >= c.delay) detonate(c);
+      }
+      if (charges.every(c => c.fired)) {
+        boomArmed = false;
+        settle = 0;
+        state = "flying"; // reuse settle check
+        if (!ball || ball.stuck) {
+          // create dummy settle wait without ball motion
+          ball = ball || { x: 0, y: 0, vx: 0, vy: 0, stuck: true, r: 1 };
+        }
+      }
+    }
+
+    if (state !== "flying" && state !== "settled") return;
+
+    if (ball && !ball.stuck) {
+      ball.vy += 980 * dt;
+      ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+      if (ball.y > floorY - ball.r) { ball.y = floorY - ball.r; ball.vy *= -0.35; ball.vx *= 0.92; }
+      if (ball.x < ball.r) { ball.x = ball.r; ball.vx = Math.abs(ball.vx) * 0.7; }
+      if (ball.x > W - ball.r) { ball.x = W - ball.r; ball.vx = -Math.abs(ball.vx) * 0.7; }
+    }
+
+    for (const b of blocks) {
+      b.vy += 980 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.ang += b.w * dt;
+      b.vx *= 0.995; b.vy *= 0.995; b.w *= 0.99;
+      if (b.y > floorY - b.half) { b.y = floorY - b.half; b.vy *= -0.15; b.vx *= 0.85; b.w *= 0.7; }
+      if (ball && !ball.stuck) {
+        const dx = b.x - ball.x, dy = b.y - ball.y, d = Math.hypot(dx, dy), minD = b.half + ball.r;
+        if (d < minD && d > 1e-3) {
+          const nx = dx / d, ny = dy / d, overlap = minD - d;
+          const invB = 1 / b.dens, invBall = 1 / 3.2, sum = invB + invBall;
+          b.x += nx * overlap * (invB / sum); b.y += ny * overlap * (invB / sum);
+          ball.x -= nx * overlap * (invBall / sum); ball.y -= ny * overlap * (invBall / sum);
+          const vn = (b.vx - ball.vx) * nx + (b.vy - ball.vy) * ny;
+          if (vn < 0) {
+            const j = -(1.15) * vn / sum;
+            b.vx += j * nx * invB; b.vy += j * ny * invB;
+            ball.vx -= j * nx * invBall; ball.vy -= j * ny * invBall;
+            burst(b.x, b.y, b.col, 5);
+          }
+        }
+      }
+      for (const o of blocks) {
+        if (o === b) continue;
+        const dx = o.x - b.x, dy = o.y - b.y, d = Math.hypot(dx, dy), minD = b.half + o.half;
+        if (d < minD && d > 1e-3) {
+          const nx = dx / d, ny = dy / d, push = (minD - d) * 0.5;
+          b.x -= nx * push; b.y -= ny * push; o.x += nx * push; o.y += ny * push;
+        }
+      }
+      if (!b.scored) {
+        const fallen = b.y > floorY - BLOCK * 0.25 || Math.abs(b.ang) > 1.0 || b.x < 40 || b.x > W - 20;
+        if (fallen) scoreBlock(b);
+      }
+    }
+
+    if (state === "flying") {
+      const spd = (ball && !ball.stuck) ? Math.hypot(ball.vx, ball.vy) : 0;
+      const movingBlocks = blocks.some(b => !b.scored && Math.hypot(b.vx, b.vy) > 40);
+      if (spd < 28 && !movingBlocks && !boomArmed) settle += dt; else settle = 0;
+      if (settle > 1.15 || (ball && !ball.stuck && ball.y > H + 80)) {
+        state = "settled";
+        const down = blocks.filter(b => b.scored).length / Math.max(1, initial);
+        if (down >= WIN) {
+          state = "won";
+          winStage();
+        } else if (shots <= 0 && charges.every(c => c.fired || charges.length === 0)) {
+          // allow planting more TNT even at 0 shots — only lose if no charges left unfired and shots 0
+          if (charges.length === 0 || charges.every(c => c.fired)) {
+            failRun(`ONLY ${(down * 100) | 0}% DOWN`);
+          } else {
+            state = "aim";
+            spawnBall();
+            toast("Plant TNT or fling leftover ball", 1.5);
+          }
+        } else {
+          spawnBall();
+          toast(shots + " shots left", 1.2);
+        }
+      }
+    }
+  }
+
+  function drawHazardStripe(y, h) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, y, W, h); ctx.clip();
+    for (let x = -40; x < W + 40; x += 28) {
+      ctx.fillStyle = ((x / 28) | 0) % 2 === 0 ? "#ffb000" : "#1a1a1a";
+      ctx.beginPath();
+      ctx.moveTo(x, y); ctx.lineTo(x + 18, y); ctx.lineTo(x + 18 - h, y + h); ctx.lineTo(x - h, y + h);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function draw() {
+    // sky
+    const g = ctx.createLinearGradient(0, 0, 0, floorY);
+    g.addColorStop(0, "#2a3548");
+    g.addColorStop(1, "#6a7a8c");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // skyline
+    ctx.fillStyle = "#1c2430";
+    for (let i = 1; i <= 14; i++) {
+      const h = 70 + (i * 41) % 170;
+      ctx.fillRect(i * 85 - 50, floorY - h, 48, h);
+    }
+    // sun
+    ctx.fillStyle = "rgba(255,200,90,0.2)";
+    ctx.beginPath(); ctx.arc(W * 0.82, H * 0.18, 55, 0, Math.PI * 2); ctx.fill();
+
+    // ground
+    ctx.fillStyle = "#3a3f38";
+    ctx.fillRect(0, floorY, W, H - floorY);
+    drawHazardStripe(floorY, 10);
+
+    // sling posts
+    ctx.strokeStyle = "#6a5230"; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(95, floorY); ctx.lineTo(95, floorY - 110); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(165, floorY); ctx.lineTo(165, floorY - 110); ctx.stroke();
+    ctx.fillStyle = "#7a5e34"; ctx.fillRect(85, floorY - 114, 90, 14);
+
+    // blocks
+    for (const b of blocks) {
+      ctx.save();
+      ctx.translate(b.x, b.y); ctx.rotate(b.ang);
+      ctx.fillStyle = `rgba(${b.col[0]},${b.col[1]},${b.col[2]},${b.scored ? 0.35 : 1})`;
+      ctx.fillRect(-b.half, -b.half, b.half * 2, b.half * 2);
+      if (!b.scored) {
+        ctx.strokeStyle = "rgba(0,0,0,0.25)";
+        ctx.strokeRect(-b.half, -b.half, b.half * 2, b.half * 2);
+      }
+      ctx.restore();
+    }
+
+    // TNT charges
+    for (const c of charges) {
+      ctx.fillStyle = c.fired ? "#ff6020" : "#28a050";
+      ctx.fillRect(c.x - 8, c.y - 8, 16, 16);
+      ctx.fillStyle = "#fff";
+      ctx.font = "10px monospace";
+      ctx.fillText(c.delay.toFixed(1), c.x - 10, c.y - 12);
+    }
+
+    // ball + bands
+    let bx = ball ? ball.x : 130, by = ball ? ball.y : floorY - BALL_R - 8;
+    if (state === "aim" && drag) { bx = drag.x; by = drag.y; }
+    if (ball && screen === "play") {
+      ctx.strokeStyle = "#c43c32"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(100, floorY - 105); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(160, floorY - 105); ctx.lineTo(bx, by); ctx.stroke();
+      if (drag) {
+        const px = ball.homeX - drag.x, py = ball.homeY - drag.y, len = Math.hypot(px, py) || 1;
+        const power = Math.min(980, len * 3.4);
+        ctx.strokeStyle = "rgba(255,220,100,0.55)"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + (px / len) * power * 0.18, by + (py / len) * power * 0.18); ctx.stroke();
+      }
+      ctx.fillStyle = "#4a5460";
+      ctx.beginPath(); ctx.arc(bx, by, BALL_R, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#c8d0dc";
+      ctx.beginPath(); ctx.arc(bx - 5, by - 6, BALL_R * 0.4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    for (const p of particles) {
+      ctx.fillStyle = `rgba(${p.col[0]},${p.col[1]},${p.col[2]},${Math.max(0, p.life)})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+
+    for (const f of floaters) {
+      ctx.globalAlpha = Math.min(1, f.life * 1.5);
+      ctx.fillStyle = f.color;
+      ctx.font = 'bold 20px "Bangers", Impact, sans-serif';
+      ctx.textAlign = "center";
+      ctx.fillText(f.text, f.x, f.y);
+      ctx.textAlign = "left";
+      ctx.globalAlpha = 1;
+    }
+
+    // score panel
+    if (screen === "play") {
+      const down = blocks.filter(b => b.scored).length / Math.max(1, initial);
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(10, 10, 230, 88);
+      ctx.strokeStyle = "#ffb000"; ctx.lineWidth = 2;
+      ctx.strokeRect(10, 10, 230, 88);
+      ctx.fillStyle = "#ffe066";
+      ctx.font = 'bold 18px "Bangers", Impact, sans-serif';
+      ctx.fillText("SCORE  " + runScore.toLocaleString(), 22, 36);
+      ctx.fillStyle = "#d8e0ea";
+      ctx.font = '14px "Bangers", Impact, sans-serif';
+      ctx.fillText(`STAGE ${level + 1}/${LEVELS.length}   SHOTS ${shots}`, 22, 56);
+      ctx.fillText(`DOWN ${(down * 100) | 0}% / 62%   TNT×${charges.length}`, 22, 74);
+      ctx.fillText(`HI ${highScore.toLocaleString()}`, 22, 90);
+    }
+
+    msgEl.textContent = messageT > 0 ? message : (plantMode ? "TAP BUILDING TO PLANT TNT" : "");
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000); last = now;
+    step(dt); draw();
+    requestAnimationFrame(frame);
+  }
+
+  function pointer(e) {
+    const r = canvas.getBoundingClientRect();
+    const t = e.changedTouches ? e.changedTouches[0] : (e.touches ? e.touches[0] : e);
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+
+  canvas.addEventListener("pointerdown", e => {
+    if (screen !== "play") return;
+    const p = pointer(e);
+    if (plantMode) {
+      placeCharge(p.x, p.y);
+      return;
+    }
+    if (state === "aim" && ball && Math.hypot(p.x - ball.x, p.y - ball.y) < 90) {
+      drag = { x: p.x, y: p.y };
+      canvas.setPointerCapture(e.pointerId);
+    }
+  });
+  canvas.addEventListener("pointermove", e => {
+    if (drag) drag = { x: pointer(e).x, y: pointer(e).y };
+  });
+  canvas.addEventListener("pointerup", e => {
+    if (!drag || screen !== "play") return;
+    const p = pointer(e); drag = { x: p.x, y: p.y };
+    const px = ball.homeX - drag.x, py = ball.homeY - drag.y;
+    const len = Math.hypot(px, py);
+    const power = Math.min(980, len * 3.4);
+    if (power < 120) { toast("Pull farther", 1); drag = null; return; }
+    ball.stuck = false; ball.x = drag.x; ball.y = drag.y;
+    ball.vx = (px / len) * power; ball.vy = (py / len) * power;
+    shots--; state = "flying"; settle = 0;
+    toast("IMPACT!", 0.7);
+    sfxFling();
+    burst(ball.x, ball.y, [220, 230, 255], 10);
+    drag = null;
+  });
+
+  document.getElementById("btnPlay").onclick = () => startRun();
+  document.getElementById("btnHowto").onclick = () => setScreen("howto");
+  document.getElementById("btnBack").onclick = () => setScreen("title");
+  document.getElementById("btnAgain").onclick = () => startRun();
+  document.getElementById("btnRetry").onclick = () => startRun();
+  document.getElementById("btnMenu").onclick = () => setScreen("title");
+  document.getElementById("btnMenu2").onclick = () => setScreen("title");
+  document.getElementById("btnQuit").onclick = () => failRun("ABORTED");
+  document.getElementById("btnSkip").onclick = () => {
+    if (screen !== "play") return;
+    if (level >= LEVELS.length - 1) clearCampaign();
+    else buildLevel(level + 1, true);
+  };
+  document.getElementById("btnMute").onclick = () => {
+    muted = !muted;
+    document.getElementById("btnMute").textContent = muted ? "UNMUTE" : "MUTE";
+    ensureAudio();
+  };
+  btnTnt.onclick = () => {
+    plantMode = !plantMode;
+    btnTnt.classList.toggle("on", plantMode);
+    toast(plantMode ? "TNT MODE — tap structure" : "Wrecking ball mode", 1.3);
+  };
+  document.getElementById("btnBoom").onclick = () => {
+    plantMode = false; btnTnt.classList.remove("on");
+    beginBoom();
+  };
+
+  window.addEventListener("keydown", e => {
+    if (screen === "title" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); startRun(); }
+    if (screen !== "play") return;
+    if (e.key === "t" || e.key === "T") btnTnt.click();
+    if (e.key === "b" || e.key === "B") document.getElementById("btnBoom").click();
+    if (e.key === "m" || e.key === "M") document.getElementById("btnMute").click();
+  });
+
+  resize();
+  buildLevel(0, false); // warm scene under title
+  setScreen("title");
+  document.getElementById("titleHi").textContent = highScore.toLocaleString();
+  document.getElementById("hiLabel").textContent = "HI " + highScore.toLocaleString();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
