@@ -10,6 +10,7 @@ local DATA = {
     {
         name = "Starter Shed",
         shots = 3,
+        tnt = 1,
         baseX = nil,
         map = {
             ".BBBB.",
@@ -21,6 +22,7 @@ local DATA = {
     {
         name = "Brick Stack",
         shots = 4,
+        tnt = 1,
         map = {
             "..BBBB..",
             ".BBBBBB.",
@@ -32,6 +34,7 @@ local DATA = {
     {
         name = "Glass Office",
         shots = 4,
+        tnt = 1,
         map = {
             ".CCCCCCC.",
             ".CGGGGGC.",
@@ -44,6 +47,7 @@ local DATA = {
     {
         name = "Steel Spine",
         shots = 5,
+        tnt = 2,
         map = {
             "..BBBBB..",
             ".BBSBSBB.",
@@ -56,6 +60,7 @@ local DATA = {
     {
         name = "Highrise Razing",
         shots = 5,
+        tnt = 2,
         map = {
             "...GGG...",
             "..CGGGC..",

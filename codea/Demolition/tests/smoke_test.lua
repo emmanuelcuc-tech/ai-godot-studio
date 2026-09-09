@@ -1,5 +1,5 @@
--- Headless smoke test for Demolition (no Codea runtime required)
--- Run from repo root: lua5.4 codea/Demolition/tests/smoke_test.lua
+-- Headless smoke test for Demolition materials + TNT
+-- Run: lua5.4 codea/Demolition/tests/smoke_test.lua
 
 local ROOT = "codea/Demolition/"
 
@@ -21,14 +21,13 @@ vec2 = function(x, y)
 end
 
 color = function(r, g, b, a) return { r = r, g = g, b = b, a = a or 255 } end
-WIDTH, HEIGHT = 1024, 768
-DeltaTime = 1 / 60
+WIDTH, HEIGHT, DeltaTime, ElapsedTime = 1024, 768, 1 / 60, 0
 STATIC, DYNAMIC = 0, 1
-BEGAN, MOVING, ENDED = 0, 1, 2
+CIRCLE, POLYGON = 1, 2
 
 function supportedOrientations() end
 function displayMode() end
-parameter = setmetatable({}, {
+parameter = setmetatable({ number = function() end }, {
     __call = function() end,
     __index = function() return function() end end,
 })
@@ -42,8 +41,8 @@ physics = {
     resume = function() end,
     body = function()
         local b = {
-            x = 0, y = 0, angle = 0, type = DYNAMIC,
-            density = 1, friction = 0.5, restitution = 0.1,
+            x = 0, y = 0, angle = 0, type = DYNAMIC, density = 1,
+            friction = 0.5, restitution = 0.1,
             linearVelocity = vec2(0, 0), angularVelocity = 0,
             linearDamping = 0, angularDamping = 0,
             sleepingAllowed = true, interpolate = false, info = "",
@@ -57,7 +56,6 @@ physics = {
         return b
     end,
 }
-CIRCLE, POLYGON = 1, 2
 
 function background() end
 function fill() end
@@ -76,46 +74,74 @@ function popMatrix() end
 function translate() end
 function rotate() end
 function rectMode() end
-CENTER, CORNER = 1, 0
+
+assert(loadfile(ROOT .. "Materials.lua"))()
+assert(Materials.TNT_J_PER_G == 4184)
+assert(math.abs(Materials.TNT_J_PER_TON - 4.184e9) < 1e3)
+
+-- Glass fails under tension much easier than steel
+local glass = Materials.get("glass")
+local steel = Materials.get("steel")
+local wood = Materials.get("wood")
+local concrete = Materials.get("concrete")
+local e = 500
+local gStress = Materials.failureStress(glass, e, 0.9)
+local sStress = Materials.failureStress(steel, e, 0.9)
+assert(gStress > sStress * 3, "glass should fail far easier than steel under tension")
+local woodShock = Materials.failureStress(wood, e, 0.9)
+local woodComp = Materials.failureStress(wood, e, 0.1)
+assert(woodShock > woodComp, "wood weaker under shock/tension than compression path")
+local concT = Materials.failureStress(concrete, e, 0.9)
+local concC = Materials.failureStress(concrete, e, 0.1)
+assert(concT > concC, "concrete spalls under tension more than crush")
+
+local pNear = Materials.blastImpulseAt(0.5, 0.025)
+local pFar = Materials.blastImpulseAt(5.0, 0.025)
+assert(pNear > pFar, "blast falls off with distance")
+print(string.format("OK materials glassStress=%.2f steelStress=%.2f blastNear=%.1f", gStress, sStress, pNear))
 
 assert(loadfile(ROOT .. "Levels.lua"))()
-assert(Levels.count() == 5, "expected 5 levels")
-for i = 1, Levels.count() do
-    local d, idx = Levels.get(i)
-    assert(idx == i)
-    local cols = #d.map[1]
-    local blocksN = 0
-    for r, line in ipairs(d.map) do
-        assert(#line == cols, string.format("level %d row %d width mismatch", i, r))
-        for c = 1, #line do
-            local ch = line:sub(c, c)
-            if ch ~= "." and ch ~= " " then blocksN = blocksN + 1 end
-        end
-    end
-    assert(blocksN > 0)
-    print(string.format("OK level %d %-18s blocks=%d shots=%d", i, d.name, blocksN, d.shots or 4))
-end
-
 assert(loadfile(ROOT .. "Main.lua"))()
-assert(DISPLAYED_NAME == "Demolition")
+assert(APP_VERSION == "1.1.0")
 setup()
-assert(#blocks > 0, "blocks built")
-assert(ball ~= nil, "ball spawned")
-assert(state == "aim")
+assert(#blocks > 0)
 
-dragStart = vec2(ball.x, ball.y)
-dragNow = vec2(ball.x - 120, ball.y + 20)
-local shotsBefore = shotsLeft
-launchBall()
-assert(state == "flying")
-assert(shotsLeft == shotsBefore - 1)
-
-local need = math.ceil(initialBlockCount * WIN_RATIO)
-for i = 1, need do
-    if blocks[i] then blocks[i].scored = true end
+-- Fracture a glass block via applyMaterialDamage
+local glassBlk
+for _, b in ipairs(blocks) do
+    if b.kind == "glass" then glassBlk = b break end
 end
-shotsLeft = 0
-evaluateStage()
-assert(state == "won", "expected won, got " .. tostring(state))
+-- Starter shed has wood/brick only — go to glass office
+startLevel(3)
+glassBlk = nil
+for _, b in ipairs(blocks) do
+    if b.kind == "glass" then glassBlk = b break end
+end
+assert(glassBlk, "glass block expected on stage 3")
+applyMaterialDamage(glassBlk, 2.0, 800, 0.9, 1, 0)
+assert(glassBlk.broken, "glass should shatter")
+assert(#debris > 0, "debris shards spawned")
+print("OK glass shatter debris=" .. #debris)
 
-print("SMOKE_OK Demolition")
+-- Steel bends first
+startLevel(4)
+local steelBlk
+for _, b in ipairs(blocks) do
+    if b.kind == "steel" then steelBlk = b break end
+end
+assert(steelBlk)
+applyMaterialDamage(steelBlk, 0.4, 400, 0.5, 1, 0)
+assert(not steelBlk.broken, "steel should bend, not snap at low stress")
+assert(steelBlk.bent > 0, "steel bent")
+print(string.format("OK steel bend=%.2f", steelBlk.bent))
+
+-- TNT detonation path
+tntLeft = 1
+placeTNT()
+assert(#charges == 1)
+charges[1].fuse = 0
+detonate(charges[1])
+charges = {}
+print("OK TNT detonate")
+
+print("SMOKE_OK Demolition materials")

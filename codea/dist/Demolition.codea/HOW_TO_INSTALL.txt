@@ -1,17 +1,13 @@
-DEMOLITION — Codea install (iPad)
+DEMOLITION v1.1 — Codea (iPad)
 
-1. Buy/install Codea from the App Store (paid).
-2. Unzip this package.
-3. Copy the folder Demolition.codea into:
-      Files → On My iPad → Codea
-4. Open Codea → tap Demolition → Play.
+Real material physics: glass shatters, wood splits, concrete spalls, steel bends.
+TNT: 4184 J per gram (standard TNT equivalent).
 
-Controls:
-  Drag the wrecking ball back, release to fling.
-  Knock down 62% of the building to clear the stage.
-  RESET rebuilds. NEXT skips ahead.
+1. Unzip Demolition-COPY-PASTE.zip
+2. Copy Demolition.codea into Files → On My iPad → Codea
+3. Open Codea → Demolition → Play
 
-Paste option:
-  Create a new project named Demolition.
-  Make two buffers: Main, Levels (order in Info.plist).
-  Paste from lua-buffers-for-paste/01_Main.lua and 02_Levels.lua.
+Or paste buffers in order:
+  01_Materials.lua → 02_Levels.lua → 03_Main.lua
+
+Controls: drag wrecking ball, tap TNT, RESET / NEXT.

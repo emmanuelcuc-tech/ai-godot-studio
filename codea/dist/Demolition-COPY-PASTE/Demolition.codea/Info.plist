@@ -4,14 +4,15 @@
 <dict>
 	<key>Buffer Order</key>
 	<array>
-		<string>Main</string>
+		<string>Materials</string>
 		<string>Levels</string>
+		<string>Main</string>
 	</array>
 	<key>Description</key>
-	<string>Slingshot a wrecking ball into brick, glass, wood, and steel towers. Knock down 62% to clear each stage.</string>
+	<string>Wrecking-ball and TNT demolition with real material fracture: glass shatters, wood splits, concrete spalls, steel bends.</string>
 	<key>Author</key>
 	<string>AI Godot Studio / Codea</string>
 	<key>Version</key>
-	<string>1.0.0</string>
+	<string>1.1.0</string>
 </dict>
 </plist>

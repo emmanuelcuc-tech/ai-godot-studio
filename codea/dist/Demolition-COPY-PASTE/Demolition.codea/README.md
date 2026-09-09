@@ -1,24 +1,25 @@
-# Demolition (Codea)
+# Demolition (Codea) v1.1
 
-Slingshot wrecking-ball demolition for **Codea on iPad**.
-
-## Install
-1. Unzip `Demolition-COPY-PASTE.zip` (or copy `Demolition.codea`)
-2. Put **`Demolition.codea`** in **On My iPad → Codea**
-3. Open in Codea → Play
-
-Or paste buffers in order: `Main` then `Levels` (see `lua-buffers-for-paste/`).
-
-## Controls
-| Input | Action |
-|--------|--------|
-| Drag ball back | Pull slingshot |
-| Release | Fling wrecking ball |
-| **RESET** | Rebuild stage |
-| **NEXT** | Next stage |
-
-## Goal
-Destroy **≥ 62%** of the blocks (fallen / tipped / off-side) before shots run out.
+Wrecking-ball + **TNT** demolition with **real material fracture physics**.
 
 ## Materials
-- **B** brick · **C** concrete · **G** glass · **W** wood · **S** steel
+| Block | Failure mode |
+|--------|----------------|
+| **G** glass | Tension shatter → many shards |
+| **W** wood | Shock split along grain |
+| **C** concrete | Compression-strong; **spalls** in tension/blast |
+| **S** steel | **Ductile bend** absorbs energy; snaps only at extreme load |
+| **B** brick | Brittle crumble |
+
+TNT uses **4184 J/g** (1 ton = 4.184×10⁹ J) with Kinney–Graham-style blast falloff.
+
+## Install
+1. Unzip `Demolition-COPY-PASTE.zip`
+2. Copy **`Demolition.codea`** → **On My iPad → Codea**
+3. Play
+
+Buffers (order): `Materials`, `Levels`, `Main`.
+
+## Controls
+Drag ball · **TNT** button · **RESET** / **NEXT**  
+Clear **≥ 62%** broken/fallen blocks.

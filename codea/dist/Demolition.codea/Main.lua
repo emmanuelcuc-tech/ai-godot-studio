@@ -1,40 +1,46 @@
 -- Demolition
--- Codea (classic API): slingshot a wrecking ball into brick towers.
--- Knock the structure down. Clear the quota to finish the stage.
+-- Codea: wrecking-ball + TNT demolition with real material fracture physics.
+-- Glass shatters, wood splits on shock, concrete spalls, steel bends (ductile).
+-- TNT: 4184 J/g reference, Kinney–Graham-style blast falloff.
 --
 -- Controls:
---   Drag back from the ball — pull the slingshot
---   Release — fling the wrecking ball
---   RESET — rebuild the stage
---   NEXT — skip to next stage (after clear, tap also advances)
+--   Drag ball back · release to fling
+--   TNT button — place a charge on the structure (then auto-detonates)
+--   RESET / NEXT
 
 DISPLAYED_NAME = "Demolition"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 SHOTS_PER_STAGE = 4
 BLOCK = 36
 BALL_R = 22
 WIN_RATIO = 0.62
+TNT_GRAMS = 25 -- stick-scale charge (game); energy from Materials.TNT_J_PER_G
 
 state = "aim" -- aim | flying | settled | won | lost
 levelIndex = 1
 shotsLeft = SHOTS_PER_STAGE
+tntLeft = 1
 score = 0
 message = ""
 messageTimer = 0
 
 ground = nil
 blocks = {}
+debris = {}
 ball = nil
 anchor = nil
 particles = {}
+cracks = {} -- visual crack lines {x,y,ang,life,col}
+charges = {} -- armed TNT {x,y,fuse,grams}
 dragging = false
 dragStart = nil
 dragNow = nil
 settleTimer = 0
 initialBlockCount = 0
-resetBtn = { w = 130, h = 50 }
-nextBtn = { w = 130, h = 50 }
+resetBtn = { w = 130, h = 48 }
+nextBtn = { w = 130, h = 48 }
+tntBtn = { w = 130, h = 48 }
 floorY = 70
 
 function setup()
@@ -42,6 +48,7 @@ function setup()
     displayMode(FULLSCREEN_NO_BUTTONS)
 
     parameter.integer("Level", 1, Levels.count(), 1)
+    parameter.number("TNT_Grams", 5, 200, TNT_GRAMS)
     parameter.action("Restart Stage", function()
         levelIndex = Level
         startLevel(levelIndex)
@@ -49,9 +56,12 @@ function setup()
     parameter.action("Next Stage", function()
         advanceLevel()
     end)
+    parameter.action("Detonate TNT", function()
+        placeTNT()
+    end)
 
     physics.continuous = true
-    physics.iterations(14, 10)
+    physics.iterations(16, 12)
     physics.gravity(0, -980)
 
     startLevel(levelIndex)
@@ -67,16 +77,25 @@ function advanceLevel()
     startLevel(levelIndex)
 end
 
+function destroyList(list, field)
+    for _, item in ipairs(list) do
+        local body = field and item[field] or item.body
+        if body and body.destroy then body:destroy() end
+    end
+end
+
 function clearWorld()
     physics.pause()
     if ball then ball:destroy(); ball = nil end
     if ground then ground:destroy(); ground = nil end
     if anchor then anchor:destroy(); anchor = nil end
-    for _, b in ipairs(blocks) do
-        if b.body then b.body:destroy() end
-    end
+    destroyList(blocks, "body")
+    destroyList(debris, "body")
     blocks = {}
+    debris = {}
     particles = {}
+    cracks = {}
+    charges = {}
     physics.resume()
 end
 
@@ -87,6 +106,8 @@ function startLevel(index)
     clearWorld()
 
     shotsLeft = data.shots or SHOTS_PER_STAGE
+    tntLeft = data.tnt or 1
+    TNT_GRAMS = TNT_Grams or TNT_GRAMS
     score = 0
     state = "aim"
     dragging = false
@@ -96,7 +117,6 @@ function startLevel(index)
     messageTimer = 2.5
 
     floorY = 70
-    -- Ground
     local gw, gh = WIDTH + 200, 40
     ground = physics.body(POLYGON,
         vec2(-gw * 0.5, -gh * 0.5),
@@ -110,12 +130,9 @@ function startLevel(index)
     ground.restitution = 0.05
     ground.info = "ground"
 
-    -- Left backstop so ball doesn't fly forever left
     anchor = physics.body(POLYGON,
-        vec2(-20, -HEIGHT),
-        vec2(20, -HEIGHT),
-        vec2(20, HEIGHT),
-        vec2(-20, HEIGHT))
+        vec2(-20, -HEIGHT), vec2(20, -HEIGHT),
+        vec2(20, HEIGHT), vec2(-20, HEIGHT))
     anchor.x = -30
     anchor.y = HEIGHT * 0.5
     anchor.type = STATIC
@@ -140,7 +157,8 @@ function buildStructure(data)
         for c = 1, cols do
             local ch = line:sub(c, c)
             if ch ~= "." and ch ~= " " then
-                local kind = blockKind(ch)
+                local id = Materials.fromChar(ch)
+                local mat = Materials.get(id)
                 local cx = baseX + (c - (cols + 1) * 0.5) * BLOCK
                 local cy = baseY + rowFromBottom * BLOCK
                 local body = physics.body(POLYGON,
@@ -151,57 +169,28 @@ function buildStructure(data)
                 body.x = cx
                 body.y = cy
                 body.type = DYNAMIC
-                body.density = kind.density
-                body.friction = kind.friction
-                body.restitution = kind.restitution
+                body.density = mat.dens
+                body.friction = mat.friction
+                body.restitution = mat.restitution
                 body.linearDamping = 0.08
                 body.angularDamping = 0.12
                 body.sleepingAllowed = true
                 body.info = "block"
                 table.insert(blocks, {
                     body = body,
-                    kind = kind.id,
-                    color = kind.color,
-                    points = kind.points,
+                    kind = id,
+                    mat = mat,
+                    color = mat.color,
+                    points = mat.points,
                     scored = false,
-                    hp = kind.hp,
+                    broken = false,
+                    integrity = 1,
+                    bent = 0,
+                    crack = 0,
                 })
             end
         end
     end
-end
-
-function blockKind(ch)
-    if ch == "C" then -- concrete
-        return {
-            id = "concrete", density = 1.6, friction = 0.7, restitution = 0.08,
-            color = color(160, 165, 175), points = 40, hp = 2,
-        }
-    elseif ch == "B" then -- brick
-        return {
-            id = "brick", density = 1.2, friction = 0.75, restitution = 0.1,
-            color = color(190, 85, 55), points = 55, hp = 1,
-        }
-    elseif ch == "G" then -- glass
-        return {
-            id = "glass", density = 0.55, friction = 0.2, restitution = 0.05,
-            color = color(140, 210, 230), points = 80, hp = 1,
-        }
-    elseif ch == "S" then -- steel
-        return {
-            id = "steel", density = 2.4, friction = 0.45, restitution = 0.2,
-            color = color(120, 130, 145), points = 30, hp = 3,
-        }
-    elseif ch == "W" then -- wood
-        return {
-            id = "wood", density = 0.7, friction = 0.65, restitution = 0.15,
-            color = color(150, 105, 55), points = 45, hp = 1,
-        }
-    end
-    return {
-        id = "brick", density = 1.2, friction = 0.7, restitution = 0.1,
-        color = color(190, 85, 55), points = 50, hp = 1,
-    }
 end
 
 function spawnBallReady()
@@ -209,7 +198,7 @@ function spawnBallReady()
     ball = physics.body(CIRCLE, BALL_R)
     ball.x = 130
     ball.y = floorY + BALL_R + 8
-    ball.type = DYNAMIC
+    ball.type = STATIC
     ball.density = 3.2
     ball.friction = 0.35
     ball.restitution = 0.35
@@ -218,34 +207,28 @@ function spawnBallReady()
     ball.sleepingAllowed = false
     ball.info = "ball"
     ball.interpolate = true
-    -- Hold still until launch
     ball.linearVelocity = vec2(0, 0)
-    ball.type = STATIC
     state = "aim"
+end
+
+function findBlock(body)
+    for _, b in ipairs(blocks) do
+        if b.body == body then return b end
+    end
+    return nil
 end
 
 function touched(touch)
     local x, y = touch.x, touch.y
 
     if touch.state == ENDED then
-        if hitBtn(resetBtn, x, y) then
-            startLevel(levelIndex)
-            return
-        end
-        if hitBtn(nextBtn, x, y) then
-            if state == "won" or state == "lost" then
-                advanceLevel()
-            else
-                advanceLevel()
-            end
-            return
-        end
+        if hitBtn(resetBtn, x, y) then startLevel(levelIndex); return end
+        if hitBtn(nextBtn, x, y) then advanceLevel(); return end
+        if hitBtn(tntBtn, x, y) then placeTNT(); return end
     end
 
     if state == "won" or state == "lost" then
-        if touch.state == BEGAN then
-            advanceLevel()
-        end
+        if touch.state == BEGAN then advanceLevel() end
         return
     end
 
@@ -267,7 +250,7 @@ function touched(touch)
 end
 
 function hitBtn(btn, x, y)
-    return x >= btn.x and x <= btn.x + btn.w and y >= btn.y and y <= btn.y + btn.h
+    return btn.x and x >= btn.x and x <= btn.x + btn.w and y >= btn.y and y <= btn.y + btn.h
 end
 
 function launchBall()
@@ -296,27 +279,237 @@ function launchBall()
     burst(ball.x, ball.y, color(220, 230, 255), 10)
 end
 
+function placeTNT()
+    if tntLeft <= 0 then
+        message = "No TNT left"
+        messageTimer = 1.2
+        return
+    end
+    if state == "won" or state == "lost" then return end
+
+    -- Place on nearest intact block to structure center
+    local tx = WIDTH * 0.62
+    local ty = floorY + BLOCK * 3
+    local best, bestD = nil, 1e9
+    for _, b in ipairs(blocks) do
+        if b.body and not b.broken then
+            local d = dist(tx, ty, b.body.x, b.body.y)
+            if d < bestD then bestD = d; best = b end
+        end
+    end
+    if not best then return end
+
+    tntLeft = tntLeft - 1
+    local grams = TNT_Grams or TNT_GRAMS
+    table.insert(charges, {
+        x = best.body.x,
+        y = best.body.y,
+        fuse = 0.85,
+        grams = grams,
+    })
+    message = string.format("TNT armed · %.0fg (%.0f kJ)", grams, grams * 4.184)
+    messageTimer = 1.6
+    if state == "aim" then
+        state = "flying"
+        settleTimer = 0
+    end
+end
+
+function detonate(charge)
+    local grams = charge.grams or TNT_GRAMS
+    local tntKg = grams / 1000
+    local yieldJ = grams * Materials.TNT_J_PER_G
+    burst(charge.x, charge.y, color(255, 180, 60), 42)
+    burst(charge.x, charge.y, color(255, 80, 40), 24)
+    message = string.format("BLAST · %.2f MJ", yieldJ / 1e6)
+    messageTimer = 1.4
+
+    -- Flash shockwave ring (visual)
+    table.insert(cracks, {
+        x = charge.x, y = charge.y, ang = 0, life = 0.45,
+        col = color(255, 220, 120), ring = true, r0 = 20,
+    })
+
+    for _, b in ipairs(blocks) do
+        if b.body and not b.broken then
+            local dx = b.body.x - charge.x
+            local dy = b.body.y - charge.y
+            local distPx = math.max(8, math.sqrt(dx * dx + dy * dy))
+            local distM = distPx / 80 -- ~80 px ≈ 1 m game scale
+            local pKpa = Materials.blastImpulseAt(distM, tntKg)
+            local mat = b.mat
+            -- Blast creates rapid compression then tension (spall) — bias tensile
+            local energy = pKpa * 12 * mat.blastWeak
+            local stress = Materials.failureStress(mat, energy, 0.85)
+            -- Impulse shove
+            local inv = distPx
+            local nx, ny = dx / inv, dy / inv
+            local push = pKpa * 2.2 / mat.dens
+            local v = b.body.linearVelocity or vec2(0, 0)
+            b.body.linearVelocity = vec2(v.x + nx * push, v.y + ny * push)
+            b.body.angularVelocity = (b.body.angularVelocity or 0) + (math.random() - 0.5) * pKpa * 0.05
+
+            applyMaterialDamage(b, stress, energy, 0.9, nx, ny)
+        end
+    end
+end
+
 function collide(contact)
     if not contact or not contact.bodyA or not contact.bodyB then return end
     local a = contact.bodyA
     local b = contact.bodyB
     local speed = 0
+    local rvx, rvy = 0, 0
     if a.linearVelocity and b.linearVelocity then
-        local rx = a.linearVelocity.x - b.linearVelocity.x
-        local ry = a.linearVelocity.y - b.linearVelocity.y
-        speed = math.sqrt(rx * rx + ry * ry)
+        rvx = a.linearVelocity.x - b.linearVelocity.x
+        rvy = a.linearVelocity.y - b.linearVelocity.y
+        speed = math.sqrt(rvx * rvx + rvy * rvy)
     end
-    if speed < 180 then return end
+    if speed < 120 then return end
 
     local bx = (a.x + b.x) * 0.5
     local by = (a.y + b.y) * 0.5
-    local col = color(200, 190, 170)
-    if (a.info == "ball" or b.info == "ball") then
-        col = color(255, 220, 120)
-        burst(bx, by, col, 14)
+    local densA = a.density or 1
+    local densB = b.density or 1
+    local energy = Materials.impactEnergy(speed, densA, densB)
+
+    -- Estimate tension factor from impact direction (glancing = more shear/tension)
+    local nx = (b.x - a.x)
+    local ny = (b.y - a.y)
+    local nlen = math.max(1e-3, math.sqrt(nx * nx + ny * ny))
+    nx, ny = nx / nlen, ny / nlen
+    local closing = -(rvx * nx + rvy * ny)
+    local tangential = math.abs(rvx * -ny + rvy * nx)
+    local tensionFactor = 0.35 + 0.5 * (tangential / math.max(1, speed))
+    if a.info == "ball" or b.info == "ball" then
+        tensionFactor = tensionFactor + 0.15
+        burst(bx, by, color(255, 220, 120), 12)
     else
-        burst(bx, by, col, 6)
+        burst(bx, by, color(200, 190, 170), 5)
     end
+
+    local blkA = findBlock(a)
+    local blkB = findBlock(b)
+    if blkA then applyMaterialDamage(blkA, Materials.failureStress(blkA.mat, energy, tensionFactor), energy, tensionFactor, -nx, -ny) end
+    if blkB then applyMaterialDamage(blkB, Materials.failureStress(blkB.mat, energy, tensionFactor), energy, tensionFactor, nx, ny) end
+end
+
+function applyMaterialDamage(blk, stress, energy, tensionFactor, nx, ny)
+    if not blk or blk.broken or not blk.body then return end
+    local mat = blk.mat
+
+    -- Steel: plastic bend absorbs energy instead of shattering
+    if mat.mode == "bend" then
+        local bendAdd = math.min(1, stress * 0.55)
+        blk.bent = math.min(1, blk.bent + bendAdd)
+        blk.integrity = math.max(0.15, 1 - blk.bent * 0.7)
+        -- Soften restitution / add damping as it yields
+        blk.body.restitution = mat.restitution * (1 - blk.bent * 0.5)
+        blk.body.angularDamping = 0.12 + blk.bent * 0.5
+        -- Visual warp via angle nudge
+        blk.body.angularVelocity = (blk.body.angularVelocity or 0) + (math.random() - 0.5) * blk.bent * 3
+        if stress < 1.15 then
+            -- Survives: ductile energy sink
+            score = score + math.floor(mat.points * 0.15 * bendAdd)
+            return
+        end
+        -- Extreme overload finally snaps
+    end
+
+    -- Accumulate crack for brittle materials
+    blk.crack = math.min(1, blk.crack + stress * (1.1 - mat.ductility))
+    blk.integrity = math.max(0, 1 - blk.crack)
+
+    if blk.crack > 0.25 then
+        table.insert(cracks, {
+            x = blk.body.x, y = blk.body.y,
+            ang = math.random() * 180,
+            life = 0.8,
+            col = color(30, 30, 35),
+            ring = false,
+        })
+    end
+
+    local breakThreshold = 0.92
+    if mat.mode == "shatter" then breakThreshold = 0.55 end
+    if mat.mode == "split" then breakThreshold = 0.7 end
+    if mat.mode == "spall" then breakThreshold = 0.75 end
+    if mat.mode == "crumble" then breakThreshold = 0.8 end
+
+    if stress >= breakThreshold or blk.crack >= 1 then
+        fractureBlock(blk, energy, nx or 1, ny or 0)
+    end
+end
+
+function fractureBlock(blk, energy, nx, ny)
+    if blk.broken or not blk.body then return end
+    blk.broken = true
+    blk.scored = true
+    score = score + blk.points
+    local mat = blk.mat
+    local x, y = blk.body.x, blk.body.y
+    local vx = (blk.body.linearVelocity and blk.body.linearVelocity.x) or 0
+    local vy = (blk.body.linearVelocity and blk.body.linearVelocity.y) or 0
+
+    message = string.upper(mat.mode) .. " · " .. mat.label
+    messageTimer = 0.9
+
+    local n = mat.shards
+    if mat.mode == "shatter" then
+        burst(x, y, mat.color, 28)
+        n = n + 3
+    elseif mat.mode == "split" then
+        burst(x, y, mat.color, 14)
+        -- Prefer fragments along grain (horizontal split bias)
+        nx, ny = 1, 0.15
+    elseif mat.mode == "spall" then
+        burst(x, y, color(180, 180, 185), 18)
+    elseif mat.mode == "bend" then
+        burst(x, y, color(160, 170, 190), 10)
+        n = 2
+    else
+        burst(x, y, mat.color, 12)
+    end
+
+    -- Spawn physical debris shards
+    for i = 1, n do
+        local ang = (i / n) * math.pi * 2 + math.random() * 0.4
+        local size = BLOCK * (0.12 + math.random() * 0.22)
+        if mat.mode == "split" then
+            size = BLOCK * (0.2 + (i % 2) * 0.15)
+            ang = (i % 2 == 0) and 0.1 or math.pi + 0.1
+        end
+        local body = physics.body(POLYGON,
+            vec2(-size, -size * 0.7),
+            vec2(size, -size * 0.7),
+            vec2(size, size * 0.7),
+            vec2(-size, size * 0.7))
+        body.x = x + math.cos(ang) * 6
+        body.y = y + math.sin(ang) * 6
+        body.type = DYNAMIC
+        body.density = mat.dens * (mat.mode == "shatter" and 0.7 or 1)
+        body.friction = mat.friction
+        body.restitution = mat.mode == "shatter" and 0.02 or mat.restitution
+        body.linearDamping = 0.1
+        body.angularDamping = 0.08
+        body.info = "debris"
+        local speed = 80 + energy * 0.15 + math.random() * 120
+        if mat.mode == "shatter" then speed = speed * 1.4 end
+        body.linearVelocity = vec2(
+            vx * 0.4 + math.cos(ang) * speed * (0.6 + math.abs(nx)),
+            vy * 0.4 + math.sin(ang) * speed * (0.6 + math.abs(ny))
+        )
+        body.angularVelocity = (math.random() - 0.5) * 14
+        table.insert(debris, {
+            body = body,
+            color = mat.color,
+            kind = mat.mode,
+            life = mat.mode == "shatter" and 4.5 or 8,
+        })
+    end
+
+    blk.body:destroy()
+    blk.body = nil
 end
 
 function draw()
@@ -327,50 +520,84 @@ function draw()
     drawSkyline()
     drawGround()
     drawBlocks()
+    drawDebris()
     drawBall()
     drawSling()
-    drawParticles(dt)
-    updateDemo(dt)
+    drawCharges()
+    updateSim(dt)
+    drawParticles()
+    drawCracks()
     drawHUD()
 
     if messageTimer > 0 then
         messageTimer = messageTimer - dt
-        fontSize(26)
+        fontSize(24)
         fill(255, 235, 200)
         textMode(CENTER)
         text(message, WIDTH * 0.5, HEIGHT * 0.58)
     end
 
     if state == "won" then
-        drawBanner("STRUCTURE DOWN", "Tap for next demolition")
+        drawBanner("STRUCTURE DOWN", "Materials failed · tap for next")
     elseif state == "lost" then
-        drawBanner("STILL STANDING", "Tap to retry stage")
+        drawBanner("STILL STANDING", "Steel held / not enough break")
     elseif state == "aim" then
-        fontSize(16)
+        fontSize(15)
         fill(180, 200, 220)
         textMode(CENTER)
-        text("Drag the ball back · release to fling", WIDTH * 0.28, 130)
+        text("Drag ball · TNT places blast charge", WIDTH * 0.28, 130)
     end
 end
 
-function updateDemo(dt)
+function updateSim(dt)
+    -- TNT fuses
+    local kept = {}
+    for _, c in ipairs(charges) do
+        c.fuse = c.fuse - dt
+        if c.fuse <= 0 then
+            detonate(c)
+        else
+            table.insert(kept, c)
+        end
+    end
+    charges = kept
+
+    -- Crack FX + debris lifetime
+    local nextCracks = {}
+    for _, c in ipairs(cracks) do
+        c.life = c.life - dt
+        if c.ring then c.r0 = (c.r0 or 20) + dt * 420 end
+        if c.life > 0 then table.insert(nextCracks, c) end
+    end
+    cracks = nextCracks
+
+    local nextDebris = {}
+    for _, d in ipairs(debris) do
+        d.life = d.life - dt
+        if d.life <= 0 then
+            if d.body then d.body:destroy() end
+        else
+            table.insert(nextDebris, d)
+        end
+    end
+    debris = nextDebris
+
     updateParticlesOnly(dt)
     if state == "flying" or state == "settled" then
         scoreStandingBlocks()
         if state == "flying" then
-            if ballSleeping() then
+            if ballSleeping() and #charges == 0 then
                 settleTimer = settleTimer + dt
             else
-                settleTimer = 0
+                if #charges > 0 then settleTimer = 0 end
             end
-            if settleTimer > 1.15 then
+            if settleTimer > 1.2 then
                 state = "settled"
                 evaluateStage()
             end
-            -- Ball fell off screen
             if ball and ball.y < -80 then
                 settleTimer = settleTimer + dt
-                if settleTimer > 0.6 then
+                if settleTimer > 0.7 and #charges == 0 then
                     state = "settled"
                     evaluateStage()
                 end
@@ -380,7 +607,7 @@ function updateDemo(dt)
 end
 
 function ballSleeping()
-    if not ball then return true end
+    if not ball or ball.type == STATIC then return true end
     local v = ball.linearVelocity
     if not v then return true end
     local spd = math.sqrt(v.x * v.x + v.y * v.y)
@@ -394,6 +621,8 @@ function scoreStandingBlocks()
             local fallen = b.body.y < floorY + BLOCK * 0.2
                 or math.abs(b.body.angle or 0) > 55
                 or b.body.x < 40 or b.body.x > WIDTH - 20
+            -- Heavily bent steel counts partially destroyed
+            if b.bent and b.bent > 0.85 then fallen = true end
             if fallen then
                 b.scored = true
                 score = score + b.points
@@ -407,7 +636,7 @@ function destructionRatio()
     if initialBlockCount <= 0 then return 1 end
     local down = 0
     for _, b in ipairs(blocks) do
-        if b.scored then down = down + 1 end
+        if b.scored or b.broken then down = down + 1 end
     end
     return down / initialBlockCount
 end
@@ -419,14 +648,13 @@ function evaluateStage()
         message = string.format("Cleared %.0f%%", ratio * 100)
         messageTimer = 2.5
         burst(WIDTH * 0.62, HEIGHT * 0.45, color(255, 200, 80), 36)
-    elseif shotsLeft <= 0 then
+    elseif shotsLeft <= 0 and tntLeft <= 0 then
         state = "lost"
         message = string.format("Only %.0f%% down", ratio * 100)
         messageTimer = 2.5
     else
-        -- Prepare next shot
         spawnBallReady()
-        message = shotsLeft .. " shots left"
+        message = shotsLeft .. " shots · " .. tntLeft .. " TNT"
         messageTimer = 1.4
     end
 end
@@ -458,22 +686,29 @@ end
 function drawBlocks()
     rectMode(CENTER)
     for _, b in ipairs(blocks) do
-        if b.body then
+        if b.body and not b.broken then
             pushMatrix()
             translate(b.body.x, b.body.y)
-            rotate(b.body.angle or 0)
+            local ang = (b.body.angle or 0) + b.bent * 18
+            rotate(ang)
             local c = b.color
-            local a = b.scored and 120 or 255
+            local a = 255 * (0.45 + 0.55 * b.integrity)
             fill(c.r, c.g, c.b, a)
-            rect(0, 0, BLOCK * 0.92, BLOCK * 0.92, 3)
-            -- edge
-            stroke(20, 20, 25, 100)
-            strokeWidth(1)
-            noFill()
-            rect(0, 0, BLOCK * 0.92, BLOCK * 0.92, 3)
-            noStroke()
+            local sx = BLOCK * 0.92 * (1 + b.bent * 0.15)
+            local sy = BLOCK * 0.92 * (1 - b.bent * 0.25)
+            rect(0, 0, sx, sy, 3)
+            -- cracks
+            if b.crack > 0.2 then
+                stroke(25, 25, 30, 180 * b.crack)
+                strokeWidth(1.5)
+                line(-sx * 0.3, -sy * 0.2, sx * 0.25, sy * 0.35)
+                if b.crack > 0.5 then
+                    line(-sx * 0.1, sy * 0.35, sx * 0.35, -sy * 0.15)
+                end
+                noStroke()
+            end
             if b.kind == "glass" then
-                fill(255, 255, 255, 50)
+                fill(255, 255, 255, 55)
                 rect(0, 6, BLOCK * 0.5, 6, 2)
             elseif b.kind == "brick" then
                 stroke(120, 50, 30, 150)
@@ -481,9 +716,35 @@ function drawBlocks()
                 line(-BLOCK * 0.35, 0, BLOCK * 0.35, 0)
                 noStroke()
             elseif b.kind == "steel" then
-                fill(220, 230, 240, 80)
+                fill(220, 230, 240, 70 + b.bent * 40)
                 rect(0, 0, BLOCK * 0.7, 4)
+            elseif b.kind == "wood" then
+                stroke(90, 60, 30, 120)
+                strokeWidth(1)
+                line(-BLOCK * 0.3, -6, BLOCK * 0.3, -6)
+                line(-BLOCK * 0.3, 6, BLOCK * 0.3, 6)
+                noStroke()
+            elseif b.kind == "concrete" then
+                fill(120, 120, 125, 60)
+                ellipse(-6, 4, 5)
+                ellipse(8, -5, 4)
             end
+            popMatrix()
+        end
+    end
+    rectMode(CORNER)
+end
+
+function drawDebris()
+    rectMode(CENTER)
+    for _, d in ipairs(debris) do
+        if d.body then
+            pushMatrix()
+            translate(d.body.x, d.body.y)
+            rotate(d.body.angle or 0)
+            local c = d.color
+            fill(c.r, c.g, c.b, 220)
+            rect(0, 0, 12, 9, 2)
             popMatrix()
         end
     end
@@ -496,7 +757,6 @@ function drawBall()
     if state == "aim" and dragging and dragNow then
         x = dragNow.x
         y = dragNow.y
-        -- visual only while aiming (body stays at rest until launch)
     end
     noStroke()
     fill(40, 45, 55, 80)
@@ -512,7 +772,6 @@ end
 function drawSling()
     if state ~= "aim" or not ball then return end
     local ax, ay = 130, floorY + BALL_R + 8
-    -- posts
     stroke(90, 70, 45)
     strokeWidth(8)
     line(95, floorY, 95, floorY + 110)
@@ -524,12 +783,10 @@ function drawSling()
     local bx, by = ax, ay
     if dragging and dragNow then
         bx, by = dragNow.x, dragNow.y
-        -- rubber bands
         stroke(180, 60, 50)
         strokeWidth(4)
         line(100, floorY + 105, bx, by)
         line(160, floorY + 105, bx, by)
-        -- power ghost
         local pull = vec2(ax - bx, ay - by)
         local power = math.min(980, pull:len() * 3.4)
         local dir = pull:normalize()
@@ -543,6 +800,39 @@ function drawSling()
         line(100, floorY + 105, bx, by)
         line(160, floorY + 105, bx, by)
         noStroke()
+    end
+end
+
+function drawCharges()
+    for _, c in ipairs(charges) do
+        noStroke()
+        fill(40, 90, 45)
+        rectMode(CENTER)
+        rect(c.x, c.y, 22, 28, 3)
+        fill(200, 40, 40)
+        ellipse(c.x, c.y + 16, 8)
+        -- fuse spark
+        if (ElapsedTime * 12) % 2 < 1 then
+            fill(255, 200, 80)
+            ellipse(c.x, c.y + 22, 6)
+        end
+        rectMode(CORNER)
+        fontSize(10)
+        fill(255)
+        textMode(CENTER)
+        text(string.format("%.0fg", c.grams), c.x, c.y - 2)
+    end
+end
+
+function drawCracks()
+    for _, c in ipairs(cracks) do
+        if c.ring then
+            noFill()
+            stroke(c.col.r, c.col.g, c.col.b, 180 * c.life)
+            strokeWidth(3)
+            ellipse(c.x, c.y, c.r0 * 2)
+            noStroke()
+        end
     end
 end
 
@@ -573,8 +863,7 @@ function updateParticlesOnly(dt)
     particles = next
 end
 
-function drawParticles(dt)
-    -- dt handled in updateDemo
+function drawParticles()
     noStroke()
     for _, p in ipairs(particles) do
         local a = math.floor(255 * math.max(0, math.min(1, p.life)))
@@ -584,31 +873,34 @@ function drawParticles(dt)
 end
 
 function drawHUD()
-    fontSize(18)
+    fontSize(16)
     fill(230, 235, 245)
     textMode(CORNER)
-    text("SCORE  " .. score, 20, HEIGHT - 28)
-    text("SHOTS  " .. shotsLeft, 20, HEIGHT - 54)
+    text("SCORE  " .. score, 20, HEIGHT - 26)
+    text("SHOTS  " .. shotsLeft .. "   TNT  " .. tntLeft, 20, HEIGHT - 50)
     textMode(CENTER)
-    text("STAGE  " .. levelIndex .. "/" .. Levels.count() .. "  ·  need " .. math.floor(WIN_RATIO * 100) .. "%", WIDTH * 0.5, HEIGHT - 28)
+    text("STAGE  " .. levelIndex .. "/" .. Levels.count() .. "  ·  need " .. math.floor(WIN_RATIO * 100) .. "%", WIDTH * 0.5, HEIGHT - 26)
     local pct = math.floor(destructionRatio() * 100)
     fill(255, 200, 120)
-    text("DOWN  " .. pct .. "%", WIDTH * 0.5, HEIGHT - 54)
+    text("DOWN  " .. pct .. "%", WIDTH * 0.5, HEIGHT - 50)
 
-    resetBtn.x = WIDTH - 150
-    resetBtn.y = 18
-    nextBtn.x = WIDTH - 150
-    nextBtn.y = 78
+    resetBtn.x = WIDTH - 150; resetBtn.y = 16
+    tntBtn.x = WIDTH - 150; tntBtn.y = 72
+    nextBtn.x = WIDTH - 150; nextBtn.y = 128
     drawBtn(resetBtn, "RESET")
+    drawBtn(tntBtn, "TNT")
     drawBtn(nextBtn, "NEXT")
 end
 
 function drawBtn(btn, label)
     noStroke()
-    fill(45, 52, 68)
+    local bg = 45
+    if label == "TNT" then bg = 70 end
+    fill(bg, 52, 68)
+    if label == "TNT" then fill(70, 95, 55) end
     rect(btn.x, btn.y, btn.w, btn.h, 10)
     fill(220, 230, 245)
-    fontSize(18)
+    fontSize(17)
     textMode(CENTER)
     text(label, btn.x + btn.w * 0.5, btn.y + btn.h * 0.5)
 end
@@ -616,12 +908,12 @@ end
 function drawBanner(title, sub)
     noStroke()
     fill(8, 10, 16, 200)
-    rect(WIDTH * 0.5 - 240, HEIGHT * 0.5 - 70, 480, 140, 16)
-    fontSize(34)
+    rect(WIDTH * 0.5 - 250, HEIGHT * 0.5 - 70, 500, 140, 16)
+    fontSize(32)
     fill(255, 210, 110)
     textMode(CENTER)
     text(title, WIDTH * 0.5, HEIGHT * 0.5 + 18)
-    fontSize(17)
+    fontSize(16)
     fill(180, 200, 220)
     text(sub, WIDTH * 0.5, HEIGHT * 0.5 - 28)
 end
